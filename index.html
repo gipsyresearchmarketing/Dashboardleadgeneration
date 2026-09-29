@@ -1928,7 +1928,16 @@
   <!-- Toast -->
   <div id="toast" class="toast">Saved</div>
 
+  <!-- ===== Supabase config: GANTI anonKey dengan anon/publishable key lu ===== -->
   <script>
+  window.SUPABASE_CONFIG = {
+    url: 'https://ugxrtiitmqrfrdpmcxka.supabase.co',
+    anonKey: 'PASTE_ANON_KEY_HERE'
+  };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- App source: dijalankan oleh bootstrap di bawah setelah data Supabase dimuat -->
+  <script type="text/plain" id="app-src">
   /* ================================================================
    * State + storage
    * ================================================================ */
@@ -5987,6 +5996,126 @@
 
   /* ----- Initial workspace render ----- */
   wsRenderAll();
+  </script>
+  <script>
+  /* ===== Supabase sync layer: localStorage = cache, Supabase = source of truth ===== */
+  (function () {
+    var cfg = window.SUPABASE_CONFIG || {};
+    var sb = null, synced = false;
+    var P = 'leads-dashboard:';
+    var SPECS = [
+      { ls: P + 'v1', table: 'leads', cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at'] },
+      { ls: P + 'activities:v1', table: 'activities', cols: ['id','lead_id','type','title','notes','created_at'] },
+      { ls: P + 'tasks:v1', table: 'tasks', cols: ['id','lead_id','title','due_at','completed','completed_at','notes','created_at'] },
+      { ls: P + 'assets:v1', table: 'assets', cols: ['id','kind','name','url','created_at','last_used'] },
+      { ls: P + 'audiences:v1', table: 'audiences', cols: ['id','name','type','description','lead_ids','created_at','last_used'] },
+      { ls: P + 'blast-email:v1', table: 'blast_drafts', part: 'drafts', channel: 'email', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at'] },
+      { ls: P + 'blast-email:v1', table: 'blast_history', part: 'history', channel: 'email', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] },
+      { ls: P + 'blast-wa:v1', table: 'blast_drafts', part: 'drafts', channel: 'wa', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at'] },
+      { ls: P + 'blast-wa:v1', table: 'blast_history', part: 'history', channel: 'wa', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] }
+    ];
+    var NULLABLE = { last_contacted_at:1, completed_at:1, scheduled_at:1, last_used:1, audience_id:1, lead_id:1 };
+    var known = {}; /* "table|channel" -> array of ids known on server */
+
+    function specKey(s) { return s.table + '|' + (s.channel || ''); }
+    function rowsOf(s, raw) {
+      var d; try { d = JSON.parse(raw); } catch (e) { return null; }
+      if (s.part) d = d && d[s.part];
+      return Array.isArray(d) ? d : null;
+    }
+    function clean(s, r) {
+      var o = {};
+      s.cols.forEach(function (c) {
+        var v = (c === 'channel') ? s.channel : r[c];
+        if (v === undefined) return;
+        if (v === null && !NULLABLE[c]) return;
+        o[c] = v;
+      });
+      if (o.tags !== undefined && !Array.isArray(o.tags)) o.tags = [];
+      return o;
+    }
+    function withTimeout(p, ms) {
+      return Promise.race([p, new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms); })]);
+    }
+
+    async function hydrate() {
+      var blast = {};
+      var results = await withTimeout(Promise.all(SPECS.map(function (s) {
+        var q = sb.from(s.table).select('*');
+        if (s.channel) q = q.eq('channel', s.channel);
+        return q.order('created_at', { ascending: false }).order('id', { ascending: true });
+      })), 10000);
+      results.forEach(function (res) { if (res.error) throw res.error; });
+      SPECS.forEach(function (s, i) {
+        var rows = results[i].data || [];
+        known[specKey(s)] = rows.map(function (r) { return r.id; });
+        if (!rows.length) return;
+        if (s.part) {
+          blast[s.ls] = blast[s.ls] || (function () { try { return JSON.parse(localStorage.getItem(s.ls)) || {}; } catch (e) { return {}; } })();
+          blast[s.ls][s.part] = rows.map(function (r) { var c = Object.assign({}, r); delete c.channel; return c; });
+        } else {
+          localStorage.setItem(s.ls, JSON.stringify(rows));
+        }
+      });
+      Object.keys(blast).forEach(function (k) {
+        var cur = blast[k]; cur.drafts = cur.drafts || []; cur.history = cur.history || [];
+        localStorage.setItem(k, JSON.stringify(cur));
+      });
+    }
+
+    var chains = {}, timers = {};
+    function pushSpec(s, raw) {
+      var rows = rowsOf(s, raw); if (!rows) return;
+      var k = specKey(s);
+      var payload = rows.filter(function (r) { return r && r.id; }).map(function (r) { return clean(s, r); });
+      var ids = payload.map(function (r) { return r.id; });
+      chains[k] = (chains[k] || Promise.resolve()).then(async function () {
+        try {
+          if (payload.length) { var u = await sb.from(s.table).upsert(payload); if (u.error) throw u.error; }
+          var gone = (known[k] || []).filter(function (id) { return ids.indexOf(id) < 0; });
+          if (gone.length) { var d = await sb.from(s.table).delete().in('id', gone); if (d.error) throw d.error; }
+          known[k] = ids;
+        } catch (e) { console.warn('[supabase] sync gagal:', s.table, e.message || e); }
+      });
+    }
+
+    function hookWrites() {
+      var orig = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, val) {
+        orig.call(this, key, val);
+        if (!synced || this !== window.localStorage) return;
+        SPECS.forEach(function (s) {
+          if (s.ls !== key) return;
+          var t = specKey(s);
+          clearTimeout(timers[t]);
+          timers[t] = setTimeout(function () { pushSpec(s, val); }, 400);
+        });
+      };
+    }
+
+    function startApp() {
+      var el = document.createElement('script');
+      el.textContent = document.getElementById('app-src').textContent;
+      document.body.appendChild(el);
+    }
+
+    (async function () {
+      var keyOk = cfg.anonKey && !/PASTE/.test(cfg.anonKey) && window.supabase;
+      if (keyOk) {
+        try {
+          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+          await hydrate();
+          synced = true;
+          hookWrites();
+        } catch (e) {
+          console.warn('[supabase] offline / error, pakai localStorage saja:', e.message || e);
+        }
+      } else {
+        console.warn('[supabase] anonKey belum diisi, pakai localStorage saja.');
+      }
+      startApp();
+    })();
+  })();
   </script>
 </body>
 </html>
