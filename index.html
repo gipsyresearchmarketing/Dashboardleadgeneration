@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Leads Dashboard — Sales Pipeline</title>
 
   <!-- Tailwind via CDN -->
@@ -4461,37 +4464,34 @@
     const color = colors[(e.id || '0').charCodeAt(4) % colors.length];
 
     return '<div style="display:flex;flex-direction:column;height:100%">' +
-      // Header bar (sticky)
-      '<div style="padding:16px 20px;border-bottom:1px solid var(--border);background:white">' +
-        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
-          '<div style="flex:1;min-width:0">' +
-            '<h2 style="font-size:18px;font-weight:700;margin:0 0 6px 0;color:var(--fg);line-height:1.3">' + escapeHTML(e.subject || '(no subject)') + '</h2>' +
-            '<div style="display:flex;align-items:center;gap:10px">' +
-              '<div style="width:36px;height:36px;border-radius:50%;background:' + color + ';color:white;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0">' + escapeHTML(initials) + '</div>' +
-              '<div>' +
-                '<div style="font-size:13px;font-weight:600;color:var(--fg)">' + escapeHTML(e.from_name || e.from_email) + '</div>' +
-                '<div style="font-size:11px;color:var(--muted)">&lt;' + escapeHTML(e.from_email) + '&gt; → &lt;' + escapeHTML(e.to_email) + '&gt;</div>' +
-              '</div>' +
-            '</div>' +
-            '<div style="font-size:11px;color:var(--muted);margin-top:8px">' + dateStr + '</div>' +
-          '</div>' +
-          '<div style="display:flex;gap:4px;flex-shrink:0">' +
-            '<button type="button" data-inbox-action="star" data-id="' + e.id + '" title="' + (e.starred ? 'Unstar' : 'Star') + '" style="padding:6px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:14px">' + (e.starred ? '⭐' : '☆') + '</button>' +
-            '<button type="button" data-inbox-action="archive" data-id="' + e.id + '" title="Archive" style="padding:6px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px">📦</button>' +
-            '<button type="button" data-inbox-action="delete" data-id="' + e.id + '" title="Delete" style="padding:6px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;color:var(--danger)">🗑</button>' +
-          '</div>' +
+      // Compact sender bar (sticky)
+      '<div style="padding:14px 20px;background:white;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f1f5f9">' +
+        '<div style="width:36px;height:36px;border-radius:50%;background:' + color + ';color:white;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0">' + escapeHTML(initials) + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:13px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHTML(e.from_name || e.from_email) + ' <span style="font-weight:400;color:var(--muted);font-size:12px">&lt;' + escapeHTML(e.from_email) + '&gt;</span></div>' +
+          '<div style="font-size:11px;color:var(--muted)">kepada ' + escapeHTML(e.to_email) + ' · ' + dateStr + '</div>' +
         '</div>' +
-        // Link to lead badge
+        '<div style="display:flex;gap:4px;flex-shrink:0">' +
+          '<button type="button" data-inbox-action="star" data-id="' + e.id + '" title="' + (e.starred ? 'Unstar' : 'Star') + '" style="padding:6px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:14px">' + (e.starred ? '⭐' : '☆') + '</button>' +
+          '<button type="button" data-inbox-action="archive" data-id="' + e.id + '" title="Archive" style="padding:6px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px">📦</button>' +
+          '<button type="button" data-inbox-action="delete" data-id="' + e.id + '" title="Delete" style="padding:6px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;color:var(--danger)">🗑</button>' +
+        '</div>' +
+      '</div>' +
+      // Body card (subject + content together)
+      '<div style="flex:1;overflow-y:auto;padding:20px;background:#fafbfc">' +
+        // Link to lead badge (above the card)
         (lead ?
-          '<div style="margin-top:12px;padding:8px 12px;background:#eff6ff;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">' +
-            '<div style="font-size:12px;color:#1e40af">↳ Dari lead: <strong>' + escapeHTML(lead.name) + '</strong> · ' + escapeHTML(lead.company || '') + ' · ' + escapeHTML(lead.email || '') + '</div>' +
+          '<div style="max-width:760px;margin:0 auto 12px auto;padding:8px 12px;background:#eff6ff;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">' +
+            '<div style="font-size:12px;color:#1e40af">↳ Dari lead: <strong>' + escapeHTML(lead.name) + '</strong> · ' + escapeHTML(lead.company || '') + '</div>' +
             '<button type="button" data-inbox-action="open-lead" data-lead-id="' + lead.id + '" style="padding:4px 10px;background:#2563eb;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">Buka Lead →</button>' +
           '</div>'
         : '') +
-      '</div>' +
-      // Body
-      '<div style="flex:1;overflow-y:auto;padding:20px;background:#fafbfc">' +
-        '<div style="background:white;padding:20px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;font-size:14px;line-height:1.65;color:var(--fg);max-width:720px">' + escapeHTML(e.body) + '</div>' +
+        '<div style="background:white;padding:28px 32px;border-radius:8px;border:1px solid var(--border);max-width:760px;margin:0 auto">' +
+          // Subject (big, prominent, integrated with body)
+          '<h2 style="font-size:22px;font-weight:700;margin:0 0 16px 0;color:var(--fg);line-height:1.35;word-wrap:break-word">' + escapeHTML(e.subject || '(no subject)') + '</h2>' +
+          // Body content
+          '<div style="white-space:pre-wrap;font-size:14px;line-height:1.7;color:var(--fg)">' + escapeHTML(e.body) + '</div>' +
+        '</div>' +
         // Attachments
         (e.attachments && e.attachments.length > 0
           ? '<div style="max-width:720px;margin-top:14px">' +
@@ -4511,15 +4511,13 @@
           : '') +
       '</div>' +
       // Reply composer
-      '<div style="padding:14px 20px;border-top:1px solid var(--border);background:white">' +
-        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
-          '<button type="button" data-inbox-action="reply" data-id="' + e.id + '" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">↩ Reply via Email Blast</button>' +
-          '<button type="button" data-inbox-action="create-task" data-id="' + e.id + '" style="padding:8px 14px;background:white;color:var(--fg);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">✓ Create Task</button>' +
-          '<button type="button" data-inbox-action="log-activity" data-id="' + e.id + '" style="padding:8px 14px;background:white;color:var(--fg);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">📝 Log as Activity</button>' +
-          (e.status !== 'replied'
-            ? '<button type="button" data-inbox-action="mark-replied" data-id="' + e.id + '" style="padding:8px 14px;background:white;color:#166534;border:1px solid #86efac;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;margin-left:auto">✓ Mark as Replied</button>'
-            : '<span style="margin-left:auto;font-size:12px;color:#166534;font-weight:600">✓ Sudah dibalas ' + (e.replied_at ? new Date(e.replied_at).toLocaleDateString('id-ID') : '') + '</span>') +
-        '</div>' +
+      '<div style="padding:16px 20px;background:#fafbfc;display:flex;align-items:center;flex-wrap:wrap;gap:8px">' +
+        '<button type="button" data-inbox-action="reply" data-id="' + e.id + '" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">↩ Reply via Email Blast</button>' +
+        '<button type="button" data-inbox-action="create-task" data-id="' + e.id + '" style="padding:8px 14px;background:white;color:var(--fg);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">✓ Create Task</button>' +
+        '<button type="button" data-inbox-action="log-activity" data-id="' + e.id + '" style="padding:8px 14px;background:white;color:var(--fg);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">📝 Log as Activity</button>' +
+        (e.status !== 'replied'
+          ? '<button type="button" data-inbox-action="mark-replied" data-id="' + e.id + '" style="padding:8px 14px;background:white;color:#166534;border:1px solid #86efac;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;margin-left:auto">✓ Mark as Replied</button>'
+          : '<span style="margin-left:auto;font-size:12px;color:#166534;font-weight:600">✓ Sudah dibalas ' + (e.replied_at ? new Date(e.replied_at).toLocaleDateString('id-ID') : '') + '</span>') +
       '</div>' +
     '</div>';
   }
@@ -5569,7 +5567,7 @@
           <button class="blast-tab ${emailBlast.activeTab==='inbox'?'active':''}" data-blast-tab="inbox" data-channel="email">📥 Inbox${(state.inboxEmails||[]).filter(e=>e.status==='unread').length ? ' (' + (state.inboxEmails||[]).filter(e=>e.status==='unread').length + ')' : ''}</button>
           <button class="blast-tab ${emailBlast.activeTab==='compose'?'active':''}" data-blast-tab="compose" data-channel="email">Compose</button>
           <button class="blast-tab ${emailBlast.activeTab==='drafts'?'active':''}" data-blast-tab="drafts" data-channel="email">Drafts (${emailBlast.drafts.length})</button>
-          <button class="blast-tab ${emailBlast.activeTab==='history'?'active':''}" data-blast-tab="history" data-channel="email">History (${emailBlast.history.length})</button>
+          <button class="blast-tab ${emailBlast.activeTab==='history'?'active':''}" data-blast-tab="history" data-channel="email">Sent (${emailBlast.history.length})</button>
         </div>
       </div>
       ${emailBlast.activeTab === 'inbox' ? '<div id="email-inbox-host" style="height:calc(100vh - 220px)"></div>' : emailBlast.activeTab === 'compose' ? renderBlastCanvas({ channel: 'email', mode: 'edit' }) : emailBlast.activeTab === 'drafts' ? renderBlastDrafts(emailBlast, 'email') : renderBlastHistory(emailBlast, 'email')}
