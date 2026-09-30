@@ -1,0 +1,1 @@
+gh repo create leads-crm-dashboard --public --source=. --remote=origin --push
