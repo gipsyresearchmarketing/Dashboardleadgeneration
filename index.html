@@ -1157,9 +1157,16 @@
     .canvas-col .email-card-header .ech-from { font-weight: 600; color: #374151; display: block; margin-bottom: 4px; }
     .canvas-col .email-card-header .ech-subject {
       font-size: 16px; font-weight: 600; color: #111827; line-height: 1.35;
-      word-wrap: break-word;
+      word-wrap: break-word; outline: none; min-height: 22px;
+      padding: 4px 6px; margin-left: -6px; border-radius: 4px;
+      transition: background 120ms;
     }
-    .canvas-col .email-card-header .ech-subject.empty { color: #cbd5e1; font-weight: 500; font-style: italic; }
+    .canvas-col .email-card-header .ech-subject:hover { background: #f8fafc; }
+    .canvas-col .email-card-header .ech-subject:focus { background: #eff6ff; }
+    .canvas-col .email-card-header .ech-subject:empty::before {
+      content: attr(data-placeholder);
+      color: #cbd5e1; font-weight: 500; font-style: italic;
+    }
     .canvas-col .email-card-body {
       padding: 24px 28px; min-height: 240px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -5064,9 +5071,6 @@
           '</select>' +
           '<div class="hub-help">👥 ' + recipientCount + ' recipient' + (recipientCount === 1 ? '' : 's') + ' selected</div>' +
         '</div>' +
-        (isEmail ? '<div><label>Subject</label>' +
-          '<input data-blast-input="subject" class="input" style="font-size:12px;padding:5px 8px" placeholder="Subject line…" value="' + escapeHTML(compose.subject) + '" />' +
-        '</div>' : '') +
         '<div>' +
           '<label>When</label>' +
           '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">' +
@@ -5131,7 +5135,7 @@
         '<div class="email-card-header">' +
           '<span class="ech-from">From: Your Business &lt;hello@business.com&gt;</span>' +
           (isEmail
-            ? '<div class="ech-subject' + (compose.subject ? '' : ' empty') + '">' + escapeHTML(compose.subject || 'Subject line...') + '</div>'
+            ? '<div class="ech-subject" data-blast-input="subject" contenteditable="true" data-placeholder="Subject line...">' + escapeHTML(compose.subject || '') + '</div>'
             : '') +
         '</div>' +
         '<div ' + editableAttr + ' data-blast-input="body" class="email-card-body' + (readOnly ? ' readonly' : '') + '" data-placeholder="Click here and start typing your message…">' + (compose.body || compose.message || '') + '</div>' + (readOnly ? '' :
@@ -5775,11 +5779,30 @@
         const key = inputMap[el.getAttribute('data-blast-input')];
         if (!key) return;
         if (el.isContentEditable) {
-          blastState.compose[key] = el.innerHTML;
+          // Subject is contenteditable but we want plain text (not HTML)
+          if (key === 'subject') {
+            blastState.compose[key] = el.textContent.trim();
+          } else {
+            blastState.compose[key] = el.innerHTML;
+          }
         } else {
           blastState.compose[key] = el.value;
         }
       });
+      // Strip HTML when pasting into subject (plain text only)
+      if (el.isContentEditable && el.getAttribute('data-blast-input') === 'subject') {
+        el.addEventListener('paste', (e) => {
+          e.preventDefault();
+          const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+          document.execCommand('insertText', false, text);
+        });
+        // Prevent Enter from creating line breaks in subject — single line only
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+          }
+        });
+      }
     });
     // Canvas preview-as-recipient toggle (read-only mode)
     document.querySelectorAll('[data-canvas-preview-toggle]').forEach(el => {
