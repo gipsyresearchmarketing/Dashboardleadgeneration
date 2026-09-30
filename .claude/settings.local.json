@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(awk '/^  function renderTable/,/^  }$/' \"/Users/bagas/Documents/Dashboard leads generation/dashboard.html\")",
+      "Bash(awk 'NR==3446,NR==3905' \"/Users/bagas/Documents/Dashboard leads generation/dashboard.html\")"
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+.DS_Store
+*.log
+node_modules/
+.env
+.env.local
+.env.*.local
+.vercel
+dist/
+build/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+Thumbs.db
+
+# Temp
+*.tmp
+*.bak
+
+# Local-only (untracked from earlier Next.js scaffolding)
+app/
+components/
+components.json
+lib/
+next.config.mjs
+package.json
+postcss.config.mjs
+tailwind.config.ts
+tsconfig.json
+dashboard.html.artifact.json
+
+# Skill / prototype exploration files
+.od-skills/
+task-board.html
+Board.png
+Kalender.png
+List.png
+
+# Local helper scripts
+_apply_changes.py
