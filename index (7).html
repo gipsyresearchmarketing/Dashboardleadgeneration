@@ -3,10 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Supabase config: URL needs to be filled in after project is created on supabase.com -->
-  <meta name="supabase-url" content="https://JTxgxH.supabase.co">
-  <meta name="supabase-anon-key" content="sb_publishable_JTxgxH__IgjcJhGkncaIkQ_erJNnZDG">
   <title>Leads Dashboard — Sales Pipeline</title>
 
   <!-- Tailwind via CDN -->
@@ -14,9 +10,6 @@
 
   <!-- Chart.js for visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-  <!-- Supabase JS SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
   <!-- Inter font -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1659,6 +1652,11 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
             Reset
           </button>
+          <button class="btn btn-outline" id="btn-import" title="Import leads dari file CSV">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+            Import CSV
+          </button>
+          <input type="file" id="csv-file" accept=".csv,text/csv" style="display:none" />
           <button class="btn btn-primary" id="btn-add">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Add Lead
@@ -1753,7 +1751,9 @@
                   <th><button class="sort-btn" data-sort="name">Name <span data-arrow="name">↕</span></button></th>
                   <th class="table-hide-mobile">Email / Phone</th>
                   <th>Status</th>
-                  <th class="text-right"><button class="sort-btn" data-sort="sales_value">Potential MRR <span data-arrow="sales_value">�</span></button></th>
+                  <th class="table-hide-mobile">Produk</th>
+                  <th class="table-hide-mobile">Tgl Transaksi</th>
+                  <th class="text-right"><button class="sort-btn" data-sort="sales_value">Nilai <span data-arrow="sales_value">�</span></button></th>
                   <th class="table-hide-mobile"><button class="sort-btn" data-sort="last_contacted_at">Last Contact <span data-arrow="last_contacted_at">↕</span></button></th>
                   <th class="w-12"></th>
                 </tr>
@@ -1935,7 +1935,16 @@
   <!-- Toast -->
   <div id="toast" class="toast">Saved</div>
 
+  <!-- ===== Supabase config: GANTI anonKey dengan anon/publishable key lu ===== -->
   <script>
+  window.SUPABASE_CONFIG = {
+    url: 'https://ugxrtiitmqrfrdpmcxka.supabase.co',
+    anonKey: 'sb_publishable_JTxgxH__IgjcJhGkncaIkQ_erJNnZDG'
+  };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- App source: dijalankan oleh bootstrap di bawah setelah data Supabase dimuat -->
+  <script type="text/plain" id="app-src">
   /* ================================================================
    * State + storage
    * ================================================================ */
@@ -1946,96 +1955,6 @@
   const STORAGE_KEY_BLAST_WA = 'leads-dashboard:blast-wa:v1';
   const STORAGE_KEY_ASSETS = 'leads-dashboard:assets:v1';
   const STORAGE_KEY_AUDIENCES = 'leads-dashboard:audiences:v1';
-
-  // =====================================================
-  // SUPABASE SYNC (optional — falls back to localStorage)
-  // =====================================================
-  // Set SUPABASE_CONFIG to enable cloud sync. When unset/empty, the app runs
-  // in pure-localStorage mode (offline-friendly, demo mode).
-  // Set via: <meta name="supabase-url" content="..."> + anon key OR define
-  // window.SUPABASE_CONFIG = { url, anonKey } before this script runs.
-  window.SUPABASE_CONFIG = (function(){
-    try {
-      if (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) return window.SUPABASE_CONFIG;
-      const urlMeta = document.querySelector('meta[name="supabase-url"]');
-      const keyMeta = document.querySelector('meta[name="supabase-anon-key"]');
-      if (urlMeta && keyMeta) return { url: urlMeta.content, anonKey: keyMeta.content };
-    } catch (e) {}
-    return null;
-  })();
-
-  let _supabase = null;
-  let _supabaseReady = false;
-  function sb() {
-    if (_supabase || !window.SUPABASE_CONFIG) return null;
-    if (!window.supabase) return null;
-    try {
-      _supabase = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
-      _supabaseReady = true;
-    } catch (e) { return null; }
-    return _supabase;
-  }
-
-  // Push current localStorage data to cloud (upsert by id).
-  // Called lazily after each save. Errors are swallowed — localStorage is the
-  // source of truth; cloud is a best-effort mirror.
-  async function sbSync(table, rows) {
-    const s = sb();
-    if (!s) return;
-    try {
-      if (!rows || rows.length === 0) return;
-      const cleaned = rows.map(r => { const o = {...r}; if (Array.isArray(o.tags)) o.tags = o.tags.join(','); return o; });
-      const { error } = await s.from(table).upsert(cleaned, { onConflict: 'id' });
-      if (error) console.warn('sbSync(' + table + ') error:', error.message);
-    } catch (e) { /* offline */ }
-  }
-
-  // Fetch latest version from cloud and merge into localStorage.
-  // Called once at boot for each table. Returns null if no client / offline.
-  async function sbLoad(table) {
-    const s = sb();
-    if (!s) return null;
-    try {
-      const { data, error } = await s.from(table).select('*').order('created_at', { ascending: false });
-      if (error) return null;
-      if (!data) return null;
-      // Normalize: array columns back to arrays
-      return data.map(r => { const o = {...r}; if (typeof o.tags === 'string' && o.tags) o.tags = o.tags.split(',').filter(Boolean); return o; });
-    } catch (e) { return null; }
-  }
-
-  // Resolve which data source to use. Priority: cloud (newest updated_at) > localStorage > mock data.
-  // To keep this initial implementation simple, we ONLY fetch from cloud at boot if
-  // Supabase is configured and reachable; if so, cache the result into localStorage
-  // so subsequent reads use the local (now-cloud-synced) values.
-  let _cloudBootstrapped = false;
-  async function bootstrapFromCloud() {
-    if (_cloudBootstrapped) return;
-    _cloudBootstrapped = true;
-    const s = sb(); if (!s) return;
-
-    const tableMap = [
-      ['leads',             STORAGE_KEY,             MOCK_LEADS],
-      ['activities',        STORAGE_KEY_ACTIVITIES,  MOCK_ACTIVITIES],
-      ['tasks',             STORAGE_KEY_TASKS,       MOCK_TASKS],
-      ['audiences',         STORAGE_KEY_AUDIENCES,   []],
-      ['assets',            STORAGE_KEY_ASSETS,      []],
-    ];
-
-    for (const [tbl, lkey, fallback] of tableMap) {
-      try {
-        const rows = await sbLoad(tbl);
-        if (rows && rows.length) {
-          localStorage.setItem(lkey, JSON.stringify(rows));
-        }
-      } catch (e) {}
-    }
-  }
-  if (window.SUPABASE_CONFIG && window.supabase) bootstrapFromCloud();
-
-  // Async helpers that pair save* calls with cloud push.
-  async function syncTable(table, rows) { return sbSync(table, rows); }
-
 
   const LEAD_STATUSES = [
     'New Lead',
@@ -2126,13 +2045,12 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
+      if (!Array.isArray(parsed)) return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
       // Backfill tags + type on older records
       return parsed.map(l => ({ ...l, tags: l.tags || [], type: l.type || 'company' }));
     } catch { return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] })); }
   }
   function saveLeads(leads) {
-    syncTable('leads', rows).catch(()=>{});
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(leads)); } catch {}
   }
 
@@ -2141,12 +2059,11 @@
       const raw = localStorage.getItem(STORAGE_KEY_ACTIVITIES);
       if (!raw) return [...MOCK_ACTIVITIES];
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return [...MOCK_ACTIVITIES];
+      if (!Array.isArray(parsed)) return [...MOCK_ACTIVITIES];
       return parsed;
     } catch { return [...MOCK_ACTIVITIES]; }
   }
   function saveActivities(items) {
-    syncTable('activities', rows).catch(()=>{});
     try { localStorage.setItem(STORAGE_KEY_ACTIVITIES, JSON.stringify(items)); } catch {}
   }
 
@@ -2155,12 +2072,11 @@
       const raw = localStorage.getItem(STORAGE_KEY_TASKS);
       if (!raw) return [...MOCK_TASKS];
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return [...MOCK_TASKS];
+      if (!Array.isArray(parsed)) return [...MOCK_TASKS];
       return parsed;
     } catch { return [...MOCK_TASKS]; }
   }
   function saveTasks(items) {
-    syncTable('tasks', rows).catch(()=>{});
     try { localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(items)); } catch {}
   }
 
@@ -2173,11 +2089,7 @@
     } catch { return { drafts: [], history: [] }; }
   }
   function saveBlast(key, data) {
-    try { localStorage.setItem(key, JSON.stringify(data)); }
-    const tbl = key === STORAGE_KEY_BLAST_EMAIL ? 'blast_drafts' : 'blast_was_drafts';
-    syncTable(tbl, data.drafts).catch(()=>{});
-    const tblH = key === STORAGE_KEY_BLAST_EMAIL ? 'blast_history' : 'blast_was_history';
-    syncTable(tblH, data.history).catch(()=>{}); catch {}
+    try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
   }
 
   function loadAssets() {
@@ -2189,7 +2101,6 @@
     } catch { return []; }
   }
   function saveAssets(items) {
-    syncTable('assets', rows).catch(()=>{});
     try { localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(items)); } catch {}
   }
 
@@ -2402,7 +2313,6 @@
     } catch { return []; }
   }
   function saveAudiences(list) {
-    syncTable('audiences', rows).catch(()=>{});
     try { localStorage.setItem(STORAGE_KEY_AUDIENCES, JSON.stringify(list)); } catch {}
   }
 
@@ -3051,7 +2961,7 @@
     const body = document.getElementById('table-body');
     if (!body) return;
     if (rows.length === 0) {
-      body.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-sm text-gray-500">No contacts match your filters.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-sm text-gray-500">No contacts match your filters.</td></tr>`;
       return;
     }
 
@@ -3085,6 +2995,8 @@
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
           </button>
         </td>
+        <td class="table-hide-mobile text-sm">${escapeHTML(lead.product_name || '-')}</td>
+        <td class="table-hide-mobile text-gray-500">${lead.transaction_date ? formatDate(lead.transaction_date) : '-'}</td>
         <td class="text-right font-medium tabular-nums">${formatIDR(lead.sales_value)}</td>
         <td class="table-hide-mobile text-gray-500">${formatDate(lead.last_contacted_at)}</td>
         <td class="text-right">
@@ -3852,6 +3764,16 @@
                 <input name="sales_value" type="number" min="0" step="1000000" value="0" class="input" />
               </div>
             </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="label">Nama Produk</label>
+                <input name="product_name" class="input" placeholder="Produk yang dibeli / diminati" />
+              </div>
+              <div>
+                <label class="label">Tanggal Transaksi</label>
+                <input name="transaction_date" type="date" class="input" />
+              </div>
+            </div>
             <div>
               <label class="label">Notes</label>
               <textarea name="notes" rows="3" class="input" placeholder="Apa yang sudah dibahas? Next step apa?"></textarea>
@@ -3877,15 +3799,15 @@
     // Type-driven field label swap + show/hide Tags section for contacts
     const swapLabels = (type) => {
       const labels = {
-        person:  { name: 'Full Name', company: 'Employer / Bisnis (optional)', value: 'Potential MRR (Rp)' },
-        company: { name: 'Primary Contact', company: 'Company Name', value: 'Deal Value (Rp)' },
+        person:  { name: 'Nama Lengkap', company: 'Institusi / Universitas', value: 'Nilai (Rp)' },
+        company: { name: 'Nama Kontak', company: 'Institusi / Universitas', value: 'Nilai (Rp)' },
       };
       const cfg = labels[type];
       document.querySelectorAll('[data-label="name"]').forEach(n => n.textContent = cfg.name);
       document.querySelectorAll('[data-label="company"]').forEach(n => n.textContent = cfg.company);
       document.querySelectorAll('[data-label="value"]').forEach(n => n.textContent = cfg.value);
       document.querySelector('input[name="name"]').placeholder = type === 'person' ? 'Contoh: Andi Saputra' : 'Contoh: Ibu Susi (CFO)';
-      document.querySelector('input[name="company"]').placeholder = type === 'person' ? 'Optional' : 'PT / CV / Nama perusahaan';
+      document.querySelector('input[name="company"]').placeholder = 'Nama institusi / universitas';
       // Hide Tags section for person (Contact) — tags only meaningful for company deals
       const tagsSection = document.getElementById('add-tags-section');
       if (tagsSection) tagsSection.style.display = type === 'person' ? 'none' : '';
@@ -3950,7 +3872,7 @@
       const form = e.target;
       const data = Object.fromEntries(new FormData(form).entries());
       if (!data.name.trim() || !data.company.trim()) {
-        showFormError('Name dan Company wajib diisi.');
+        showFormError('Nama dan Institusi/Universitas wajib diisi.');
         return;
       }
       if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
@@ -3967,6 +3889,8 @@
         status: data.status,
         sales_value: Math.max(0, Number(data.sales_value) || 0),
         notes: data.notes.trim(),
+        product_name: (data.product_name || '').trim(),
+        transaction_date: data.transaction_date || null,
         tags: newTags,
         last_contacted_at: new Date().toISOString(),
       };
@@ -4684,8 +4608,16 @@
           { key: 'text', icon: '📄', label: 'Text' },
           { key: 'image', icon: '🖼️', label: 'Image' },
           { key: 'button', icon: '🔘', label: 'Button' },
+          { key: 'cta-banner', icon: '📣', label: 'CTA Banner' },
+          { key: 'quote', icon: '💬', label: 'Quote' },
+          { key: 'list', icon: '📋', label: 'List' },
+          { key: 'video', icon: '▶️', label: 'Video' },
+          { key: 'social', icon: '🌐', label: 'Social' },
+          { key: 'columns', icon: '⫴', label: 'Columns' },
+          { key: 'html', icon: '🔧', label: 'HTML' },
           { key: 'divider', icon: '➖', label: 'Divider' },
           { key: 'spacer', icon: '⇕', label: 'Spacer' },
+          { key: 'footer', icon: '🦶', label: 'Footer' },
           { key: 'library', icon: '📚', label: 'Library', attr: 'data-editor-action="insert-from-library" data-channel="' + channel + '"' },
         ]
       : [
@@ -4817,7 +4749,6 @@
     refreshEmailDropzones();
     setupEmailDragListeners();
     setupImageButtonLiveEditors();
-  }
   }
 
   function renderBlastPreview(blastState, sample, channel) {
@@ -4984,7 +4915,8 @@
       '</div>' +
       '<div class="flex flex-wrap gap-2" style="border-top:1px solid var(--border);padding-top:14px">' +
         '<button class="btn btn-outline" data-blast-action="duplicate-as-draft" data-id="' + h.id + '" data-channel="' + channel + '" style="padding:6px 14px;font-size:12px">📋 Duplicate as Draft</button>' +
-        '<button class="btn btn-outline" data-blast-action="delete-history" data-id="' + h.id + '" style="padding:6px 14px;font-size:12px;color:var(--danger);border-color:#fecaca">🗑 Delete</button>' +
+        '<button class="btn btn-outline" data-blast-action="view-report" data-id="' + h.id + '" data-channel="' + channel + '" style="padding:6px 14px;font-size:12px">📊 View Report</button>' +
+        '<button class="btn btn-outline" data-blast-action="delete-history" data-id="' + h.id + '" data-channel="' + channel + '" style="padding:6px 14px;font-size:12px;color:var(--danger);border-color:#fecaca">🗑 Delete</button>' +
       '</div>' +
     '</div>';
   }
@@ -5157,6 +5089,49 @@
     const sentAt = new Date().toISOString();
     const blastId = 'B-' + Math.floor(Math.random() * 9000 + 1000);
 
+    const recipientCount = compose.recipients.length;
+
+    // Generate plausible metrics (mock — based on typical email benchmarks)
+    function generateMetrics() {
+      if (recipientCount === 0) return null;
+      const deliveryRate = 0.95 + Math.random() * 0.04;
+      const delivered = Math.round(recipientCount * deliveryRate);
+      const openRate = 0.20 + Math.random() * 0.30; // 20-50% open
+      const uniqueOpens = Math.round(delivered * openRate);
+      const totalOpens = Math.round(uniqueOpens * (1.2 + Math.random() * 0.5));
+      const clickRate = 0.05 + Math.random() * 0.20;
+      const clicks = Math.round(uniqueOpens * clickRate);
+      const replyRate = 0.02 + Math.random() * 0.08;
+      const replies = Math.round(uniqueOpens * replyRate);
+      const bounceRate = 1 - deliveryRate;
+      const bounces = recipientCount - delivered;
+      // Opens over time (hourly buckets for last 24h)
+      const opensOverTime = [];
+      const now = Date.now();
+      let remaining = totalOpens;
+      for (let h = 23; h >= 0 && remaining > 0; h--) {
+        const peakBoost = h < 6 ? 0.4 : 1.0;
+        const chunk = Math.round((remaining * peakBoost * (0.3 + Math.random() * 0.15)) / (h < 12 ? 8 : 6));
+        const count = Math.min(remaining, Math.max(0, chunk));
+        if (count > 0) {
+          opensOverTime.push({
+            hour: new Date(now - h * 3600000).toISOString(),
+            count: count,
+          });
+          remaining -= count;
+        }
+      }
+      return {
+        delivered,
+        opens: totalOpens,
+        unique_opens: uniqueOpens,
+        clicks,
+        click_rate: uniqueOpens > 0 ? clicks / uniqueOpens : 0,
+        replies,
+        opens_over_time: opensOverTime,
+      };
+    }
+
     const entry = {
       id: blastId,
       subject: compose.subject || null,
@@ -5164,6 +5139,7 @@
       message: compose.message || null,
       recipients: compose.recipients.map(r => ({ lead_id: r.lead_id })),
       attachments: compose.blocks || [],
+      metrics: isScheduled ? null : generateMetrics(),
       scheduled_at: isScheduled ? compose.scheduled_at : null,
       sent_at: isScheduled ? null : sentAt,
       status: isScheduled ? 'scheduled' : 'sent',
@@ -5204,6 +5180,100 @@
     else renderWaBlastView();
     renderAll();
     toast(isScheduled ? `⏰ ${channel==='email'?'Email':'WA'} Blast scheduled` : `✉ ${channel==='email'?'Email':'WA'} Blast sent ke ${compose.recipients.length} recipient`);
+  }
+
+  /* ====================================================
+   * Campaign report modal (HubSpot-style)
+   * ==================================================== */
+  function renderReportModal(blastId, channel) {
+    const state = channel === 'email' ? emailBlast : waBlast;
+    const h = state.history.find(x => x.id === blastId);
+    if (!h) { toast('Campaign tidak ditemukan'); return; }
+    if (!h.metrics) { toast('Belum ada metrics untuk campaign ini (mungkin masih scheduled)'); return; }
+    const m = h.metrics;
+    const recipientCount = (h.recipients || []).length;
+    const openRate = recipientCount > 0 ? m.unique_opens / recipientCount : 0;
+    const clickRate = m.unique_opens > 0 ? m.clicks / m.unique_opens : 0;
+    const replyRate = m.unique_opens > 0 ? m.replies / m.unique_opens : 0;
+    const bounceRate = recipientCount > 0 ? (m.bounces || 0) / recipientCount : 0;
+
+    const html = '<div class="modal-backdrop" id="report-modal-backdrop" style="z-index:300">' +
+      '<div class="modal" style="max-width:920px;width:95vw;max-height:90vh;overflow-y:auto">' +
+        '<div class="p-5 border-b flex items-center justify-between" style="position:sticky;top:0;background:white;z-index:1">' +
+          '<div>' +
+            '<h2 class="text-lg font-semibold flex items-center gap-2">📊 ' + escapeHTML(h.subject || h.message || "Campaign report") + '</h2>' +
+            '<div class="text-xs text-gray-500 mt-1">' + (channel === "email" ? "Email" : "WhatsApp") + " · " + (h.sent_at ? new Date(h.sent_at).toLocaleString("id-ID") : "—") + '</div>' +
+          '</div>' +
+          '<button id="report-close" class="btn btn-outline" style="padding:6px 14px;font-size:13px">✕ Close</button>' +
+        '</div>' +
+        '<div class="p-5" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">' +
+          statCard("Sent to", recipientCount, "📤", "#6366f1") +
+          statCard("Delivered", m.delivered, "✅", "#10b981") +
+          statCard("Opens", m.unique_opens, "👁", "#f59e0b") +
+          statCard("Clicks", m.clicks, "🖱", "#ec4899") +
+        '</div>' +
+        '<div class="px-5 pb-5" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">' +
+          rateCard("Open rate", (openRate * 100).toFixed(2) + "%", m.unique_opens, recipientCount) +
+          rateCard("Click rate", (clickRate * 100).toFixed(2) + "%", m.clicks, m.unique_opens) +
+          rateCard("Reply rate", (replyRate * 100).toFixed(2) + "%", m.replies, m.unique_opens) +
+          rateCard("Bounce rate", (bounceRate * 100).toFixed(2) + "%", m.bounces || 0, recipientCount) +
+        '</div>' +
+        '<div class="px-5 pb-5">' +
+          '<h3 class="text-sm font-semibold mb-2 text-gray-700">Opens over time (last 24h)</h3>' +
+          '<div style="height:200px;background:#f9fafb;border-radius:8px;padding:12px;display:flex;align-items:flex-end;gap:2px">' +
+            (m.opens_over_time && m.opens_over_time.length > 0 ?
+              m.opens_over_time.slice(-24).map(o => {
+                const maxC = Math.max.apply(null, m.opens_over_time.map(x => x.count));
+                const hh = Math.max(2, (o.count / Math.max(maxC, 1)) * 160);
+                return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end" title="' + o.count + ' opens"><div style="background:#3b82f6;width:100%;height:' + hh + 'px;border-radius:2px 2px 0 0"></div></div>';
+              }).join("")
+            : '<div style="margin:auto;color:#9ca3af">No opens yet</div>') +
+          '</div>' +
+        '</div>' +
+        '<div class="px-5 pb-5">' +
+          '<h3 class="text-sm font-semibold mb-2 text-gray-700">Recipients</h3>' +
+          '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+            '<thead><tr style="text-align:left;border-bottom:1px solid #e5e7eb">' +
+              '<th style="padding:8px">Name</th><th>Email/Phone</th><th>Status</th>' +
+            '</tr></thead><tbody>' +
+              (h.recipients || []).slice(0, 50).map((r, idx) => {
+                const lead = state.leads.find(l => l.id === r.lead_id);
+                if (!lead) return '';
+                const opened = idx < m.unique_opens;
+                const clicked = idx < m.clicks;
+                return '<tr style="border-bottom:1px solid #f3f4f6">' +
+                  '<td style="padding:8px">' + escapeHTML(lead.name) + '</td>' +
+                  '<td style="padding:8px;color:#6b7280">' + escapeHTML(lead.email || lead.phone || "—") + '</td>' +
+                  '<td style="padding:8px">' + (clicked ? "✅ opened, 🖱 clicked" : opened ? "✅ opened" : "✉ sent") + '</td>' +
+                '</tr>';
+              }).join('') +
+            '</tbody></table>' +
+          (h.recipients && h.recipients.length > 50 ? '<div class="text-xs text-gray-500 mt-2">Showing first 50 of ' + h.recipients.length + ' recipients</div>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    function statCard(label, value, icon, color) {
+      return '<div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:14px">' +
+        '<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em">' + icon + ' ' + label + '</div>' +
+        '<div style="font-size:24px;font-weight:600;color:' + color + ';margin-top:4px">' + (value || 0).toLocaleString() + '</div>' +
+      '</div>';
+    }
+    function rateCard(label, pct, numerator, denominator) {
+      const denomLabel = denominator > 0 ? denominator : "—";
+      return '<div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:14px">' +
+        '<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em">' + label + '</div>' +
+        '<div style="font-size:20px;font-weight:600;color:#111827;margin-top:4px">' + pct + '</div>' +
+        '<div style="font-size:10px;color:#9ca3af;margin-top:2px">' + (numerator || 0) + ' of ' + denomLabel + '</div>' +
+      '</div>';
+    }
+
+    const modalHost = document.getElementById('modal-host');
+    modalHost.innerHTML = html;
+    document.getElementById('report-close').addEventListener('click', () => modalHost.innerHTML = '');
+    document.getElementById('report-modal-backdrop').addEventListener('click', (e) => {
+      if (e.target.id === 'report-modal-backdrop') modalHost.innerHTML = '';
+    });
   }
 
   /* ====================================================
@@ -5336,6 +5406,11 @@
    * Wire up all blast actions (event delegation on body)
    * ==================================================== */
   function wireBlastEvents(channel) {
+    /* expose hoisted helpers so setupBlockInteractions() (outside this function) can reach them */
+    window.refreshEmailDropzones = refreshEmailDropzones;
+    window.setupEmailDragListeners = setupEmailDragListeners;
+    window.setupImageButtonLiveEditors = setupImageButtonLiveEditors;
+    window.attachBlockControls = attachBlockControls;
     const blastState = channel === 'email' ? emailBlast : waBlast;
     const storageKey = channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA;
 
@@ -5782,6 +5857,19 @@
             setupImageButtonLiveEditors();
           }
         }
+      } else if (block.dataset.block === 'html') {
+        const htmlEl = block.querySelector('[data-eb-input="html"]');
+        const preview = block.querySelector('.eb-html-preview');
+        const html = htmlEl ? htmlEl.value : '';
+        if (preview) {
+          if (html.trim()) {
+            preview.innerHTML = html;
+            preview.style.color = '';
+          } else {
+            preview.innerHTML = 'HTML preview appears here';
+            preview.style.color = '#64748b';
+          }
+        }
       }
     }
 
@@ -5829,6 +5917,76 @@
         return '<div class="email-block" data-block="heading"><span class="email-block-label">Subheading</span><h3 contenteditable="true" style="font-size:18px;font-weight:600;margin:0;color:#374151">Your subheading</h3></div>';
       } else if (type === 'text') {
         return '<div class="email-block" data-block="text"><span class="email-block-label">Text</span><p contenteditable="true" style="margin:0">Write your message here. Click to edit this paragraph.</p></div>';
+      } else if (type === 'cta-banner') {
+        return '<div class="email-block" data-block="cta-banner" style="background:linear-gradient(135deg,#2563eb 0%,#7c3aed 100%);border-radius:8px;padding:24px;text-align:center;margin:8px 0;color:#fff">' +
+          '<div contenteditable="true" style="font-size:20px;font-weight:700;margin-bottom:8px">Special offer just for you!</div>' +
+          '<div contenteditable="true" style="font-size:14px;margin-bottom:14px;opacity:0.95">Save 20% when you upgrade this week.</div>' +
+          '<a contenteditable="true" href="https://example.com" style="display:inline-block;background:#fff;color:#2563eb;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">Claim Discount →</a>' +
+        '</div>';
+      } else if (type === 'quote') {
+        return '<div class="email-block" data-block="quote" style="border-left:4px solid #2563eb;background:#eff6ff;padding:14px 18px;margin:8px 0;border-radius:0 6px 6px 0">' +
+          '<div contenteditable="true" style="font-size:15px;font-style:italic;color:#1e3a8a;margin-bottom:6px">"This product completely changed how we work."</div>' +
+          '<div contenteditable="true" style="font-size:13px;color:#64748b;font-weight:600">— Jane Doe, CEO of Acme</div>' +
+        '</div>';
+      } else if (type === 'list') {
+        return '<div class="email-block" data-block="list" style="margin:8px 0">' +
+          '<div contenteditable="true" style="font-size:14px">' +
+            '<ul style="margin:0;padding-left:20px;line-height:1.8">' +
+              '<li>First benefit or feature</li>' +
+              '<li>Second benefit or feature</li>' +
+              '<li>Third benefit or feature</li>' +
+            '</ul>' +
+          '</div>' +
+        '</div>';
+      } else if (type === 'video') {
+        return '<div class="email-block" data-block="video" style="text-align:center;margin:8px 0">' +
+          '<div style="position:relative;background:linear-gradient(135deg,#1e293b,#475569);border-radius:8px;padding:40px 20px;color:#fff;cursor:pointer">' +
+            '<div style="font-size:48px;margin-bottom:8px">▶️</div>' +
+            '<div contenteditable="true" style="font-size:14px;font-weight:600">Watch our 2-min demo</div>' +
+          '</div>' +
+          '<div class="eb-controls" style="margin-top:6px">' +
+            '<input data-eb-input="href" style="width:80%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Video URL (YouTube, Vimeo, Loom...)" />' +
+          '</div>' +
+        '</div>';
+      } else if (type === 'social') {
+        return '<div class="email-block" data-block="social" style="text-align:center;margin:8px 0">' +
+          '<div contenteditable="true" style="font-size:13px;color:#64748b;margin-bottom:8px">Follow us</div>' +
+          '<div style="display:flex;gap:10px;justify-content:center;align-items:center">' +
+            '<a href="https://twitter.com" title="Twitter" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#1da1f2;color:#fff;border-radius:50%;text-decoration:none;font-weight:700">𝕏</a>' +
+            '<a href="https://facebook.com" title="Facebook" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#1877f2;color:#fff;border-radius:50%;text-decoration:none;font-weight:700">f</a>' +
+            '<a href="https://instagram.com" title="Instagram" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;border-radius:50%;text-decoration:none;font-weight:700">◉</a>' +
+            '<a href="https://linkedin.com" title="LinkedIn" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#0a66c2;color:#fff;border-radius:50%;text-decoration:none;font-weight:700">in</a>' +
+            '<a href="https://youtube.com" title="YouTube" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#ff0000;color:#fff;border-radius:50%;text-decoration:none;font-weight:700">▶</a>' +
+          '</div>' +
+        '</div>';
+      } else if (type === 'columns') {
+        return '<div class="email-block" data-block="columns" style="margin:8px 0">' +
+          '<table style="width:100%;border-collapse:collapse">' +
+            '<tr>' +
+              '<td style="width:50%;padding:8px;vertical-align:top">' +
+                '<div contenteditable="true" style="font-size:13px;color:#374151;line-height:1.5">Left column content. Edit me!</div>' +
+              '</td>' +
+              '<td style="width:50%;padding:8px;vertical-align:top;border-left:1px solid #e5e7eb">' +
+                '<div contenteditable="true" style="font-size:13px;color:#374151;line-height:1.5">Right column content. Edit me!</div>' +
+              '</td>' +
+            '</tr>' +
+          '</table>' +
+        '</div>';
+      } else if (type === 'html') {
+        return '<div class="email-block" data-block="html" contenteditable="false" style="margin:8px 0;border:1px dashed #cbd5e1;border-radius:6px;padding:8px;background:#f8fafc">' +
+          '<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;font-weight:600">HTML block</div>' +
+          '<textarea data-eb-input="html" style="width:100%;min-height:80px;font-family:monospace;font-size:12px;padding:6px;border:1px solid #e2e8f0;border-radius:4px;background:#fff" placeholder="<div>Paste raw HTML here...</div>"></textarea>' +
+          '<div class="eb-html-preview" style="margin-top:6px;padding:8px;background:#fff;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;color:#64748b">HTML preview appears here</div>' +
+        '</div>';
+      } else if (type === 'footer') {
+        return '<div class="email-block" data-block="footer" style="margin:8px 0;padding:14px;background:#f8fafc;border-radius:6px;text-align:center">' +
+          '<div contenteditable="true" style="font-size:12px;color:#64748b;line-height:1.6">' +
+            '© 2026 Your Company. All rights reserved.<br>' +
+            '<a href="#" style="color:#2563eb;text-decoration:none">Unsubscribe</a> · ' +
+            '<a href="#" style="color:#2563eb;text-decoration:none">Update preferences</a> · ' +
+            '<a href="#" style="color:#2563eb;text-decoration:none">View in browser</a>' +
+          '</div>' +
+        '</div>';
       }
       return null;
     }
@@ -6071,6 +6229,16 @@
       if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
       toast('History deleted');
     }));
+    // View Report (campaign analytics modal)
+    document.querySelectorAll('[data-blast-action="view-report"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        // Channel comes from data-channel on the parent or fallback to email
+        const channelEl = btn.closest('[data-channel]');
+        const ch = channelEl ? channelEl.getAttribute('data-channel') : 'email';
+        renderReportModal(id, ch);
+      });
+    });
   }
 
   // Delegate document-level click for blast actions (re-wires after each re-render)
@@ -6091,8 +6259,302 @@
   renderEmailBlastView();
   renderWaBlastView();
 
+  /* ================================================================
+   * Import leads dari CSV
+   * ================================================================ */
+  (function () {
+    function parseCSV(text) {
+      text = text.replace(/^\uFEFF/, '');
+      const first = text.split(/\r?\n/, 1)[0] || '';
+      const delim = (first.split(';').length > first.split(',').length) ? ';' : ',';
+      const rows = []; let row = [], cur = '', q = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (q) {
+          if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+          else cur += c;
+        } else if (c === '"') q = true;
+        else if (c === delim) { row.push(cur); cur = ''; }
+        else if (c === '\n' || c === '\r') {
+          if (c === '\r' && text[i + 1] === '\n') i++;
+          row.push(cur); cur = ''; rows.push(row); row = [];
+        } else cur += c;
+      }
+      if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+      return rows.filter(r => r.some(x => String(x).trim() !== ''));
+    }
+
+    const ALIAS = {
+      id: ['id'], type: ['type', 'tipe', 'jenis'],
+      name: ['name', 'nama', 'nama lengkap', 'full name', 'contact', 'kontak'],
+      company: ['company', 'perusahaan', 'nama perusahaan', 'organisasi', 'bisnis', 'company/kampus', 'company / kampus', 'institusi/universitas', 'institusi / universitas', 'perusahaan/kampus', 'kampus', 'universitas', 'instansi', 'asal instansi', 'sekolah', 'institusi'],
+      email: ['email', 'e-mail', 'surel'],
+      phone: ['phone', 'telepon', 'telp', 'hp', 'no hp', 'no. hp', 'nomor hp', 'whatsapp', 'wa', 'no wa', 'mobile', 'no telepon', 'no. telepon', 'nomor telepon', 'no whatsapp', 'nomor whatsapp', 'no. wa'],
+      status: ['status', 'tahap', 'stage'],
+      sales_value: ['sales_value', 'sales value', 'value', 'nilai', 'nilai deal', 'deal value', 'omzet', 'nilai sales', 'nilai penjualan', 'nilai transaksi', 'harga'],
+      notes: ['notes', 'note', 'catatan', 'keterangan'],
+      tags: ['tags', 'tag', 'label'],
+      product_name: ['nama produk', 'produk', 'product', 'product name', 'product_name', 'paket', 'layanan'],
+      transaction_date: ['tanggal transaksi', 'tgl transaksi', 'tanggal', 'tgl', 'transaction date', 'transaction_date', 'date', 'tanggal beli']
+    };
+    function mapHeaders(hdr) {
+      const idx = {};
+      hdr.forEach((h, i) => {
+        const k = String(h).trim().toLowerCase();
+        Object.keys(ALIAS).forEach(f => { if (idx[f] === undefined && ALIAS[f].indexOf(k) >= 0) idx[f] = i; });
+      });
+      return idx;
+    }
+    function normStatus(v) {
+      const t = String(v || '').trim().toLowerCase();
+      if (!t) return 'New Lead';
+      const hit = LEAD_STATUSES.find(x => x.toLowerCase() === t);
+      if (hit) return hit;
+      if (/^(new|baru)/.test(t)) return 'New Lead';
+      if (/(whatsapp|wa)/.test(t)) return 'Followed Up (WhatsApp)';
+      if (/(email|mail)/.test(t)) return 'Followed Up (Email)';
+      if (/(nego)/.test(t)) return 'In Negotiation';
+      if (/(won|menang|closing|deal|sales)/.test(t)) return 'Won/Sales';
+      if (/(lost|kalah|batal|gagal)/.test(t)) return 'Lost';
+      return 'New Lead';
+    }
+
+    const BULAN = { jan:1, januari:1, feb:2, februari:2, mar:3, maret:3, apr:4, april:4, mei:5, may:5, jun:6, juni:6, jul:7, juli:7, agu:8, agt:8, agustus:8, aug:8, sep:9, september:9, okt:10, oktober:10, oct:10, nov:11, november:11, des:12, desember:12, dec:12 };
+    function normDate(v) {
+      v = String(v || '').trim(); if (!v) return null;
+      const pad = n => String(n).padStart(2, '0'); let y, m, d, x;
+      if ((x = v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) { y = +x[1]; m = +x[2]; d = +x[3]; }
+      else if ((x = v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/))) { d = +x[1]; m = +x[2]; y = +x[3]; if (y < 100) y += 2000; }
+      else if ((x = v.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/)) && BULAN[x[2].toLowerCase()]) { d = +x[1]; m = BULAN[x[2].toLowerCase()]; y = +x[3]; }
+      else return null;
+      if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+      return y + '-' + pad(m) + '-' + pad(d);
+    }
+    function importRows(rows) {
+      const idx = mapHeaders(rows[0]);
+      if (idx.name === undefined && idx.company === undefined && idx.email === undefined) {
+        alert('Header CSV tidak dikenali. Minimal harus ada kolom: name (atau nama), company, atau email.');
+        return;
+      }
+      const get = (r, f) => idx[f] === undefined ? '' : String(r[idx[f]] === undefined ? '' : r[idx[f]]).trim();
+      const used = new Set(state.leads.map(l => l.id));
+      const out = []; let skipped = 0;
+      rows.slice(1).forEach((r, n) => {
+        const name = get(r, 'name'), company = get(r, 'company'), email = get(r, 'email');
+        if (!name && !company && !email) { skipped++; return; }
+        let id = get(r, 'id');
+        if (!id || used.has(id)) id = 'L-' + Date.now().toString(36).toUpperCase() + '-' + (n + 1);
+        used.add(id);
+        const t = get(r, 'type').toLowerCase();
+        const type = (t === 'person' || t === 'company') ? t : (company ? 'company' : 'person');
+        out.push({
+          id: id, type: type, name: name || company, company: company, email: email,
+          phone: get(r, 'phone'), status: normStatus(get(r, 'status')),
+          sales_value: Math.max(0, parseInt(get(r, 'sales_value').replace(/[^\d]/g, ''), 10) || 0),
+          notes: get(r, 'notes'),
+          product_name: get(r, 'product_name'),
+          transaction_date: normDate(get(r, 'transaction_date')),
+          tags: get(r, 'tags').split(/[;|,]/).map(x => x.trim()).filter(Boolean),
+          last_contacted_at: new Date().toISOString()
+        });
+      });
+      if (!out.length) { alert('Tidak ada baris valid untuk diimport.'); return; }
+      if (!confirm('Import ' + out.length + ' lead' + (skipped ? ' (' + skipped + ' baris kosong dilewati)' : '') + '?')) return;
+      let replace = false;
+      if (state.leads.length) {
+        replace = confirm('Sudah ada ' + state.leads.length + ' lead di dashboard.\n\nOK = HAPUS semua lead lama dan ganti dengan hasil import\nCancel = gabungkan (tambahkan ke data yang ada)');
+      }
+      state.leads = replace ? out : out.concat(state.leads);
+      saveLeads(state.leads);
+      renderAll();
+      toast(out.length + ' lead diimport');
+    }
+
+    const btn = document.getElementById('btn-import');
+    const inp = document.getElementById('csv-file');
+    btn.addEventListener('click', () => inp.click());
+    inp.addEventListener('change', () => {
+      const f = inp.files && inp.files[0]; if (!f) return;
+      const fr = new FileReader();
+      fr.onload = () => {
+        try { const rows = parseCSV(String(fr.result)); if (rows.length < 2) { alert('File CSV kosong atau hanya berisi header.'); } else importRows(rows); }
+        catch (e) { alert('Gagal membaca CSV: ' + e.message); }
+        inp.value = '';
+      };
+      fr.readAsText(f, 'UTF-8');
+    });
+  })();
+
   /* ----- Initial workspace render ----- */
   wsRenderAll();
   </script>
+  <script>
+  /* ===== Supabase sync layer: localStorage = cache, Supabase = source of truth ===== */
+  (function () {
+    var cfg = window.SUPABASE_CONFIG || {};
+    var sb = null, synced = false;
+    var P = 'leads-dashboard:';
+    var SPECS = [
+      { ls: P + 'v1', table: 'leads', cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at','product_name','transaction_date'] },
+      { ls: P + 'activities:v1', table: 'activities', cols: ['id','lead_id','type','title','notes','created_at'] },
+      { ls: P + 'tasks:v1', table: 'tasks', cols: ['id','lead_id','title','due_at','completed','completed_at','notes','created_at'] },
+      { ls: P + 'assets:v1', table: 'assets', cols: ['id','kind','name','url','created_at','last_used'] },
+      { ls: P + 'audiences:v1', table: 'audiences', cols: ['id','name','type','description','lead_ids','created_at','last_used'] },
+      { ls: P + 'blast-email:v1', table: 'blast_drafts', part: 'drafts', channel: 'email', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at'] },
+      { ls: P + 'blast-email:v1', table: 'blast_history', part: 'history', channel: 'email', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] },
+      { ls: P + 'blast-wa:v1', table: 'blast_drafts', part: 'drafts', channel: 'wa', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at'] },
+      { ls: P + 'blast-wa:v1', table: 'blast_history', part: 'history', channel: 'wa', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] }
+    ];
+    var NULLABLE = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, last_used:1, audience_id:1, lead_id:1 };
+    var known = {}; /* "table|channel" -> array of ids known on server */
+
+    function specKey(s) { return s.table + '|' + (s.channel || ''); }
+    function rowsOf(s, raw) {
+      var d; try { d = JSON.parse(raw); } catch (e) { return null; }
+      if (s.part) d = d && d[s.part];
+      return Array.isArray(d) ? d : null;
+    }
+    function clean(s, r) {
+      var o = {};
+      s.cols.forEach(function (c) {
+        var v = (c === 'channel') ? s.channel : r[c];
+        if (v === undefined) return;
+        if (v === null && !NULLABLE[c]) return;
+        o[c] = v;
+      });
+      if (o.tags !== undefined && !Array.isArray(o.tags)) o.tags = [];
+      return o;
+    }
+    function withTimeout(p, ms) {
+      return Promise.race([p, new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms); })]);
+    }
+
+    async function hydrate() {
+      var blast = {};
+      var results = await withTimeout(Promise.all(SPECS.map(function (s) {
+        var q = sb.from(s.table).select('*');
+        if (s.channel) q = q.eq('channel', s.channel);
+        return q.order('created_at', { ascending: false }).order('id', { ascending: true });
+      })), 10000);
+      results.forEach(function (res) { if (res.error) throw res.error; });
+      SPECS.forEach(function (s, i) {
+        var rows = results[i].data || [];
+        known[specKey(s)] = rows.map(function (r) { return r.id; });
+        if (!rows.length) return;
+        if (s.part) {
+          blast[s.ls] = blast[s.ls] || (function () { try { return JSON.parse(localStorage.getItem(s.ls)) || {}; } catch (e) { return {}; } })();
+          blast[s.ls][s.part] = rows.map(function (r) { var c = Object.assign({}, r); delete c.channel; return c; });
+        } else {
+          localStorage.setItem(s.ls, JSON.stringify(rows));
+        }
+      });
+      Object.keys(blast).forEach(function (k) {
+        var cur = blast[k]; cur.drafts = cur.drafts || []; cur.history = cur.history || [];
+        localStorage.setItem(k, JSON.stringify(cur));
+      });
+    }
+
+    var chains = {}, timers = {};
+    function pushSpec(s, raw) {
+      var rows = rowsOf(s, raw); if (!rows) return;
+      var k = specKey(s);
+      var payload = rows.filter(function (r) { return r && r.id; }).map(function (r) { return clean(s, r); });
+      var ids = payload.map(function (r) { return r.id; });
+      chains[k] = (chains[k] || Promise.resolve()).then(async function () {
+        try {
+          if (payload.length) {
+            var u = await sb.from(s.table).upsert(payload);
+            if (u.error && /product_name|transaction_date/.test(u.error.message || '')) {
+              console.warn('[supabase] kolom product_name/transaction_date belum ada di tabel. Jalankan SQL ALTER TABLE dulu.');
+              u = await sb.from(s.table).upsert(payload.map(function (r) { var c = Object.assign({}, r); delete c.product_name; delete c.transaction_date; return c; }));
+            }
+            if (u.error) throw u.error;
+          }
+          var gone = (known[k] || []).filter(function (id) { return ids.indexOf(id) < 0; });
+          if (gone.length) { var d = await sb.from(s.table).delete().in('id', gone); if (d.error) throw d.error; }
+          known[k] = ids;
+        } catch (e) { console.warn('[supabase] sync gagal:', s.table, e.message || e); }
+      });
+    }
+
+    function hookWrites() {
+      var orig = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, val) {
+        orig.call(this, key, val);
+        if (!synced || this !== window.localStorage) return;
+        SPECS.forEach(function (s) {
+          if (s.ls !== key) return;
+          var t = specKey(s);
+          clearTimeout(timers[t]);
+          timers[t] = setTimeout(function () { pushSpec(s, val); }, 400);
+        });
+      };
+    }
+
+    async function ensureLogin() {
+      var cur = await sb.auth.getSession();
+      if (cur.data && cur.data.session) return;
+      await new Promise(function (resolve) {
+        var st = 'width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:10px;font-size:14px;box-sizing:border-box';
+        var ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif';
+        ov.innerHTML = '<form style="background:#fff;padding:28px;border-radius:14px;border:1px solid #e2e8f0;width:min(360px,90vw)">'
+          + '<div style="font-weight:700;font-size:18px;margin-bottom:4px">Leads CRM</div>'
+          + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">Masuk untuk melanjutkan</div>'
+          + '<input name="e" type="email" placeholder="Email" required autocomplete="username" style="' + st + '">'
+          + '<input name="p" type="password" placeholder="Password" required autocomplete="current-password" style="' + st + '">'
+          + '<div data-err style="color:#e11d48;font-size:13px;min-height:18px;margin-bottom:8px"></div>'
+          + '<button type="submit" style="width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;font-size:14px;cursor:pointer">Masuk</button></form>';
+        document.body.appendChild(ov);
+        var f = ov.querySelector('form');
+        f.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          var b = f.querySelector('button'); b.disabled = true;
+          var r = await sb.auth.signInWithPassword({ email: f.querySelector('[name=e]').value.trim(), password: f.querySelector('[name=p]').value });
+          if (r.error) { f.querySelector('[data-err]').textContent = 'Email atau password salah.'; b.disabled = false; return; }
+          ov.remove(); resolve();
+        });
+      });
+    }
+
+    function addLogout() {
+      var b = document.createElement('button');
+      b.textContent = 'Keluar';
+      b.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:9999;padding:6px 12px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;font-size:12px;cursor:pointer;color:#475569';
+      b.addEventListener('click', async function () {
+        await sb.auth.signOut();
+        Object.keys(localStorage).filter(function (k) { return k.indexOf('leads-dashboard:') === 0; }).forEach(function (k) { localStorage.removeItem(k); });
+        location.reload();
+      });
+      document.body.appendChild(b);
+    }
+
+    function startApp() {
+      var el = document.createElement('script');
+      el.textContent = document.getElementById('app-src').textContent;
+      document.body.appendChild(el);
+    }
+
+    (async function () {
+      var keyOk = cfg.anonKey && !/PASTE/.test(cfg.anonKey) && window.supabase;
+      if (keyOk) {
+        try {
+          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+          // Anon-mode: skip login modal (single-user mode — use anon key + RLS allow-all)
+          await hydrate();
+          synced = true;
+          hookWrites();
+        } catch (e) {
+          console.warn('[supabase] offline / error, pakai localStorage saja:', e.message || e);
+        }
+      } else {
+        console.warn('[supabase] anonKey belum diisi, pakai localStorage saja.');
+      }
+      startApp();
+      // No logout button in anon mode (no user session to log out of)
+    })();
+  })();
+  </script>
 </body>
 </html>
+
