@@ -1,3 +1,0 @@
-cd "/Users/bagas/Documents/Dashboard leads generation"
-git commit -m "Add Supabase config (URL + publishable key)"
-git push origin main
