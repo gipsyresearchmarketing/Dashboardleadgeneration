@@ -4721,7 +4721,6 @@
     setupEmailDragListeners();
     setupImageButtonLiveEditors();
   }
-  }
 
   function renderBlastPreview(blastState, sample, channel) {
     if (!sample) {
@@ -5239,6 +5238,11 @@
    * Wire up all blast actions (event delegation on body)
    * ==================================================== */
   function wireBlastEvents(channel) {
+    /* expose hoisted helpers so setupBlockInteractions() (outside this function) can reach them */
+    window.refreshEmailDropzones = refreshEmailDropzones;
+    window.setupEmailDragListeners = setupEmailDragListeners;
+    window.setupImageButtonLiveEditors = setupImageButtonLiveEditors;
+    window.attachBlockControls = attachBlockControls;
     const blastState = channel === 'email' ? emailBlast : waBlast;
     const storageKey = channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA;
 
