@@ -4608,16 +4608,8 @@
           { key: 'text', icon: '📄', label: 'Text' },
           { key: 'image', icon: '🖼️', label: 'Image' },
           { key: 'button', icon: '🔘', label: 'Button' },
-          { key: 'cta-banner', icon: '📣', label: 'CTA Banner' },
-          { key: 'quote', icon: '💬', label: 'Quote' },
-          { key: 'list', icon: '📋', label: 'List' },
-          { key: 'video', icon: '▶️', label: 'Video' },
-          { key: 'social', icon: '🌐', label: 'Social' },
-          { key: 'columns', icon: '⫴', label: 'Columns' },
-          { key: 'html', icon: '🔧', label: 'HTML' },
           { key: 'divider', icon: '➖', label: 'Divider' },
           { key: 'spacer', icon: '⇕', label: 'Spacer' },
-          { key: 'footer', icon: '🦶', label: 'Footer' },
           { key: 'library', icon: '📚', label: 'Library', attr: 'data-editor-action="insert-from-library" data-channel="' + channel + '"' },
         ]
       : [
@@ -4915,8 +4907,7 @@
       '</div>' +
       '<div class="flex flex-wrap gap-2" style="border-top:1px solid var(--border);padding-top:14px">' +
         '<button class="btn btn-outline" data-blast-action="duplicate-as-draft" data-id="' + h.id + '" data-channel="' + channel + '" style="padding:6px 14px;font-size:12px">📋 Duplicate as Draft</button>' +
-        '<button class="btn btn-outline" data-blast-action="view-report" data-id="' + h.id + '" data-channel="' + channel + '" style="padding:6px 14px;font-size:12px">📊 View Report</button>' +
-        '<button class="btn btn-outline" data-blast-action="delete-history" data-id="' + h.id + '" data-channel="' + channel + '" style="padding:6px 14px;font-size:12px;color:var(--danger);border-color:#fecaca">🗑 Delete</button>' +
+        '<button class="btn btn-outline" data-blast-action="delete-history" data-id="' + h.id + '" style="padding:6px 14px;font-size:12px;color:var(--danger);border-color:#fecaca">🗑 Delete</button>' +
       '</div>' +
     '</div>';
   }
@@ -5089,49 +5080,6 @@
     const sentAt = new Date().toISOString();
     const blastId = 'B-' + Math.floor(Math.random() * 9000 + 1000);
 
-    const recipientCount = compose.recipients.length;
-
-    // Generate plausible metrics (mock — based on typical email benchmarks)
-    function generateMetrics() {
-      if (recipientCount === 0) return null;
-      const deliveryRate = 0.95 + Math.random() * 0.04;
-      const delivered = Math.round(recipientCount * deliveryRate);
-      const openRate = 0.20 + Math.random() * 0.30; // 20-50% open
-      const uniqueOpens = Math.round(delivered * openRate);
-      const totalOpens = Math.round(uniqueOpens * (1.2 + Math.random() * 0.5));
-      const clickRate = 0.05 + Math.random() * 0.20;
-      const clicks = Math.round(uniqueOpens * clickRate);
-      const replyRate = 0.02 + Math.random() * 0.08;
-      const replies = Math.round(uniqueOpens * replyRate);
-      const bounceRate = 1 - deliveryRate;
-      const bounces = recipientCount - delivered;
-      // Opens over time (hourly buckets for last 24h)
-      const opensOverTime = [];
-      const now = Date.now();
-      let remaining = totalOpens;
-      for (let h = 23; h >= 0 && remaining > 0; h--) {
-        const peakBoost = h < 6 ? 0.4 : 1.0;
-        const chunk = Math.round((remaining * peakBoost * (0.3 + Math.random() * 0.15)) / (h < 12 ? 8 : 6));
-        const count = Math.min(remaining, Math.max(0, chunk));
-        if (count > 0) {
-          opensOverTime.push({
-            hour: new Date(now - h * 3600000).toISOString(),
-            count: count,
-          });
-          remaining -= count;
-        }
-      }
-      return {
-        delivered,
-        opens: totalOpens,
-        unique_opens: uniqueOpens,
-        clicks,
-        click_rate: uniqueOpens > 0 ? clicks / uniqueOpens : 0,
-        replies,
-        opens_over_time: opensOverTime,
-      };
-    }
-
     const entry = {
       id: blastId,
       subject: compose.subject || null,
@@ -5139,7 +5087,6 @@
       message: compose.message || null,
       recipients: compose.recipients.map(r => ({ lead_id: r.lead_id })),
       attachments: compose.blocks || [],
-      metrics: isScheduled ? null : generateMetrics(),
       scheduled_at: isScheduled ? compose.scheduled_at : null,
       sent_at: isScheduled ? null : sentAt,
       status: isScheduled ? 'scheduled' : 'sent',
@@ -5180,100 +5127,6 @@
     else renderWaBlastView();
     renderAll();
     toast(isScheduled ? `⏰ ${channel==='email'?'Email':'WA'} Blast scheduled` : `✉ ${channel==='email'?'Email':'WA'} Blast sent ke ${compose.recipients.length} recipient`);
-  }
-
-  /* ====================================================
-   * Campaign report modal (HubSpot-style)
-   * ==================================================== */
-  function renderReportModal(blastId, channel) {
-    const state = channel === 'email' ? emailBlast : waBlast;
-    const h = state.history.find(x => x.id === blastId);
-    if (!h) { toast('Campaign tidak ditemukan'); return; }
-    if (!h.metrics) { toast('Belum ada metrics untuk campaign ini (mungkin masih scheduled)'); return; }
-    const m = h.metrics;
-    const recipientCount = (h.recipients || []).length;
-    const openRate = recipientCount > 0 ? m.unique_opens / recipientCount : 0;
-    const clickRate = m.unique_opens > 0 ? m.clicks / m.unique_opens : 0;
-    const replyRate = m.unique_opens > 0 ? m.replies / m.unique_opens : 0;
-    const bounceRate = recipientCount > 0 ? (m.bounces || 0) / recipientCount : 0;
-
-    const html = '<div class="modal-backdrop" id="report-modal-backdrop" style="z-index:300">' +
-      '<div class="modal" style="max-width:920px;width:95vw;max-height:90vh;overflow-y:auto">' +
-        '<div class="p-5 border-b flex items-center justify-between" style="position:sticky;top:0;background:white;z-index:1">' +
-          '<div>' +
-            '<h2 class="text-lg font-semibold flex items-center gap-2">📊 ' + escapeHTML(h.subject || h.message || "Campaign report") + '</h2>' +
-            '<div class="text-xs text-gray-500 mt-1">' + (channel === "email" ? "Email" : "WhatsApp") + " · " + (h.sent_at ? new Date(h.sent_at).toLocaleString("id-ID") : "—") + '</div>' +
-          '</div>' +
-          '<button id="report-close" class="btn btn-outline" style="padding:6px 14px;font-size:13px">✕ Close</button>' +
-        '</div>' +
-        '<div class="p-5" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">' +
-          statCard("Sent to", recipientCount, "📤", "#6366f1") +
-          statCard("Delivered", m.delivered, "✅", "#10b981") +
-          statCard("Opens", m.unique_opens, "👁", "#f59e0b") +
-          statCard("Clicks", m.clicks, "🖱", "#ec4899") +
-        '</div>' +
-        '<div class="px-5 pb-5" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">' +
-          rateCard("Open rate", (openRate * 100).toFixed(2) + "%", m.unique_opens, recipientCount) +
-          rateCard("Click rate", (clickRate * 100).toFixed(2) + "%", m.clicks, m.unique_opens) +
-          rateCard("Reply rate", (replyRate * 100).toFixed(2) + "%", m.replies, m.unique_opens) +
-          rateCard("Bounce rate", (bounceRate * 100).toFixed(2) + "%", m.bounces || 0, recipientCount) +
-        '</div>' +
-        '<div class="px-5 pb-5">' +
-          '<h3 class="text-sm font-semibold mb-2 text-gray-700">Opens over time (last 24h)</h3>' +
-          '<div style="height:200px;background:#f9fafb;border-radius:8px;padding:12px;display:flex;align-items:flex-end;gap:2px">' +
-            (m.opens_over_time && m.opens_over_time.length > 0 ?
-              m.opens_over_time.slice(-24).map(o => {
-                const maxC = Math.max.apply(null, m.opens_over_time.map(x => x.count));
-                const hh = Math.max(2, (o.count / Math.max(maxC, 1)) * 160);
-                return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end" title="' + o.count + ' opens"><div style="background:#3b82f6;width:100%;height:' + hh + 'px;border-radius:2px 2px 0 0"></div></div>';
-              }).join("")
-            : '<div style="margin:auto;color:#9ca3af">No opens yet</div>') +
-          '</div>' +
-        '</div>' +
-        '<div class="px-5 pb-5">' +
-          '<h3 class="text-sm font-semibold mb-2 text-gray-700">Recipients</h3>' +
-          '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
-            '<thead><tr style="text-align:left;border-bottom:1px solid #e5e7eb">' +
-              '<th style="padding:8px">Name</th><th>Email/Phone</th><th>Status</th>' +
-            '</tr></thead><tbody>' +
-              (h.recipients || []).slice(0, 50).map((r, idx) => {
-                const lead = state.leads.find(l => l.id === r.lead_id);
-                if (!lead) return '';
-                const opened = idx < m.unique_opens;
-                const clicked = idx < m.clicks;
-                return '<tr style="border-bottom:1px solid #f3f4f6">' +
-                  '<td style="padding:8px">' + escapeHTML(lead.name) + '</td>' +
-                  '<td style="padding:8px;color:#6b7280">' + escapeHTML(lead.email || lead.phone || "—") + '</td>' +
-                  '<td style="padding:8px">' + (clicked ? "✅ opened, 🖱 clicked" : opened ? "✅ opened" : "✉ sent") + '</td>' +
-                '</tr>';
-              }).join('') +
-            '</tbody></table>' +
-          (h.recipients && h.recipients.length > 50 ? '<div class="text-xs text-gray-500 mt-2">Showing first 50 of ' + h.recipients.length + ' recipients</div>' : '') +
-        '</div>' +
-      '</div>' +
-    '</div>';
-
-    function statCard(label, value, icon, color) {
-      return '<div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:14px">' +
-        '<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em">' + icon + ' ' + label + '</div>' +
-        '<div style="font-size:24px;font-weight:600;color:' + color + ';margin-top:4px">' + (value || 0).toLocaleString() + '</div>' +
-      '</div>';
-    }
-    function rateCard(label, pct, numerator, denominator) {
-      const denomLabel = denominator > 0 ? denominator : "—";
-      return '<div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:14px">' +
-        '<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em">' + label + '</div>' +
-        '<div style="font-size:20px;font-weight:600;color:#111827;margin-top:4px">' + pct + '</div>' +
-        '<div style="font-size:10px;color:#9ca3af;margin-top:2px">' + (numerator || 0) + ' of ' + denomLabel + '</div>' +
-      '</div>';
-    }
-
-    const modalHost = document.getElementById('modal-host');
-    modalHost.innerHTML = html;
-    document.getElementById('report-close').addEventListener('click', () => modalHost.innerHTML = '');
-    document.getElementById('report-modal-backdrop').addEventListener('click', (e) => {
-      if (e.target.id === 'report-modal-backdrop') modalHost.innerHTML = '';
-    });
   }
 
   /* ====================================================
@@ -5857,19 +5710,6 @@
             setupImageButtonLiveEditors();
           }
         }
-      } else if (block.dataset.block === 'html') {
-        const htmlEl = block.querySelector('[data-eb-input="html"]');
-        const preview = block.querySelector('.eb-html-preview');
-        const html = htmlEl ? htmlEl.value : '';
-        if (preview) {
-          if (html.trim()) {
-            preview.innerHTML = html;
-            preview.style.color = '';
-          } else {
-            preview.innerHTML = 'HTML preview appears here';
-            preview.style.color = '#64748b';
-          }
-        }
       }
     }
 
@@ -5917,76 +5757,6 @@
         return '<div class="email-block" data-block="heading"><span class="email-block-label">Subheading</span><h3 contenteditable="true" style="font-size:18px;font-weight:600;margin:0;color:#374151">Your subheading</h3></div>';
       } else if (type === 'text') {
         return '<div class="email-block" data-block="text"><span class="email-block-label">Text</span><p contenteditable="true" style="margin:0">Write your message here. Click to edit this paragraph.</p></div>';
-      } else if (type === 'cta-banner') {
-        return '<div class="email-block" data-block="cta-banner" style="background:linear-gradient(135deg,#2563eb 0%,#7c3aed 100%);border-radius:8px;padding:24px;text-align:center;margin:8px 0;color:#fff">' +
-          '<div contenteditable="true" style="font-size:20px;font-weight:700;margin-bottom:8px">Special offer just for you!</div>' +
-          '<div contenteditable="true" style="font-size:14px;margin-bottom:14px;opacity:0.95">Save 20% when you upgrade this week.</div>' +
-          '<a contenteditable="true" href="https://example.com" style="display:inline-block;background:#fff;color:#2563eb;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">Claim Discount →</a>' +
-        '</div>';
-      } else if (type === 'quote') {
-        return '<div class="email-block" data-block="quote" style="border-left:4px solid #2563eb;background:#eff6ff;padding:14px 18px;margin:8px 0;border-radius:0 6px 6px 0">' +
-          '<div contenteditable="true" style="font-size:15px;font-style:italic;color:#1e3a8a;margin-bottom:6px">"This product completely changed how we work."</div>' +
-          '<div contenteditable="true" style="font-size:13px;color:#64748b;font-weight:600">— Jane Doe, CEO of Acme</div>' +
-        '</div>';
-      } else if (type === 'list') {
-        return '<div class="email-block" data-block="list" style="margin:8px 0">' +
-          '<div contenteditable="true" style="font-size:14px">' +
-            '<ul style="margin:0;padding-left:20px;line-height:1.8">' +
-              '<li>First benefit or feature</li>' +
-              '<li>Second benefit or feature</li>' +
-              '<li>Third benefit or feature</li>' +
-            '</ul>' +
-          '</div>' +
-        '</div>';
-      } else if (type === 'video') {
-        return '<div class="email-block" data-block="video" style="text-align:center;margin:8px 0">' +
-          '<div style="position:relative;background:linear-gradient(135deg,#1e293b,#475569);border-radius:8px;padding:40px 20px;color:#fff;cursor:pointer">' +
-            '<div style="font-size:48px;margin-bottom:8px">▶️</div>' +
-            '<div contenteditable="true" style="font-size:14px;font-weight:600">Watch our 2-min demo</div>' +
-          '</div>' +
-          '<div class="eb-controls" style="margin-top:6px">' +
-            '<input data-eb-input="href" style="width:80%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Video URL (YouTube, Vimeo, Loom...)" />' +
-          '</div>' +
-        '</div>';
-      } else if (type === 'social') {
-        return '<div class="email-block" data-block="social" style="text-align:center;margin:8px 0">' +
-          '<div contenteditable="true" style="font-size:13px;color:#64748b;margin-bottom:8px">Follow us</div>' +
-          '<div style="display:flex;gap:10px;justify-content:center;align-items:center">' +
-            '<a href="https://twitter.com" title="Twitter" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#1da1f2;color:#fff;border-radius:50%;text-decoration:none;font-weight:700">𝕏</a>' +
-            '<a href="https://facebook.com" title="Facebook" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#1877f2;color:#fff;border-radius:50%;text-decoration:none;font-weight:700">f</a>' +
-            '<a href="https://instagram.com" title="Instagram" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;border-radius:50%;text-decoration:none;font-weight:700">◉</a>' +
-            '<a href="https://linkedin.com" title="LinkedIn" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#0a66c2;color:#fff;border-radius:50%;text-decoration:none;font-weight:700">in</a>' +
-            '<a href="https://youtube.com" title="YouTube" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#ff0000;color:#fff;border-radius:50%;text-decoration:none;font-weight:700">▶</a>' +
-          '</div>' +
-        '</div>';
-      } else if (type === 'columns') {
-        return '<div class="email-block" data-block="columns" style="margin:8px 0">' +
-          '<table style="width:100%;border-collapse:collapse">' +
-            '<tr>' +
-              '<td style="width:50%;padding:8px;vertical-align:top">' +
-                '<div contenteditable="true" style="font-size:13px;color:#374151;line-height:1.5">Left column content. Edit me!</div>' +
-              '</td>' +
-              '<td style="width:50%;padding:8px;vertical-align:top;border-left:1px solid #e5e7eb">' +
-                '<div contenteditable="true" style="font-size:13px;color:#374151;line-height:1.5">Right column content. Edit me!</div>' +
-              '</td>' +
-            '</tr>' +
-          '</table>' +
-        '</div>';
-      } else if (type === 'html') {
-        return '<div class="email-block" data-block="html" contenteditable="false" style="margin:8px 0;border:1px dashed #cbd5e1;border-radius:6px;padding:8px;background:#f8fafc">' +
-          '<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;font-weight:600">HTML block</div>' +
-          '<textarea data-eb-input="html" style="width:100%;min-height:80px;font-family:monospace;font-size:12px;padding:6px;border:1px solid #e2e8f0;border-radius:4px;background:#fff" placeholder="<div>Paste raw HTML here...</div>"></textarea>' +
-          '<div class="eb-html-preview" style="margin-top:6px;padding:8px;background:#fff;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;color:#64748b">HTML preview appears here</div>' +
-        '</div>';
-      } else if (type === 'footer') {
-        return '<div class="email-block" data-block="footer" style="margin:8px 0;padding:14px;background:#f8fafc;border-radius:6px;text-align:center">' +
-          '<div contenteditable="true" style="font-size:12px;color:#64748b;line-height:1.6">' +
-            '© 2026 Your Company. All rights reserved.<br>' +
-            '<a href="#" style="color:#2563eb;text-decoration:none">Unsubscribe</a> · ' +
-            '<a href="#" style="color:#2563eb;text-decoration:none">Update preferences</a> · ' +
-            '<a href="#" style="color:#2563eb;text-decoration:none">View in browser</a>' +
-          '</div>' +
-        '</div>';
       }
       return null;
     }
@@ -6229,16 +5999,6 @@
       if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
       toast('History deleted');
     }));
-    // View Report (campaign analytics modal)
-    document.querySelectorAll('[data-blast-action="view-report"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        // Channel comes from data-channel on the parent or fallback to email
-        const channelEl = btn.closest('[data-channel]');
-        const ch = channelEl ? channelEl.getAttribute('data-channel') : 'email';
-        renderReportModal(id, ch);
-      });
-    });
   }
 
   // Delegate document-level click for blast actions (re-wires after each re-render)
@@ -6539,8 +6299,9 @@
       var keyOk = cfg.anonKey && !/PASTE/.test(cfg.anonKey) && window.supabase;
       if (keyOk) {
         try {
-          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
-          // Anon-mode: skip login modal (single-user mode — use anon key + RLS allow-all)
+          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true } });
+          window.__sb = sb; /* dipakai untuk tes & fitur kirim email */
+          await ensureLogin();
           await hydrate();
           synced = true;
           hookWrites();
@@ -6551,10 +6312,9 @@
         console.warn('[supabase] anonKey belum diisi, pakai localStorage saja.');
       }
       startApp();
-      // No logout button in anon mode (no user session to log out of)
+      if (synced) addLogout();
     })();
   })();
   </script>
 </body>
 </html>
-
