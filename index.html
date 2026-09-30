@@ -6300,6 +6300,7 @@
       if (keyOk) {
         try {
           sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true } });
+          window.__sb = sb; /* dipakai untuk tes & fitur kirim email */
           await ensureLogin();
           await hydrate();
           synced = true;
