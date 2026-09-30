@@ -1151,21 +1151,37 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.05), 0 0 0 1px var(--border);
     }
     .canvas-col .email-card-header {
-      padding: 14px 20px 12px 20px; border-bottom: 1px solid #f1f5f9;
-      font-size: 12px; color: #6b7280;
+      padding: 0;
+      font-size: 14px; color: #1f2937;
     }
-    .canvas-col .email-card-header .ech-from { font-weight: 600; color: #374151; display: block; margin-bottom: 4px; }
+    .canvas-col .email-card-header .ech-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 20px; border-bottom: 1px solid #f1f5f9;
+      min-height: 22px;
+    }
+    .canvas-col .email-card-header .ech-row:last-child { border-bottom: none; }
+    .canvas-col .email-card-header .ech-label {
+      flex-shrink: 0; width: 56px;
+      color: #6b7280; font-size: 13px; font-weight: 400;
+    }
+    .canvas-col .email-card-header .ech-to-value {
+      flex: 1; min-width: 0;
+      font-size: 13px; color: #1f2937;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .canvas-col .email-card-header .ech-cc { flex-shrink: 0; display: flex; gap: 0; }
+    .canvas-col .email-card-header .ech-cc button {
+      transition: color 120ms;
+    }
+    .canvas-col .email-card-header .ech-cc button:hover { color: var(--accent); }
     .canvas-col .email-card-header .ech-subject {
-      font-size: 16px; font-weight: 600; color: #111827; line-height: 1.35;
-      word-wrap: break-word; outline: none; min-height: 22px;
-      padding: 4px 6px; margin-left: -6px; border-radius: 4px;
-      transition: background 120ms;
+      flex: 1; font-size: 13px; color: #1f2937;
+      outline: none; min-height: 18px; line-height: 1.4;
     }
-    .canvas-col .email-card-header .ech-subject:hover { background: #f8fafc; }
-    .canvas-col .email-card-header .ech-subject:focus { background: #eff6ff; }
+    .canvas-col .email-card-header .ech-subject:hover { color: #111827; }
     .canvas-col .email-card-header .ech-subject:empty::before {
       content: attr(data-placeholder);
-      color: #cbd5e1; font-weight: 500; font-style: italic;
+      color: #9ca3af; font-weight: 400;
     }
     .canvas-col .email-card-body {
       padding: 24px 28px; min-height: 240px;
@@ -5130,12 +5146,32 @@
           '👁 Preview mode (read-only) — <button type="button" data-canvas-preview-toggle="1" style="background:transparent;border:none;color:#92400e;text-decoration:underline;cursor:pointer">exit preview</button>' +
         '</div>'
       ) +
-      // Email card
+      // Email card (Gmail-style header: To / Cc Bcc / Subject / body)
       '<div class="email-card">' +
         '<div class="email-card-header">' +
-          '<span class="ech-from">From: Your Business &lt;hello@business.com&gt;</span>' +
+          // To row — always show (read-only since recipients managed via sidebar)
+          '<div class="ech-row">' +
+            '<span class="ech-label">To</span>' +
+            '<span class="ech-to-value">' +
+              (compose.loadedAudienceName
+                ? '<strong>' + escapeHTML(compose.loadedAudienceName) + '</strong> <span style="color:var(--muted)">· ' + recipientCount + ' recipient' + (recipientCount === 1 ? '' : 's') + '</span>'
+                : (recipientCount > 0
+                    ? compose.recipients.slice(0, 3).map(r => {
+                        const lead = state.leads.find(l => l.id === r.lead_id);
+                        return lead ? escapeHTML(lead.name) : '?';
+                      }).join(', ') + (recipientCount > 3 ? ' <span style="color:var(--muted)">+ ' + (recipientCount - 3) + ' more</span>' : '')
+                    : '<span style="color:#cbd5e1;font-style:italic">No recipients</span>')) +
+            '</span>' +
+            '<span class="ech-cc">' +
+              '<button type="button" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">Cc</button>' +
+              '<button type="button" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">Bcc</button>' +
+            '</span>' +
+          '</div>' +
+          // Subject row (Gmail-style: subtle, single line, contenteditable)
           (isEmail
-            ? '<div class="ech-subject" data-blast-input="subject" contenteditable="true" data-placeholder="Subject line...">' + escapeHTML(compose.subject || '') + '</div>'
+            ? '<div class="ech-row ech-subject-row">' +
+                '<span class="ech-subject" data-blast-input="subject" contenteditable="true" data-placeholder="Subject">' + escapeHTML(compose.subject || '') + '</span>' +
+              '</div>'
             : '') +
         '</div>' +
         '<div ' + editableAttr + ' data-blast-input="body" class="email-card-body' + (readOnly ? ' readonly' : '') + '" data-placeholder="Click here and start typing your message…">' + (compose.body || compose.message || '') + '</div>' + (readOnly ? '' :
