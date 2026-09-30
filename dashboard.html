@@ -2126,7 +2126,7 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
+      if (!Array.isArray(parsed) || parsed.length === 0) return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
       // Backfill tags + type on older records
       return parsed.map(l => ({ ...l, tags: l.tags || [], type: l.type || 'company' }));
     } catch { return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] })); }
@@ -2141,7 +2141,7 @@
       const raw = localStorage.getItem(STORAGE_KEY_ACTIVITIES);
       if (!raw) return [...MOCK_ACTIVITIES];
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [...MOCK_ACTIVITIES];
+      if (!Array.isArray(parsed) || parsed.length === 0) return [...MOCK_ACTIVITIES];
       return parsed;
     } catch { return [...MOCK_ACTIVITIES]; }
   }
@@ -2155,7 +2155,7 @@
       const raw = localStorage.getItem(STORAGE_KEY_TASKS);
       if (!raw) return [...MOCK_TASKS];
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [...MOCK_TASKS];
+      if (!Array.isArray(parsed) || parsed.length === 0) return [...MOCK_TASKS];
       return parsed;
     } catch { return [...MOCK_TASKS]; }
   }

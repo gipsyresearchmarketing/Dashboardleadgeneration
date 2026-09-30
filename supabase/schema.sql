@@ -161,6 +161,9 @@ CREATE POLICY "anon_all_history"       ON blast_history FOR ALL TO anon USING (t
 -- SEED DATA (Indonesian sample data for demos)
 -- =====================================================
 
+-- Clear existing data first (idempotent re-run)
+TRUNCATE leads, tasks, activities, audiences, assets, blast_drafts, blast_history CASCADE;
+
 -- 20 sample leads (mix of companies and persons across 6 statuses)
 INSERT INTO leads (id, type, name, company, email, phone, status, sales_value, notes, last_contacted_at, tags) VALUES
   ('L-0001','company','Andini Pratiwi','PT Batik Nusantara','andini.pratiwi@batik-nusantara.co.id','+62 812-1101-2233','New Lead',0,'Inbound dari webinar Q3. Tertarik paket Enterprise.','2026-08-18T09:12:00Z', ARRAY['Inbound','Hot']),
