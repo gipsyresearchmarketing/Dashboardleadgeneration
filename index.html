@@ -1751,7 +1751,9 @@
                   <th><button class="sort-btn" data-sort="name">Name <span data-arrow="name">↕</span></button></th>
                   <th class="table-hide-mobile">Email / Phone</th>
                   <th>Status</th>
-                  <th class="text-right"><button class="sort-btn" data-sort="sales_value">Potential MRR <span data-arrow="sales_value">�</span></button></th>
+                  <th class="table-hide-mobile">Produk</th>
+                  <th class="table-hide-mobile">Tgl Transaksi</th>
+                  <th class="text-right"><button class="sort-btn" data-sort="sales_value">Nilai <span data-arrow="sales_value">�</span></button></th>
                   <th class="table-hide-mobile"><button class="sort-btn" data-sort="last_contacted_at">Last Contact <span data-arrow="last_contacted_at">↕</span></button></th>
                   <th class="w-12"></th>
                 </tr>
@@ -2959,7 +2961,7 @@
     const body = document.getElementById('table-body');
     if (!body) return;
     if (rows.length === 0) {
-      body.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-sm text-gray-500">No contacts match your filters.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-sm text-gray-500">No contacts match your filters.</td></tr>`;
       return;
     }
 
@@ -2993,6 +2995,8 @@
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
           </button>
         </td>
+        <td class="table-hide-mobile text-sm">${escapeHTML(lead.product_name || '-')}</td>
+        <td class="table-hide-mobile text-gray-500">${lead.transaction_date ? formatDate(lead.transaction_date) : '-'}</td>
         <td class="text-right font-medium tabular-nums">${formatIDR(lead.sales_value)}</td>
         <td class="table-hide-mobile text-gray-500">${formatDate(lead.last_contacted_at)}</td>
         <td class="text-right">
@@ -3760,6 +3764,16 @@
                 <input name="sales_value" type="number" min="0" step="1000000" value="0" class="input" />
               </div>
             </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="label">Nama Produk</label>
+                <input name="product_name" class="input" placeholder="Produk yang dibeli / diminati" />
+              </div>
+              <div>
+                <label class="label">Tanggal Transaksi</label>
+                <input name="transaction_date" type="date" class="input" />
+              </div>
+            </div>
             <div>
               <label class="label">Notes</label>
               <textarea name="notes" rows="3" class="input" placeholder="Apa yang sudah dibahas? Next step apa?"></textarea>
@@ -3785,15 +3799,15 @@
     // Type-driven field label swap + show/hide Tags section for contacts
     const swapLabels = (type) => {
       const labels = {
-        person:  { name: 'Full Name', company: 'Employer / Bisnis (optional)', value: 'Potential MRR (Rp)' },
-        company: { name: 'Primary Contact', company: 'Company Name', value: 'Deal Value (Rp)' },
+        person:  { name: 'Nama Lengkap', company: 'Institusi / Universitas', value: 'Nilai (Rp)' },
+        company: { name: 'Nama Kontak', company: 'Institusi / Universitas', value: 'Nilai (Rp)' },
       };
       const cfg = labels[type];
       document.querySelectorAll('[data-label="name"]').forEach(n => n.textContent = cfg.name);
       document.querySelectorAll('[data-label="company"]').forEach(n => n.textContent = cfg.company);
       document.querySelectorAll('[data-label="value"]').forEach(n => n.textContent = cfg.value);
       document.querySelector('input[name="name"]').placeholder = type === 'person' ? 'Contoh: Andi Saputra' : 'Contoh: Ibu Susi (CFO)';
-      document.querySelector('input[name="company"]').placeholder = type === 'person' ? 'Optional' : 'PT / CV / Nama perusahaan';
+      document.querySelector('input[name="company"]').placeholder = 'Nama institusi / universitas';
       // Hide Tags section for person (Contact) — tags only meaningful for company deals
       const tagsSection = document.getElementById('add-tags-section');
       if (tagsSection) tagsSection.style.display = type === 'person' ? 'none' : '';
@@ -3858,7 +3872,7 @@
       const form = e.target;
       const data = Object.fromEntries(new FormData(form).entries());
       if (!data.name.trim() || !data.company.trim()) {
-        showFormError('Name dan Company wajib diisi.');
+        showFormError('Nama dan Institusi/Universitas wajib diisi.');
         return;
       }
       if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
@@ -3875,6 +3889,8 @@
         status: data.status,
         sales_value: Math.max(0, Number(data.sales_value) || 0),
         notes: data.notes.trim(),
+        product_name: (data.product_name || '').trim(),
+        transaction_date: data.transaction_date || null,
         tags: newTags,
         last_contacted_at: new Date().toISOString(),
       };
@@ -6031,13 +6047,15 @@
     const ALIAS = {
       id: ['id'], type: ['type', 'tipe', 'jenis'],
       name: ['name', 'nama', 'nama lengkap', 'full name', 'contact', 'kontak'],
-      company: ['company', 'perusahaan', 'nama perusahaan', 'organisasi', 'bisnis'],
+      company: ['company', 'perusahaan', 'nama perusahaan', 'organisasi', 'bisnis', 'company/kampus', 'company / kampus', 'institusi/universitas', 'institusi / universitas', 'perusahaan/kampus', 'kampus', 'universitas', 'instansi', 'asal instansi', 'sekolah', 'institusi'],
       email: ['email', 'e-mail', 'surel'],
-      phone: ['phone', 'telepon', 'telp', 'hp', 'no hp', 'no. hp', 'nomor hp', 'whatsapp', 'wa', 'no wa', 'mobile'],
+      phone: ['phone', 'telepon', 'telp', 'hp', 'no hp', 'no. hp', 'nomor hp', 'whatsapp', 'wa', 'no wa', 'mobile', 'no telepon', 'no. telepon', 'nomor telepon', 'no whatsapp', 'nomor whatsapp', 'no. wa'],
       status: ['status', 'tahap', 'stage'],
-      sales_value: ['sales_value', 'sales value', 'value', 'nilai', 'nilai deal', 'deal value', 'omzet'],
+      sales_value: ['sales_value', 'sales value', 'value', 'nilai', 'nilai deal', 'deal value', 'omzet', 'nilai sales', 'nilai penjualan', 'nilai transaksi', 'harga'],
       notes: ['notes', 'note', 'catatan', 'keterangan'],
-      tags: ['tags', 'tag', 'label']
+      tags: ['tags', 'tag', 'label'],
+      product_name: ['nama produk', 'produk', 'product', 'product name', 'product_name', 'paket', 'layanan'],
+      transaction_date: ['tanggal transaksi', 'tgl transaksi', 'tanggal', 'tgl', 'transaction date', 'transaction_date', 'date', 'tanggal beli']
     };
     function mapHeaders(hdr) {
       const idx = {};
@@ -6061,6 +6079,17 @@
       return 'New Lead';
     }
 
+    const BULAN = { jan:1, januari:1, feb:2, februari:2, mar:3, maret:3, apr:4, april:4, mei:5, may:5, jun:6, juni:6, jul:7, juli:7, agu:8, agt:8, agustus:8, aug:8, sep:9, september:9, okt:10, oktober:10, oct:10, nov:11, november:11, des:12, desember:12, dec:12 };
+    function normDate(v) {
+      v = String(v || '').trim(); if (!v) return null;
+      const pad = n => String(n).padStart(2, '0'); let y, m, d, x;
+      if ((x = v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) { y = +x[1]; m = +x[2]; d = +x[3]; }
+      else if ((x = v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/))) { d = +x[1]; m = +x[2]; y = +x[3]; if (y < 100) y += 2000; }
+      else if ((x = v.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/)) && BULAN[x[2].toLowerCase()]) { d = +x[1]; m = BULAN[x[2].toLowerCase()]; y = +x[3]; }
+      else return null;
+      if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+      return y + '-' + pad(m) + '-' + pad(d);
+    }
     function importRows(rows) {
       const idx = mapHeaders(rows[0]);
       if (idx.name === undefined && idx.company === undefined && idx.email === undefined) {
@@ -6083,6 +6112,8 @@
           phone: get(r, 'phone'), status: normStatus(get(r, 'status')),
           sales_value: Math.max(0, parseInt(get(r, 'sales_value').replace(/[^\d]/g, ''), 10) || 0),
           notes: get(r, 'notes'),
+          product_name: get(r, 'product_name'),
+          transaction_date: normDate(get(r, 'transaction_date')),
           tags: get(r, 'tags').split(/[;|,]/).map(x => x.trim()).filter(Boolean),
           last_contacted_at: new Date().toISOString()
         });
@@ -6124,7 +6155,7 @@
     var sb = null, synced = false;
     var P = 'leads-dashboard:';
     var SPECS = [
-      { ls: P + 'v1', table: 'leads', cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at'] },
+      { ls: P + 'v1', table: 'leads', cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at','product_name','transaction_date'] },
       { ls: P + 'activities:v1', table: 'activities', cols: ['id','lead_id','type','title','notes','created_at'] },
       { ls: P + 'tasks:v1', table: 'tasks', cols: ['id','lead_id','title','due_at','completed','completed_at','notes','created_at'] },
       { ls: P + 'assets:v1', table: 'assets', cols: ['id','kind','name','url','created_at','last_used'] },
@@ -6134,7 +6165,7 @@
       { ls: P + 'blast-wa:v1', table: 'blast_drafts', part: 'drafts', channel: 'wa', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at'] },
       { ls: P + 'blast-wa:v1', table: 'blast_history', part: 'history', channel: 'wa', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] }
     ];
-    var NULLABLE = { last_contacted_at:1, completed_at:1, scheduled_at:1, last_used:1, audience_id:1, lead_id:1 };
+    var NULLABLE = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, last_used:1, audience_id:1, lead_id:1 };
     var known = {}; /* "table|channel" -> array of ids known on server */
 
     function specKey(s) { return s.table + '|' + (s.channel || ''); }
@@ -6191,7 +6222,14 @@
       var ids = payload.map(function (r) { return r.id; });
       chains[k] = (chains[k] || Promise.resolve()).then(async function () {
         try {
-          if (payload.length) { var u = await sb.from(s.table).upsert(payload); if (u.error) throw u.error; }
+          if (payload.length) {
+            var u = await sb.from(s.table).upsert(payload);
+            if (u.error && /product_name|transaction_date/.test(u.error.message || '')) {
+              console.warn('[supabase] kolom product_name/transaction_date belum ada di tabel. Jalankan SQL ALTER TABLE dulu.');
+              u = await sb.from(s.table).upsert(payload.map(function (r) { var c = Object.assign({}, r); delete c.product_name; delete c.transaction_date; return c; }));
+            }
+            if (u.error) throw u.error;
+          }
           var gone = (known[k] || []).filter(function (id) { return ids.indexOf(id) < 0; });
           if (gone.length) { var d = await sb.from(s.table).delete().in('id', gone); if (d.error) throw d.error; }
           known[k] = ids;
