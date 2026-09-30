@@ -1164,10 +1164,42 @@
       flex-shrink: 0; width: 56px;
       color: #6b7280; font-size: 13px; font-weight: 400;
     }
-    .canvas-col .email-card-header .ech-to-value {
+    .canvas-col .email-card-header .ech-to-input {
       flex: 1; min-width: 0;
-      font-size: 13px; color: #1f2937;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+    }
+    .canvas-col .email-card-header .ech-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 4px 3px 10px;
+      background: #e0e7ff; color: #3730a3;
+      border-radius: 999px; font-size: 12px; font-weight: 500;
+      max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .canvas-col .email-card-header .ech-chip-x {
+      width: 18px; height: 18px;
+      background: transparent; border: none; border-radius: 50%;
+      color: #3730a3; cursor: pointer; font-size: 14px; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: background 120ms;
+    }
+    .canvas-col .email-card-header .ech-chip-x:hover { background: rgba(55,48,163,0.15); }
+    .canvas-col .email-card-header .ech-input-inline {
+      flex: 1; min-width: 120px;
+      border: none; outline: none; background: transparent;
+      font-size: 13px; color: #1f2937; padding: 3px 4px;
+      font-family: inherit;
+    }
+    .canvas-col .email-card-header .ech-input-inline::placeholder {
+      color: #9ca3af; font-style: italic;
+    }
+    .canvas-col .email-card-header .ech-input-full {
+      flex: 1; min-width: 0;
+      border: none; outline: none; background: transparent;
+      font-size: 13px; color: #1f2937; padding: 3px 4px;
+      font-family: inherit;
+    }
+    .canvas-col .email-card-header .ech-input-full::placeholder {
+      color: #9ca3af; font-style: italic;
     }
     .canvas-col .email-card-header .ech-cc { flex-shrink: 0; display: flex; gap: 0; }
     .canvas-col .email-card-header .ech-cc button {
@@ -2406,6 +2438,10 @@
       subject: '',
       body: '',
       recipients: [],
+      cc: '',
+      bcc: '',
+      showCc: false,
+      showBcc: false,
       blocks: [],        // Component blocks (image/button/divider/spacer) — shape {id, type, data}
       files: [],        // File attachment chips — shape {name}
       sendMode: 'now',
@@ -5149,24 +5185,36 @@
       // Email card (Gmail-style header: To / Cc Bcc / Subject / body)
       '<div class="email-card">' +
         '<div class="email-card-header">' +
-          // To row — always show (read-only since recipients managed via sidebar)
+          // To row — editable list of recipient chips + free text input
           '<div class="ech-row">' +
             '<span class="ech-label">To</span>' +
-            '<span class="ech-to-value">' +
-              (compose.loadedAudienceName
-                ? '<strong>' + escapeHTML(compose.loadedAudienceName) + '</strong> <span style="color:var(--muted)">· ' + recipientCount + ' recipient' + (recipientCount === 1 ? '' : 's') + '</span>'
-                : (recipientCount > 0
-                    ? compose.recipients.slice(0, 3).map(r => {
-                        const lead = state.leads.find(l => l.id === r.lead_id);
-                        return lead ? escapeHTML(lead.name) : '?';
-                      }).join(', ') + (recipientCount > 3 ? ' <span style="color:var(--muted)">+ ' + (recipientCount - 3) + ' more</span>' : '')
-                    : '<span style="color:#cbd5e1;font-style:italic">No recipients</span>')) +
-            '</span>' +
+            '<div class="ech-to-input" data-ech-field="to">' +
+              // Show existing recipients as removable chips
+              compose.recipients.map(r => {
+                const lead = state.leads.find(l => l.id === r.lead_id);
+                return '<span class="ech-chip" data-chip-id="' + escapeHTML(r.lead_id) + '">' +
+                  escapeHTML(lead ? lead.name : r.lead_id) +
+                  '<button type="button" class="ech-chip-x" data-ech-remove="' + escapeHTML(r.lead_id) + '" title="Remove">×</button>' +
+                '</span>';
+              }).join('') +
+              // Free-text input for adding more recipients (type then comma/enter)
+              '<input type="text" class="ech-input-inline" data-ech-add placeholder="' + (recipientCount === 0 ? 'Add recipients…' : '') + '" />' +
+            '</div>' +
             '<span class="ech-cc">' +
-              '<button type="button" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">Cc</button>' +
-              '<button type="button" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">Bcc</button>' +
+              '<button type="button" data-ech-toggle="cc" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">Cc</button>' +
+              '<button type="button" data-ech-toggle="bcc" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">Bcc</button>' +
             '</span>' +
           '</div>' +
+          // Cc row (hidden by default — toggled by Cc button)
+          (compose.showCc ? '<div class="ech-row">' +
+            '<span class="ech-label">Cc</span>' +
+            '<input type="text" class="ech-input-full" data-ech-cc placeholder="Add Cc recipients…" value="' + escapeHTML(compose.cc || '') + '" />' +
+          '</div>' : '') +
+          // Bcc row (hidden by default — toggled by Bcc button)
+          (compose.showBcc ? '<div class="ech-row">' +
+            '<span class="ech-label">Bcc</span>' +
+            '<input type="text" class="ech-input-full" data-ech-bcc placeholder="Add Bcc recipients…" value="' + escapeHTML(compose.bcc || '') + '" />' +
+          '</div>' : '') +
           // Subject row (Gmail-style: subtle, single line, contenteditable)
           (isEmail
             ? '<div class="ech-row ech-subject-row">' +
@@ -5577,7 +5625,7 @@
 
     // Reset compose
     if (channel === 'email') {
-      emailBlast.compose = { subject:'', body:'', recipients:[], blocks:[], files:[], sendMode:'now', scheduled_at:'' };
+      emailBlast.compose = { subject:'', body:'', recipients:[], blocks:[], files:[], sendMode:'now', scheduled_at:'', cc:'', bcc:'', showCc:false, showBcc:false };
     } else {
       waBlast.compose = { message:'', media:[], recipients:[], sendMode:'now', scheduled_at:'' };
     }
@@ -5731,6 +5779,79 @@
     window.attachBlockControls = attachBlockControls;
     const blastState = channel === 'email' ? emailBlast : waBlast;
     const storageKey = channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA;
+
+    // ===== Email card: chip removal (click X on a recipient chip) =====
+    document.querySelectorAll('[data-ech-remove]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const id = btn.getAttribute('data-ech-remove');
+        blastState.compose.recipients = blastState.compose.recipients.filter(r => r.lead_id !== id);
+        if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
+      });
+    });
+
+    // ===== Email card: free-text add recipient (type then comma/enter to commit) =====
+    const addInput = document.querySelector('[data-ech-add]');
+    if (addInput) {
+      addInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          const raw = addInput.value.trim().replace(/,$/, '').trim();
+          if (!raw) return;
+          // Try to find existing lead by email, then name; otherwise create a new lead
+          let lead = state.leads.find(l => (l.email && l.email.toLowerCase() === raw.toLowerCase()) ||
+                                            l.name.toLowerCase() === raw.toLowerCase());
+          if (!lead) {
+            const newId = 'L-' + Math.floor(Math.random() * 9000 + 1000);
+            const isEmailLike = /@/.test(raw);
+            lead = {
+              id: newId,
+              type: isEmailLike ? 'company' : 'person',
+              name: raw,
+              company: '',
+              email: isEmailLike ? raw : '',
+              phone: '',
+              status: 'New Lead',
+              sales_value: 0,
+              notes: 'Added via Email Blast composer',
+              last_contacted_at: new Date().toISOString(),
+              tags: [],
+              created_at: new Date().toISOString(),
+            };
+            state.leads = [lead, ...state.leads];
+            saveLeads(state.leads);
+          }
+          if (!blastState.compose.recipients.find(r => r.lead_id === lead.id)) {
+            blastState.compose.recipients.push({ lead_id: lead.id });
+          }
+          addInput.value = '';
+          if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
+          // Re-focus the input after re-render
+          setTimeout(() => {
+            const newInput = document.querySelector('[data-ech-add]');
+            if (newInput) newInput.focus();
+          }, 0);
+        }
+      });
+    }
+
+    // ===== Email card: Cc / Bcc toggle =====
+    document.querySelectorAll('[data-ech-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const which = btn.getAttribute('data-ech-toggle');
+        if (which === 'cc') blastState.compose.showCc = !blastState.compose.showCc;
+        if (which === 'bcc') blastState.compose.showBcc = !blastState.compose.showBcc;
+        if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
+      });
+    });
+
+    // ===== Email card: Cc / Bcc input =====
+    document.querySelectorAll('[data-ech-cc]').forEach(el => {
+      el.addEventListener('input', () => { blastState.compose.cc = el.value; });
+    });
+    document.querySelectorAll('[data-ech-bcc]').forEach(el => {
+      el.addEventListener('input', () => { blastState.compose.bcc = el.value; });
+    });
 
     // tab nav
     document.querySelectorAll(`[data-blast-tab][data-channel="${channel}"]`).forEach(b => b.addEventListener('click', () => {
@@ -6433,7 +6554,7 @@
     // clear
     document.querySelector(`[data-blast-action="clear"][data-channel="${channel}"]`)?.addEventListener('click', () => {
       if (!confirm('Clear compose?')) return;
-      if (channel === 'email') emailBlast.compose = { subject:'', body:'', recipients:[], blocks:[], files:[], sendMode:'now', scheduled_at:'' };
+      if (channel === 'email') emailBlast.compose = { subject:'', body:'', recipients:[], blocks:[], files:[], sendMode:'now', scheduled_at:'', cc:'', bcc:'', showCc:false, showBcc:false };
       else waBlast.compose = { message:'', media:[], recipients:[], sendMode:'now', scheduled_at:'' };
       if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
     });
@@ -6460,7 +6581,7 @@
       const draft = blastState.drafts.find(d => d.id === id);
       if (!draft) return;
       if (channel === 'email') {
-        emailBlast.compose = { subject:draft.subject||'', body:draft.body||'', recipients:draft.recipients||[], blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        emailBlast.compose = { subject:draft.subject||'', body:draft.body||'', recipients:draft.recipients||[], cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       } else {
         waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:draft.recipients||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       }
