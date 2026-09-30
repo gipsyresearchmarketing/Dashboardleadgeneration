@@ -1652,6 +1652,11 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
             Reset
           </button>
+          <button class="btn btn-outline" id="btn-import" title="Import leads dari file CSV">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+            Import CSV
+          </button>
+          <input type="file" id="csv-file" accept=".csv,text/csv" style="display:none" />
           <button class="btn btn-primary" id="btn-add">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Add Lead
@@ -5997,6 +6002,117 @@
   waBlast    = Object.assign(waBlast,    loadBlast(STORAGE_KEY_BLAST_WA));
   renderEmailBlastView();
   renderWaBlastView();
+
+  /* ================================================================
+   * Import leads dari CSV
+   * ================================================================ */
+  (function () {
+    function parseCSV(text) {
+      text = text.replace(/^\uFEFF/, '');
+      const first = text.split(/\r?\n/, 1)[0] || '';
+      const delim = (first.split(';').length > first.split(',').length) ? ';' : ',';
+      const rows = []; let row = [], cur = '', q = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (q) {
+          if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+          else cur += c;
+        } else if (c === '"') q = true;
+        else if (c === delim) { row.push(cur); cur = ''; }
+        else if (c === '\n' || c === '\r') {
+          if (c === '\r' && text[i + 1] === '\n') i++;
+          row.push(cur); cur = ''; rows.push(row); row = [];
+        } else cur += c;
+      }
+      if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+      return rows.filter(r => r.some(x => String(x).trim() !== ''));
+    }
+
+    const ALIAS = {
+      id: ['id'], type: ['type', 'tipe', 'jenis'],
+      name: ['name', 'nama', 'nama lengkap', 'full name', 'contact', 'kontak'],
+      company: ['company', 'perusahaan', 'nama perusahaan', 'organisasi', 'bisnis'],
+      email: ['email', 'e-mail', 'surel'],
+      phone: ['phone', 'telepon', 'telp', 'hp', 'no hp', 'no. hp', 'nomor hp', 'whatsapp', 'wa', 'no wa', 'mobile'],
+      status: ['status', 'tahap', 'stage'],
+      sales_value: ['sales_value', 'sales value', 'value', 'nilai', 'nilai deal', 'deal value', 'omzet'],
+      notes: ['notes', 'note', 'catatan', 'keterangan'],
+      tags: ['tags', 'tag', 'label']
+    };
+    function mapHeaders(hdr) {
+      const idx = {};
+      hdr.forEach((h, i) => {
+        const k = String(h).trim().toLowerCase();
+        Object.keys(ALIAS).forEach(f => { if (idx[f] === undefined && ALIAS[f].indexOf(k) >= 0) idx[f] = i; });
+      });
+      return idx;
+    }
+    function normStatus(v) {
+      const t = String(v || '').trim().toLowerCase();
+      if (!t) return 'New Lead';
+      const hit = LEAD_STATUSES.find(x => x.toLowerCase() === t);
+      if (hit) return hit;
+      if (/^(new|baru)/.test(t)) return 'New Lead';
+      if (/(whatsapp|wa)/.test(t)) return 'Followed Up (WhatsApp)';
+      if (/(email|mail)/.test(t)) return 'Followed Up (Email)';
+      if (/(nego)/.test(t)) return 'In Negotiation';
+      if (/(won|menang|closing|deal|sales)/.test(t)) return 'Won/Sales';
+      if (/(lost|kalah|batal|gagal)/.test(t)) return 'Lost';
+      return 'New Lead';
+    }
+
+    function importRows(rows) {
+      const idx = mapHeaders(rows[0]);
+      if (idx.name === undefined && idx.company === undefined && idx.email === undefined) {
+        alert('Header CSV tidak dikenali. Minimal harus ada kolom: name (atau nama), company, atau email.');
+        return;
+      }
+      const get = (r, f) => idx[f] === undefined ? '' : String(r[idx[f]] === undefined ? '' : r[idx[f]]).trim();
+      const used = new Set(state.leads.map(l => l.id));
+      const out = []; let skipped = 0;
+      rows.slice(1).forEach((r, n) => {
+        const name = get(r, 'name'), company = get(r, 'company'), email = get(r, 'email');
+        if (!name && !company && !email) { skipped++; return; }
+        let id = get(r, 'id');
+        if (!id || used.has(id)) id = 'L-' + Date.now().toString(36).toUpperCase() + '-' + (n + 1);
+        used.add(id);
+        const t = get(r, 'type').toLowerCase();
+        const type = (t === 'person' || t === 'company') ? t : (company ? 'company' : 'person');
+        out.push({
+          id: id, type: type, name: name || company, company: company, email: email,
+          phone: get(r, 'phone'), status: normStatus(get(r, 'status')),
+          sales_value: Math.max(0, parseInt(get(r, 'sales_value').replace(/[^\d]/g, ''), 10) || 0),
+          notes: get(r, 'notes'),
+          tags: get(r, 'tags').split(/[;|,]/).map(x => x.trim()).filter(Boolean),
+          last_contacted_at: new Date().toISOString()
+        });
+      });
+      if (!out.length) { alert('Tidak ada baris valid untuk diimport.'); return; }
+      if (!confirm('Import ' + out.length + ' lead' + (skipped ? ' (' + skipped + ' baris kosong dilewati)' : '') + '?')) return;
+      let replace = false;
+      if (state.leads.length) {
+        replace = confirm('Sudah ada ' + state.leads.length + ' lead di dashboard.\n\nOK = HAPUS semua lead lama dan ganti dengan hasil import\nCancel = gabungkan (tambahkan ke data yang ada)');
+      }
+      state.leads = replace ? out : out.concat(state.leads);
+      saveLeads(state.leads);
+      renderAll();
+      toast(out.length + ' lead diimport');
+    }
+
+    const btn = document.getElementById('btn-import');
+    const inp = document.getElementById('csv-file');
+    btn.addEventListener('click', () => inp.click());
+    inp.addEventListener('change', () => {
+      const f = inp.files && inp.files[0]; if (!f) return;
+      const fr = new FileReader();
+      fr.onload = () => {
+        try { const rows = parseCSV(String(fr.result)); if (rows.length < 2) { alert('File CSV kosong atau hanya berisi header.'); } else importRows(rows); }
+        catch (e) { alert('Gagal membaca CSV: ' + e.message); }
+        inp.value = '';
+      };
+      fr.readAsText(f, 'UTF-8');
+    });
+  })();
 
   /* ----- Initial workspace render ----- */
   wsRenderAll();
