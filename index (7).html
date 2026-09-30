@@ -1614,8 +1614,8 @@
       <nav>
         <div class="nav-item" data-view="email-blast">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          Email
-          <span class="nav-badge" id="nav-inbox-count" style="margin-left:auto">0</span>
+          Email Blast
+          <span class="badge-pill badge-busdev" title="BusDev" style="margin-left:auto">B</span>
         </div>
         <div class="nav-item" data-view="wa-blast">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.97.57 3.81 1.55 5.36L2 22l4.74-1.53C8.27 21.36 10.08 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm5.45 14.5c-.23.64-1.18 1.21-1.7 1.28-.43.06-.97.09-1.57-.1-.36-.11-.83-.26-1.43-.51-2.51-1.09-4.15-3.62-4.28-3.79-.13-.17-1.02-1.36-1.02-2.6 0-1.23.65-1.84.88-2.09.23-.25.5-.31.67-.31.17 0 .33.01.48.01.15 0 .36-.06.56.43.2.49.7 1.69.76 1.81.06.12.1.27.02.43-.08.17-..12.27-.25.42-..12.15-..26.33-..37.12.13.25.27.11.53-.14.26-.62 1.02-1.33 1.65-.91.81-1.68 1.06-1.94 1.18-.25.12-.4.1-.55-.06-.15-.17-.65-.76-.82-1.02-.17-.26-.34-.22-.58-.13-.23.09-1.49.7-1.74.83-.26.13-.43.19-.49.3-.06.11-.06.65.17 1.28z"/></svg>
@@ -1908,11 +1908,6 @@
         <div id="audiences-host"></div>
       </div>
 
-      <!-- ========== View: Inbox (mock email receiving) ========== -->
-      <div class="view-container" id="view-inbox">
-        <div id="inbox-host"></div>
-      </div>
-
       <!-- ========== View: Image Library ========== -->
       <div class="view-container" id="view-assets">
         <div id="assets-host"></div>
@@ -1960,7 +1955,6 @@
   const STORAGE_KEY_BLAST_WA = 'leads-dashboard:blast-wa:v1';
   const STORAGE_KEY_ASSETS = 'leads-dashboard:assets:v1';
   const STORAGE_KEY_AUDIENCES = 'leads-dashboard:audiences:v1';
-  const STORAGE_KEY_INBOX = 'leads-dashboard:inbox:v1';
 
   const LEAD_STATUSES = [
     'New Lead',
@@ -2045,33 +2039,6 @@
     { id:'T-11', lead_id:'L-0004', title:'Telepon follow-up email',           due_at:'2026-08-19T15:00:00.000Z', completed:false, completed_at:null,           notes:'',                       created_at:'2026-08-17T11:00:00.000Z' },
     { id:'T-12', lead_id:'L-0011', title:'Siapkan deck presentasi e-learning',due_at:'2026-08-18T10:00:00.000Z', completed:false, completed_at:null,           notes:'',                       created_at:'2026-08-14T15:30:00.000Z' },
   ];
-
-  /* Mock inbound emails (seed for inbox view — matches Supabase seed schema) */
-  const MOCK_INBOUND_EMAILS = [
-    { id:'INB-001', from_email:'citra.lestari@mitrasehat.com', from_name:'Citra Lestari', to_email:'sales@leadsdashboard.id', subject:'Re: Proposal Kerjasama CV Mitra Sehat', body:'Halo Tim Sales,\n\nTerima kasih atas proposal v2 yang dikirimkan kemarin. Sudah saya review dan didiskusikan dengan tim finance.\n\nSecara umum kami setuju dengan skema pricing yang ditawarkan, namun ada beberapa hal yang perlu kita bicarakan lebih lanjut:\n\n1. Untuk diskon 7% yang ditawarkan, kami butuh ini dinaikkan menjadi minimal 10% karena budget tahun ini sudah locked.\n2. Modul training implementasi yang disebutkan di halaman 5 — bisa tolong jelaskan apakah ini on-site atau remote?\n3. Apakah bisa ada grace period 30 hari sebelum payment termin pertama?\n\nMohon konfirmasinya. Saya available untuk call di hari Selasa atau Kamis sore.\n\nBest regards,\nCitra Lestari\nFinance Director, CV Mitra Sehat', snippet:'Re: Proposal Kerjasama — setuju pricing, minta diskusi diskon & grace period lebih lanjut', lead_id:'L-0003', blast_id:null, status:'unread', starred:true,  has_attachments:false, attachments:[], received_at:'2026-09-29T16:42:00.000Z', read_at:null, replied_at:null },
-    { id:'INB-002', from_email:'joko.riyanto@logistikcepat.co.id', from_name:'Joko Riyanto', to_email:'sales@leadsdashboard.id', subject:'Re: Proposal Enterprise - PT Logistik Cepat Indonesia', body:'Selamat pagi,\n\nSetelah saya presentasikan proposal Anda ke board of directors minggu lalu, response-nya positif. Kami tertarik untuk move forward ke tahap POC (proof of concept).\n\nBeberapa pertanyaan teknis:\n- Apakah modul fleet management Anda support integrasi dengan GPS tracking kami saat ini (Geotab)?\n- Berapa lama waktu implementasi typical untuk fleet 50+ vehicles?\n- Apakah ada referensi client di industri logistics/logistik?\n\nMohon schedule demo dengan technical team kami.\n\nSalam,\nJoko Riyanto\nCTO, PT Logistik Cepat Indonesia', snippet:'Re: Proposal Enterprise — board approve POC, butuh klarifikasi integrasi GPS & timeline', lead_id:'L-0010', blast_id:null, status:'unread', starred:true,  has_attachments:false, attachments:[], received_at:'2026-09-29T14:15:00.000Z', read_at:null, replied_at:null },
-    { id:'INB-003', from_email:'maya@salonmaya.id', from_name:'Maya Anggraini', to_email:'sales@leadsdashboard.id', subject:'Tertarik dengan paket Mobile POS', body:'Halo! Saya Maya dari Salon Maya Beauty di BSD.\n\nTadi pagi saya lihat iklan Instagram Anda tentang paket Mobile POS untuk salon & beauty business. Saya tertarik banget karena saya lagi struggle sama sistem pencatatan yang masih manual.\n\nBisa tolong info lebih detail:\n- Harga paket mobile POS berapa ya?\n- Apakah bisa integrasi dengan payment gateway (OVO, GoPay, Dana)?\n- Ada free trial ga?\n\nMohon dikirim pricelist + demo video nya.\n\nTerima kasih,\nMaya Anggraini\nOwner, Salon Maya Beauty', snippet:'Inquiry dari Instagram Ads — tertarik Mobile POS, minta pricelist + demo video', lead_id:'L-0013', blast_id:null, status:'unread', starred:false, has_attachments:false, attachments:[], received_at:'2026-09-30T08:22:00.000Z', read_at:null, replied_at:null },
-    { id:'INB-004', from_email:'qori@pesantren-h.id', from_name:'Ustadz Qori Hidayatullah', to_email:'sales@leadsdashboard.id', subject:'Trial Account - Pesantren Hidayatullah', body:'Assalamualaikum,\n\nSaya Ustadz Qori dari Pesantren Hidayatullah Yogyakarta. Kami sedang membutuhkan sistem untuk manage data siswa + pembayaran SPP.\n\nSaya sudah mencoba daftar trial 30 hari sesuai instruksi tim Anda. Namun sampai sekarang (3 hari kemudian) belum ada email konfirmasi yang masuk. Mohon dicekan.\n\nJuga tolong informasikan:\n- Berapa biaya implementasi awal?\n- Apakah ada diskon khusus untuk institusi pendidikan pesantren?\n- Bisa custom modul bahasa Arab?\n\nWassalam,\nUstadz Qori', snippet:'Trial account belum aktif — minta follow up + info harga & diskon pesantren', lead_id:'L-0017', blast_id:null, status:'unread', starred:false, has_attachments:false, attachments:[], received_at:'2026-09-29T10:05:00.000Z', read_at:null, replied_at:null },
-    { id:'INB-005', from_email:'indah.sari@sarirasa.id', from_name:'Indah Sari', to_email:'sales@leadsdashboard.id', subject:'Re: Welcome to LeadsDashboard', body:'Halo,\n\nTerima kasih atas welcome email-nya. Saya Indah dari CV Sari Rasa Catering, di-referensikan oleh Bu Tantri (Tantri Wedding Organizer).\n\nKami butuh sistem untuk manage:\n1. Order catering harian & event\n2. Schedule kitchen + delivery team\n3. Customer database untuk repeat order\n\nApakah LeadsDashboard bisa handle use case catering? Beda dengan wedding organizer kan? Mohon penjelasan.\n\nSaya available untuk demo online Kamis depan jam 14:00 WIB.\n\nSalam,\nIndah Sari\nOwner, CV Sari Rasa Catering', snippet:'Re: Welcome — di-referral Bu Tantri, butuh catering management, available demo Kamis', lead_id:'L-0009', blast_id:null, status:'read',   starred:false, has_attachments:false, attachments:[], received_at:'2026-09-28T19:30:00.000Z', read_at:'2026-09-28T20:10:00.000Z', replied_at:null },
-    { id:'INB-006', from_email:'rini.hartono@hartono-furnitur.id', from_name:'Rini Hartono', to_email:'sales@leadsdashboard.id', subject:'Re: Termin Pembayaran - CV Hartono Furniture', body:'Dear Tim Sales,\n\nSaya Rini Hartono. Sudah kita sepakati skema termin 30-60-30 untuk kontrak furniture kantor baru.\n\nNamun setelah saya berdiskusi dengan finance team, mereka minta revisi:\n- Termin 1: 40% (sebelumnya 30%)\n- Termin 2: 40% (sebelumnya 60%)\n- Termin 3: 20% (sebelumnya 30%)\n\nApakah ini bisa di-approve? Kita bisa proceed dengan PO minggu depan kalau sudah deal.\n\nMohon responnya segera karena vendor lain juga sudah offering skema serupa.\n\nBest,\nRini Hartono', snippet:'Re: Termin — finance minta revisi 40-40-20, butuh approval cepat untuk PO minggu depan', lead_id:'L-0018', blast_id:null, status:'read',   starred:false, has_attachments:false, attachments:[], received_at:'2026-09-30T09:15:00.000Z', read_at:'2026-09-30T09:20:00.000Z', replied_at:null },
-    { id:'INB-007', from_email:'noreply@linkedin.com', from_name:'LinkedIn', to_email:'sales@leadsdashboard.id', subject:'You have 23 new profile views this week', body:'Hi Bagas,\n\nYour profile was viewed by 23 professionals this week, including:\n- Surya Pranata (Energy Industry Manager at PT Surya Energy)\n- Dimas Aryasatya (Owner, Toko Dimas Elektronik)\n\nUpgrade to Premium to see all viewers and reach out directly.\n\nBest,\nThe LinkedIn Team', snippet:'LinkedIn notification — 23 profile views, termasuk 2 leads hot dari inbox Anda', lead_id:null, blast_id:null, status:'read',   starred:false, has_attachments:false, attachments:[], received_at:'2026-09-29T07:00:00.000Z', read_at:'2026-09-29T08:30:00.000Z', replied_at:null },
-    { id:'INB-008', from_email:'lutfi.hakim@hakim-mfg.com', from_name:'Lutfi Hakim', to_email:'sales@leadsdashboard.id', subject:'Konfirmasi Renewal Kontrak Tahap 2', body:'Halo Tim LeadsDashboard,\n\nBersamaan dengan email ini saya ingin konfirmasi bahwa PT Hakim Manufacturing akan proceed dengan renewal kontrak tahap 2 untuk periode 2026-2027.\n\nBeberapa hal yang sudah disetujui internal kami:\n- Volume sama dengan kontrak tahun 1\n- Tambahan 5 user seats untuk divisi baru\n- Modul HR integration (sesuai diskusi bulan lalu)\n\nMohon kirim invoice renewal selambat-lambatnya 1 Oktober 2026.\n\nTerima kasih atas partnership-nya selama ini.\n\nBest regards,\nLutfi Hakim\nManaging Director, PT Hakim Manufacturing', snippet:'Konfirmasi renewal kontrak tahun 2 + tambah 5 seats + modul HR', lead_id:'L-0012', blast_id:null, status:'read',   starred:true,  has_attachments:true,  attachments:[{name:'PO-Renewal-2026.pdf', size:'125 KB'}], received_at:'2026-09-30T10:45:00.000Z', read_at:'2026-09-30T10:50:00.000Z', replied_at:null },
-    { id:'INB-009', from_email:'tantri@tantriwo.com', from_name:'Tantri Wulandari', to_email:'sales@leadsdashboard.id', subject:'Referral: CV Sari Rasa Catering', body:'Halo!\n\nSaya Tantri, customer setia LeadsDashboard sejak 2024. Saya mau referensikan kolega saya, Indah Sari dari CV Sari Rasa Catering.\n\nMereka butuh sistem manage order catering dan schedule kitchen. Saya sudah kasih tau dia untuk kontak sales@leadsdashboard.id langsung.\n\nTolong follow up ya. Kalau closing, jangan lupa kasih tahu saya — saya dengar ada program referral bonus kan? 😊\n\nSalam,\nTantri Wulandari\nTantri Wedding Organizer', snippet:'Referral dari Tantri WO — CV Sari Rasa Catering butuh catering management system', lead_id:'L-0020', blast_id:null, status:'replied', starred:false, has_attachments:false, attachments:[], received_at:'2026-09-27T15:20:00.000Z', read_at:'2026-09-27T15:35:00.000Z', replied_at:'2026-09-27T16:00:00.000Z' },
-    { id:'INB-010', from_email:'erika.w@solusidigital.asia', from_name:'Erika Wulandari', to_email:'sales@leadsdashboard.id', subject:'Testimonial & Case Study Permission', body:'Halo Tim,\n\nSaya Erika dari PT Solusi Digital Asia. Kita sudah closing deal 2 minggu lalu dan tim sudah mulai implementasi.\n\nSaya sangat puas dengan onboarding process dan responsiveness tim support Anda. Saya ingin menulis testimonial untuk website Anda dan publish case study kita sebagai referensi.\n\nApakah tim marketing Anda bisa schedule call 30 menit minggu depan untuk discuss? Saya juga tertarik untuk join sebagai reference customer untuk prospect baru di industri SaaS / digital agency.\n\nBest,\nErika Wulandari\nCEO, PT Solusi Digital Asia', snippet:'Post-sale follow up — Erika mau tulis testimonial & jadi reference customer', lead_id:'L-0005', blast_id:null, status:'replied', starred:true,  has_attachments:false, attachments:[], received_at:'2026-09-26T11:30:00.000Z', read_at:'2026-09-26T12:00:00.000Z', replied_at:'2026-09-26T14:30:00.000Z' }
-  ];
-
-  function loadInboundEmails() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_INBOX);
-      if (!raw) return MOCK_INBOUND_EMAILS.map(e => ({ ...e }));
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return MOCK_INBOUND_EMAILS.map(e => ({ ...e }));
-      return parsed;
-    } catch { return MOCK_INBOUND_EMAILS.map(e => ({ ...e })); }
-  }
-  function saveInboundEmails(items) {
-    try { localStorage.setItem(STORAGE_KEY_INBOX, JSON.stringify(items)); } catch {}
-  }
 
   function loadLeads() {
     try {
@@ -2362,10 +2329,6 @@
     actFilter: 'all',          // filter inside Activities view
     drawerLeadId: null,
     drawerTab: 'overview',
-    inboxEmails: loadInboundEmails(),
-    inboxFilter: 'all',        // all | unread | starred | replied | archived
-    inboxQuery: '',
-    selectedEmailId: null,
   };
 
   /* Email Blast + WhatsApp Blast states (declared early so renderAll() can safely call their renderers at boot) */
@@ -2920,7 +2883,7 @@
     document.body.classList.toggle('workspace-mode', inWorkspace);
     document.querySelectorAll('.view-container').forEach(c => c.classList.toggle('active', c.id === `view-${view}`));
     document.querySelectorAll('[data-view]').forEach(n => n.classList.toggle('active', n.getAttribute('data-view') === view));
-    const titles = { dashboard:'Dashboard', contacts:'Contacts', board:'Companies', tasks:'Lead Tasks', activities:'Activity Log', 'board-calendar':'Calendar', 'email-blast':'Email', 'wa-blast':'WhatsApp Blast', audiences:'Audiences', inbox:'Email · Inbox' };
+    const titles = { dashboard:'Dashboard', contacts:'Contacts', board:'Companies', tasks:'Lead Tasks', activities:'Activity Log', 'board-calendar':'Calendar', 'email-blast':'Email Blast', 'wa-blast':'WhatsApp Blast', audiences:'Audiences' };
     document.getElementById('topbar-title').textContent = titles[view] || view;
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebar-backdrop').classList.remove('open');
@@ -2931,7 +2894,6 @@
     if (view === 'email-blast') { renderEmailBlastView(); wireBlastEvents('email'); }
     if (view === 'wa-blast')    { renderWaBlastView(); wireBlastEvents('wa'); }
     if (view === 'audiences')   { renderAudiencesView(); }
-    if (view === 'inbox')       { state.view = 'email-blast'; emailBlast.activeTab = 'inbox'; renderEmailBlastView(); wireBlastEvents('email'); }
     if (view === 'board')         { wsState.wsView = 'board';     wsRenderBoard();    syncWsTabs(); }
     if (view === 'board-calendar'){ wsState.wsView = 'calendar';  wsRenderCalendar(); syncWsTabs(); }
     if (view === 'assets')        { renderAssetsView(); }
@@ -2958,13 +2920,6 @@
     if (auc) auc.textContent = audiences.length;
     const assc = document.getElementById('nav-assets-count');
     if (assc) assc.textContent = assets.length;
-    const inb = document.getElementById('nav-inbox-count');
-    if (inb) {
-      const unread = (state.inboxEmails || []).filter(e => e.status === 'unread').length;
-      inb.textContent = unread;
-      inb.style.background = unread > 0 ? '#dbeafe' : '';
-      inb.style.color = unread > 0 ? '#1e40af' : '';
-    }
   }
 
   function filteredLeads({ type } = {}) {
@@ -4322,376 +4277,6 @@
   });
 
   /* =================================================================
-   * INBOX (mock email receiving view)
-   * ================================================================= */
-  function renderInboxView() {
-    // If we're inside the email-blast view (inbox as sub-tab), re-render the whole blast view
-    if (state.view === 'email-blast') {
-      renderEmailBlastView();
-      return;
-    }
-    return renderInboxViewInto('inbox-host');
-  }
-  function renderInboxViewInto(hostId) {
-    const host = document.getElementById(hostId);
-    if (!host) return;
-    const emails = state.inboxEmails || [];
-    const filter = state.inboxFilter || 'all';
-    const query = (state.inboxQuery || '').toLowerCase();
-
-    // Apply filter
-    let filtered = emails.slice();
-    if (filter === 'unread')  filtered = filtered.filter(e => e.status === 'unread');
-    if (filter === 'starred') filtered = filtered.filter(e => e.starred);
-    if (filter === 'replied') filtered = filtered.filter(e => e.status === 'replied');
-    if (filter === 'archived') filtered = filtered.filter(e => e.status === 'archived');
-    if (filter !== 'archived') filtered = filtered.filter(e => e.status !== 'archived');
-    if (query) {
-      filtered = filtered.filter(e =>
-        (e.subject || '').toLowerCase().includes(query) ||
-        (e.from_name || '').toLowerCase().includes(query) ||
-        (e.from_email || '').toLowerCase().includes(query) ||
-        (e.snippet || '').toLowerCase().includes(query)
-      );
-    }
-    // Sort by received_at desc
-    filtered.sort((a, b) => new Date(b.received_at) - new Date(a.received_at));
-
-    const unreadCount = emails.filter(e => e.status === 'unread').length;
-    const starredCount = emails.filter(e => e.starred).length;
-    const totalCount = emails.length;
-
-    const filterPills = [
-      { key: 'all',      label: 'All',      count: totalCount },
-      { key: 'unread',   label: 'Unread',   count: unreadCount },
-      { key: 'starred',  label: 'Starred',  count: starredCount },
-      { key: 'replied',  label: 'Replied',  count: emails.filter(e => e.status === 'replied').length },
-      { key: 'archived', label: 'Archived', count: emails.filter(e => e.status === 'archived').length },
-    ];
-
-    // Selected email
-    const selected = state.selectedEmailId
-      ? emails.find(e => e.id === state.selectedEmailId)
-      : (filtered[0] || null);
-
-    host.innerHTML = `
-      <div style="display:grid;grid-template-columns:380px 1fr;gap:14px;height:calc(100vh - 110px)">
-        <!-- Left: Email list -->
-        <div class="card" style="display:flex;flex-direction:column;overflow:hidden;padding:0">
-          <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-              <div>
-                <h2 style="font-size:16px;font-weight:700;margin:0">📥 Inbox</h2>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px">${unreadCount} unread of ${totalCount} emails</div>
-              </div>
-              <div style="font-size:11px;background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:6px;font-weight:600">MOCK</div>
-            </div>
-            <input type="search" data-inbox-action="search" placeholder="🔍 Search emails..." value="${escapeHTML(state.inboxQuery || '')}" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none" />
-            <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
-              ${filterPills.map(p =>
-                '<button type="button" data-inbox-action="filter" data-filter="' + p.key + '" style="padding:4px 10px;font-size:11px;border-radius:999px;border:1px solid ' + (filter === p.key ? 'var(--accent)' : 'var(--border)') + ';background:' + (filter === p.key ? 'var(--accent)' : 'white') + ';color:' + (filter === p.key ? 'white' : 'var(--fg)') + ';cursor:pointer;font-weight:600">' +
-                  p.label + ' ' + (p.count > 0 ? '<span style="opacity:0.8">(' + p.count + ')</span>' : '') +
-                '</button>'
-              ).join('')}
-            </div>
-          </div>
-          <div style="flex:1;overflow-y:auto" data-inbox-list>
-            ${filtered.length === 0
-              ? '<div style="padding:40px 20px;text-align:center;color:var(--muted);font-size:13px">📭 No emails match this filter.</div>'
-              : filtered.map(e => renderInboxListItem(e, e.id === (selected && selected.id))).join('')}
-          </div>
-        </div>
-
-        <!-- Right: Email detail -->
-        <div class="card" style="display:flex;flex-direction:column;overflow:hidden;padding:0">
-          ${selected ? renderInboxDetail(selected) : '<div style="padding:60px 20px;text-align:center;color:var(--muted)"><div style="font-size:48px;margin-bottom:12px">📥</div><div style="font-size:14px">Select an email to read</div></div>'}
-        </div>
-      </div>
-    `;
-    wireInboxEvents();
-  }
-
-  function renderInboxListItem(e, isSelected) {
-    const date = new Date(e.received_at);
-    const now = new Date('2026-09-30T14:00:00Z');
-    const diff = (now - date) / 1000; // seconds
-    let timeAgo;
-    if (diff < 60) timeAgo = 'just now';
-    else if (diff < 3600) timeAgo = Math.floor(diff / 60) + 'm ago';
-    else if (diff < 86400) timeAgo = Math.floor(diff / 3600) + 'h ago';
-    else if (diff < 604800) timeAgo = Math.floor(diff / 86400) + 'd ago';
-    else timeAgo = date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-
-    const lead = e.lead_id ? state.leads.find(l => l.id === e.lead_id) : null;
-    const isUnread = e.status === 'unread';
-    const isReplied = e.status === 'replied';
-
-    const initials = (e.from_name || e.from_email || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
-    const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4'];
-    const color = colors[(e.id || '0').charCodeAt(4) % colors.length];
-
-    return '<div data-inbox-action="open" data-id="' + e.id + '" style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;background:' + (isSelected ? '#eff6ff' : (isUnread ? '#fafbfc' : 'white')) + ';border-left:3px solid ' + (isSelected ? 'var(--accent)' : 'transparent') + ';transition:background 120ms" onmouseover="if(!this.dataset.selected)this.style.background=\'#f8fafc\'" onmouseout="if(!this.dataset.selected)this.style.background=\'' + (isSelected ? '#eff6ff' : (isUnread ? '#fafbfc' : 'white')) + '\'">' +
-      '<div style="display:flex;align-items:flex-start;gap:10px">' +
-        '<div style="width:36px;height:36px;border-radius:50%;background:' + color + ';color:white;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0">' + escapeHTML(initials) + '</div>' +
-        '<div style="flex:1;min-width:0">' +
-          '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">' +
-            '<div style="font-size:13px;font-weight:' + (isUnread ? '700' : '500') + ';color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">' + escapeHTML(e.from_name || e.from_email) + '</div>' +
-            '<div style="font-size:10px;color:var(--muted);flex-shrink:0">' + timeAgo + '</div>' +
-          '</div>' +
-          '<div style="font-size:12px;font-weight:' + (isUnread ? '600' : '500') + ';color:var(--fg);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHTML(e.subject || '(no subject)') + '</div>' +
-          '<div style="font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4">' + escapeHTML(e.snippet || '') + '</div>' +
-          '<div style="display:flex;align-items:center;gap:4px;margin-top:6px;flex-wrap:wrap">' +
-            (isUnread ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6"></span>' : '') +
-            (e.starred ? '<span style="font-size:11px;color:#f59e0b">⭐</span>' : '') +
-            (e.has_attachments ? '<span style="font-size:11px;color:var(--muted)">📎</span>' : '') +
-            (isReplied ? '<span style="font-size:9px;padding:1px 6px;border-radius:4px;background:#dcfce7;color:#166534;font-weight:600">REPLIED</span>' : '') +
-            (lead ? '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:#e0e7ff;color:#3730a3;font-weight:500">→ ' + escapeHTML(lead.name.split(' ')[0]) + '</span>' : '') +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  }
-
-  function renderInboxDetail(e) {
-    const lead = e.lead_id ? state.leads.find(l => l.id === e.lead_id) : null;
-    const date = new Date(e.received_at);
-    const dateStr = date.toLocaleString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const initials = (e.from_name || e.from_email || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
-    const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4'];
-    const color = colors[(e.id || '0').charCodeAt(4) % colors.length];
-
-    return '<div style="display:flex;flex-direction:column;height:100%">' +
-      // Header bar (sticky)
-      '<div style="padding:16px 20px;border-bottom:1px solid var(--border);background:white">' +
-        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
-          '<div style="flex:1;min-width:0">' +
-            '<h2 style="font-size:18px;font-weight:700;margin:0 0 6px 0;color:var(--fg);line-height:1.3">' + escapeHTML(e.subject || '(no subject)') + '</h2>' +
-            '<div style="display:flex;align-items:center;gap:10px">' +
-              '<div style="width:36px;height:36px;border-radius:50%;background:' + color + ';color:white;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0">' + escapeHTML(initials) + '</div>' +
-              '<div>' +
-                '<div style="font-size:13px;font-weight:600;color:var(--fg)">' + escapeHTML(e.from_name || e.from_email) + '</div>' +
-                '<div style="font-size:11px;color:var(--muted)">&lt;' + escapeHTML(e.from_email) + '&gt; → &lt;' + escapeHTML(e.to_email) + '&gt;</div>' +
-              '</div>' +
-            '</div>' +
-            '<div style="font-size:11px;color:var(--muted);margin-top:8px">' + dateStr + '</div>' +
-          '</div>' +
-          '<div style="display:flex;gap:4px;flex-shrink:0">' +
-            '<button type="button" data-inbox-action="star" data-id="' + e.id + '" title="' + (e.starred ? 'Unstar' : 'Star') + '" style="padding:6px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:14px">' + (e.starred ? '⭐' : '☆') + '</button>' +
-            '<button type="button" data-inbox-action="archive" data-id="' + e.id + '" title="Archive" style="padding:6px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px">📦</button>' +
-            '<button type="button" data-inbox-action="delete" data-id="' + e.id + '" title="Delete" style="padding:6px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;color:var(--danger)">🗑</button>' +
-          '</div>' +
-        '</div>' +
-        // Link to lead badge
-        (lead ?
-          '<div style="margin-top:12px;padding:8px 12px;background:#eff6ff;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">' +
-            '<div style="font-size:12px;color:#1e40af">↳ Dari lead: <strong>' + escapeHTML(lead.name) + '</strong> · ' + escapeHTML(lead.company || '') + ' · ' + escapeHTML(lead.email || '') + '</div>' +
-            '<button type="button" data-inbox-action="open-lead" data-lead-id="' + lead.id + '" style="padding:4px 10px;background:#2563eb;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">Buka Lead →</button>' +
-          '</div>'
-        : '') +
-      '</div>' +
-      // Body
-      '<div style="flex:1;overflow-y:auto;padding:20px;background:#fafbfc">' +
-        '<div style="background:white;padding:20px;border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;font-size:14px;line-height:1.65;color:var(--fg);max-width:720px">' + escapeHTML(e.body) + '</div>' +
-        // Attachments
-        (e.attachments && e.attachments.length > 0
-          ? '<div style="max-width:720px;margin-top:14px">' +
-              '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);font-weight:600;margin-bottom:6px">Attachments (' + e.attachments.length + ')</div>' +
-              '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-                e.attachments.map(a =>
-                  '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:white;border:1px solid var(--border);border-radius:6px;font-size:12px">' +
-                    '<span style="font-size:18px">📎</span>' +
-                    '<div>' +
-                      '<div style="font-weight:600;color:var(--fg)">' + escapeHTML(a.name) + '</div>' +
-                      (a.size ? '<div style="font-size:10px;color:var(--muted)">' + escapeHTML(a.size) + '</div>' : '') +
-                    '</div>' +
-                  '</div>'
-                ).join('') +
-              '</div>' +
-            '</div>'
-          : '') +
-      '</div>' +
-      // Reply composer
-      '<div style="padding:14px 20px;border-top:1px solid var(--border);background:white">' +
-        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
-          '<button type="button" data-inbox-action="reply" data-id="' + e.id + '" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">↩ Reply via Email Blast</button>' +
-          '<button type="button" data-inbox-action="create-task" data-id="' + e.id + '" style="padding:8px 14px;background:white;color:var(--fg);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">✓ Create Task</button>' +
-          '<button type="button" data-inbox-action="log-activity" data-id="' + e.id + '" style="padding:8px 14px;background:white;color:var(--fg);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">📝 Log as Activity</button>' +
-          (e.status !== 'replied'
-            ? '<button type="button" data-inbox-action="mark-replied" data-id="' + e.id + '" style="padding:8px 14px;background:white;color:#166534;border:1px solid #86efac;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;margin-left:auto">✓ Mark as Replied</button>'
-            : '<span style="margin-left:auto;font-size:12px;color:#166534;font-weight:600">✓ Sudah dibalas ' + (e.replied_at ? new Date(e.replied_at).toLocaleDateString('id-ID') : '') + '</span>') +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  }
-
-  function wireInboxEvents() {
-    // Open email
-    document.querySelectorAll('[data-inbox-action="open"]').forEach(el => {
-      el.addEventListener('click', () => {
-        const id = el.getAttribute('data-id');
-        state.selectedEmailId = id;
-        // Mark as read if unread
-        const e = state.inboxEmails.find(x => x.id === id);
-        if (e && e.status === 'unread') {
-          e.status = 'read';
-          e.read_at = new Date().toISOString();
-          saveInboundEmails(state.inboxEmails);
-        }
-        renderInboxView();
-        updateSidebarCounts();
-      });
-    });
-    // Filter pills
-    document.querySelectorAll('[data-inbox-action="filter"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.inboxFilter = btn.getAttribute('data-filter');
-        renderInboxView();
-      });
-    });
-    // Search
-    const searchEl = document.querySelector('[data-inbox-action="search"]');
-    if (searchEl) {
-      let t;
-      searchEl.addEventListener('input', () => {
-        clearTimeout(t);
-        t = setTimeout(() => {
-          state.inboxQuery = searchEl.value;
-          renderInboxView();
-        }, 200);
-      });
-    }
-    // Star toggle
-    document.querySelectorAll('[data-inbox-action="star"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        const e = state.inboxEmails.find(x => x.id === id);
-        if (e) {
-          e.starred = !e.starred;
-          saveInboundEmails(state.inboxEmails);
-          renderInboxView();
-          updateSidebarCounts();
-        }
-      });
-    });
-    // Archive
-    document.querySelectorAll('[data-inbox-action="archive"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        const e = state.inboxEmails.find(x => x.id === id);
-        if (e) {
-          e.status = 'archived';
-          state.selectedEmailId = null;
-          saveInboundEmails(state.inboxEmails);
-          toast('📦 Email archived');
-          renderInboxView();
-          updateSidebarCounts();
-        }
-      });
-    });
-    // Delete
-    document.querySelectorAll('[data-inbox-action="delete"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (!confirm('Delete this email permanently?')) return;
-        const id = btn.getAttribute('data-id');
-        state.inboxEmails = state.inboxEmails.filter(x => x.id !== id);
-        state.selectedEmailId = null;
-        saveInboundEmails(state.inboxEmails);
-        toast('🗑 Email deleted');
-        renderInboxView();
-        updateSidebarCounts();
-      });
-    });
-    // Open lead drawer
-    document.querySelectorAll('[data-inbox-action="open-lead"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-lead-id');
-        state.drawerLeadId = id;
-        state.drawerTab = 'overview';
-        setView('contacts');
-        renderLeadDrawer();
-      });
-    });
-    // Reply via email blast
-    document.querySelectorAll('[data-inbox-action="reply"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        const e = state.inboxEmails.find(x => x.id === id);
-        if (!e) return;
-        // Pre-fill compose from this email
-        emailBlast.compose.subject = 'Re: ' + (e.subject || '').replace(/^Re:\s*/i, '');
-        emailBlast.compose.body = '\n\n\n--- Original message ---\nFrom: ' + e.from_name + ' <' + e.from_email + '>\nDate: ' + new Date(e.received_at).toLocaleString() + '\nSubject: ' + e.subject + '\n\n' + e.body;
-        emailBlast.compose.recipients = e.lead_id ? [{ lead_id: e.lead_id }] : [];
-        emailBlast.compose.loadedAudienceName = '';
-        emailBlast.activeTab = 'compose';
-        // Mark as replied
-        if (e.status !== 'replied') {
-          e.status = 'replied';
-          e.replied_at = new Date().toISOString();
-          saveInboundEmails(state.inboxEmails);
-        }
-        setView('email-blast');
-        toast('↩ Reply loaded into Email Blast composer');
-      });
-    });
-    // Create task from email
-    document.querySelectorAll('[data-inbox-action="create-task"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        const e = state.inboxEmails.find(x => x.id === id);
-        if (!e) return;
-        const tomorrow = new Date(Date.now() + 86400000);
-        const task = {
-          id: 'T-' + Math.floor(Math.random() * 9000 + 1000),
-          lead_id: e.lead_id || null,
-          title: 'Follow up: ' + (e.subject || '').slice(0, 60),
-          due_at: tomorrow.toISOString(),
-          completed: false,
-          completed_at: null,
-          notes: 'From email from ' + e.from_name + ': ' + (e.snippet || ''),
-          created_at: new Date().toISOString(),
-        };
-        state.tasks = [task, ...state.tasks];
-        saveTasks(state.tasks);
-        toast('✓ Task created: ' + task.title.slice(0, 40));
-      });
-    });
-    // Log as activity
-    document.querySelectorAll('[data-inbox-action="log-activity"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        const e = state.inboxEmails.find(x => x.id === id);
-        if (!e || !e.lead_id) { toast('Email ini belum ter-link ke lead'); return; }
-        const activity = {
-          id: 'A-' + Math.floor(Math.random() * 9000 + 1000),
-          lead_id: e.lead_id,
-          type: 'email',
-          title: 'Email received: ' + (e.subject || '').slice(0, 60),
-          notes: e.body.slice(0, 200),
-          created_at: new Date().toISOString(),
-        };
-        state.activities = [activity, ...state.activities];
-        saveActivities(state.activities);
-        toast('📝 Logged as activity');
-      });
-    });
-    // Mark as replied manually
-    document.querySelectorAll('[data-inbox-action="mark-replied"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        const e = state.inboxEmails.find(x => x.id === id);
-        if (e) {
-          e.status = 'replied';
-          e.replied_at = new Date().toISOString();
-          saveInboundEmails(state.inboxEmails);
-          toast('✓ Marked as replied');
-          renderInboxView();
-          updateSidebarCounts();
-        }
-      });
-    });
-  }
-
-  /* =================================================================
    * AUDIENCES (saved recipient segments)
    * ================================================================= */
   function renderAudiencesView() {
@@ -5559,25 +5144,20 @@
         <div>
           <h2 class="text-lg font-semibold flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            Email
+            Email Blast
             <span class="badge-pill badge-busdev">B</span>
-            <span class="text-sm font-normal text-gray-500">— BusDev (B2B partnership)</span>
+            <span class="text-sm font-normal text-gray-500">— untuk BusDev (B2B partnership)</span>
           </h2>
-          <p class="text-sm text-gray-500">Kirim, terima, dan monitor email — semua dalam satu tempat.</p>
+          <p class="text-sm text-gray-500">Kirim email formal ke banyak companies. Subject + body + attachments.</p>
         </div>
         <div class="blast-tabs">
-          <button class="blast-tab ${emailBlast.activeTab==='inbox'?'active':''}" data-blast-tab="inbox" data-channel="email">📥 Inbox${(state.inboxEmails||[]).filter(e=>e.status==='unread').length ? ' (' + (state.inboxEmails||[]).filter(e=>e.status==='unread').length + ')' : ''}</button>
           <button class="blast-tab ${emailBlast.activeTab==='compose'?'active':''}" data-blast-tab="compose" data-channel="email">Compose</button>
           <button class="blast-tab ${emailBlast.activeTab==='drafts'?'active':''}" data-blast-tab="drafts" data-channel="email">Drafts (${emailBlast.drafts.length})</button>
           <button class="blast-tab ${emailBlast.activeTab==='history'?'active':''}" data-blast-tab="history" data-channel="email">History (${emailBlast.history.length})</button>
         </div>
       </div>
-      ${emailBlast.activeTab === 'inbox' ? '<div id="email-inbox-host" style="height:calc(100vh - 220px)"></div>' : emailBlast.activeTab === 'compose' ? renderBlastCanvas({ channel: 'email', mode: 'edit' }) : emailBlast.activeTab === 'drafts' ? renderBlastDrafts(emailBlast, 'email') : renderBlastHistory(emailBlast, 'email')}
+      ${emailBlast.activeTab === 'compose' ? renderBlastCanvas({ channel: 'email', mode: 'edit' }) : emailBlast.activeTab === 'drafts' ? renderBlastDrafts(emailBlast, 'email') : renderBlastHistory(emailBlast, 'email')}
     `;
-    if (emailBlast.activeTab === 'inbox') {
-      // Render inbox view into the host inside the blast container
-      renderInboxViewInto('email-inbox-host');
-    }
     wireBlastEvents('email');
     setupBlockInteractions();
   }
@@ -6583,8 +6163,7 @@
       { ls: P + 'blast-email:v1', table: 'blast_drafts', part: 'drafts', channel: 'email', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at'] },
       { ls: P + 'blast-email:v1', table: 'blast_history', part: 'history', channel: 'email', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] },
       { ls: P + 'blast-wa:v1', table: 'blast_drafts', part: 'drafts', channel: 'wa', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at'] },
-      { ls: P + 'blast-wa:v1', table: 'blast_history', part: 'history', channel: 'wa', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] },
-      { ls: P + 'inbox:v1', table: 'inbound_emails', cols: ['id','from_email','from_name','to_email','subject','body','snippet','lead_id','blast_id','status','starred','has_attachments','attachments','received_at','read_at','replied_at'] }
+      { ls: P + 'blast-wa:v1', table: 'blast_history', part: 'history', channel: 'wa', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] }
     ];
     var NULLABLE = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, last_used:1, audience_id:1, lead_id:1 };
     var known = {}; /* "table|channel" -> array of ids known on server */
@@ -6720,9 +6299,9 @@
       var keyOk = cfg.anonKey && !/PASTE/.test(cfg.anonKey) && window.supabase;
       if (keyOk) {
         try {
-          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true } });
           window.__sb = sb; /* dipakai untuk tes & fitur kirim email */
-          // Anon-mode: skip login modal (single-user mode — anon key + RLS allow-all)
+          await ensureLogin();
           await hydrate();
           synced = true;
           hookWrites();
@@ -6733,7 +6312,7 @@
         console.warn('[supabase] anonKey belum diisi, pakai localStorage saja.');
       }
       startApp();
-      // No logout button in anon mode (no user session to log out of)
+      if (synced) addLogout();
     })();
   })();
   </script>
