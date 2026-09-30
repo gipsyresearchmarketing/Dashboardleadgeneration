@@ -6251,6 +6251,44 @@
       };
     }
 
+    async function ensureLogin() {
+      var cur = await sb.auth.getSession();
+      if (cur.data && cur.data.session) return;
+      await new Promise(function (resolve) {
+        var st = 'width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:10px;font-size:14px;box-sizing:border-box';
+        var ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif';
+        ov.innerHTML = '<form style="background:#fff;padding:28px;border-radius:14px;border:1px solid #e2e8f0;width:min(360px,90vw)">'
+          + '<div style="font-weight:700;font-size:18px;margin-bottom:4px">Leads CRM</div>'
+          + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">Masuk untuk melanjutkan</div>'
+          + '<input name="e" type="email" placeholder="Email" required autocomplete="username" style="' + st + '">'
+          + '<input name="p" type="password" placeholder="Password" required autocomplete="current-password" style="' + st + '">'
+          + '<div data-err style="color:#e11d48;font-size:13px;min-height:18px;margin-bottom:8px"></div>'
+          + '<button type="submit" style="width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;font-size:14px;cursor:pointer">Masuk</button></form>';
+        document.body.appendChild(ov);
+        var f = ov.querySelector('form');
+        f.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          var b = f.querySelector('button'); b.disabled = true;
+          var r = await sb.auth.signInWithPassword({ email: f.querySelector('[name=e]').value.trim(), password: f.querySelector('[name=p]').value });
+          if (r.error) { f.querySelector('[data-err]').textContent = 'Email atau password salah.'; b.disabled = false; return; }
+          ov.remove(); resolve();
+        });
+      });
+    }
+
+    function addLogout() {
+      var b = document.createElement('button');
+      b.textContent = 'Keluar';
+      b.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:9999;padding:6px 12px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;font-size:12px;cursor:pointer;color:#475569';
+      b.addEventListener('click', async function () {
+        await sb.auth.signOut();
+        Object.keys(localStorage).filter(function (k) { return k.indexOf('leads-dashboard:') === 0; }).forEach(function (k) { localStorage.removeItem(k); });
+        location.reload();
+      });
+      document.body.appendChild(b);
+    }
+
     function startApp() {
       var el = document.createElement('script');
       el.textContent = document.getElementById('app-src').textContent;
@@ -6261,7 +6299,8 @@
       var keyOk = cfg.anonKey && !/PASTE/.test(cfg.anonKey) && window.supabase;
       if (keyOk) {
         try {
-          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true } });
+          await ensureLogin();
           await hydrate();
           synced = true;
           hookWrites();
@@ -6272,6 +6311,7 @@
         console.warn('[supabase] anonKey belum diisi, pakai localStorage saja.');
       }
       startApp();
+      if (synced) addLogout();
     })();
   })();
   </script>
