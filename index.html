@@ -1151,10 +1151,15 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.05), 0 0 0 1px var(--border);
     }
     .canvas-col .email-card-header {
-      padding: 12px 20px; border-bottom: 1px solid #f1f5f9;
+      padding: 14px 20px 12px 20px; border-bottom: 1px solid #f1f5f9;
       font-size: 12px; color: #6b7280;
     }
-    .canvas-col .email-card-header .ech-from { font-weight: 600; color: #374151; }
+    .canvas-col .email-card-header .ech-from { font-weight: 600; color: #374151; display: block; margin-bottom: 4px; }
+    .canvas-col .email-card-header .ech-subject {
+      font-size: 16px; font-weight: 600; color: #111827; line-height: 1.35;
+      word-wrap: break-word;
+    }
+    .canvas-col .email-card-header .ech-subject.empty { color: #cbd5e1; font-weight: 500; font-style: italic; }
     .canvas-col .email-card-body {
       padding: 24px 28px; min-height: 240px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -5125,7 +5130,9 @@
       '<div class="email-card">' +
         '<div class="email-card-header">' +
           '<span class="ech-from">From: Your Business &lt;hello@business.com&gt;</span>' +
-          (isEmail && compose.subject ? ' · <span><strong>Subject:</strong> ' + escapeHTML(compose.subject) + '</span>' : '') +
+          (isEmail
+            ? '<div class="ech-subject' + (compose.subject ? '' : ' empty') + '">' + escapeHTML(compose.subject || 'Subject line...') + '</div>'
+            : '') +
         '</div>' +
         '<div ' + editableAttr + ' data-blast-input="body" class="email-card-body' + (readOnly ? ' readonly' : '') + '" data-placeholder="Click here and start typing your message…">' + (compose.body || compose.message || '') + '</div>' + (readOnly ? '' :
           '<div class="email-dropzone" data-blast-dropzone="end" style="padding:10px;text-align:center;font-size:11px;color:var(--muted);border:1px dashed var(--border);border-radius:6px;margin-top:6px">Drop module here ↓</div>'
