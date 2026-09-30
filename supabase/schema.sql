@@ -5,6 +5,7 @@
 -- =====================================================
 
 -- Optional: drop existing tables if rebuilding
+-- DROP TABLE IF EXISTS inbound_emails CASCADE;
 -- DROP TABLE IF EXISTS blast_history CASCADE;
 -- DROP TABLE IF EXISTS blast_drafts CASCADE;
 -- DROP TABLE IF EXISTS audiences CASCADE;
@@ -133,6 +134,32 @@ CREATE INDEX blast_history_channel_idx ON blast_history (channel);
 CREATE INDEX blast_history_status_idx ON blast_history (status);
 
 -- =====================================================
+-- INBOUND_EMAILS: received emails (mock data — wired for real webhook later)
+-- =====================================================
+CREATE TABLE inbound_emails (
+  id              text PRIMARY KEY,
+  from_email      text NOT NULL,
+  from_name       text NOT NULL DEFAULT '',
+  to_email        text NOT NULL,
+  subject         text NOT NULL,
+  body            text NOT NULL,
+  snippet         text NOT NULL DEFAULT '',
+  lead_id         text,
+  blast_id        text,                          -- optional: reply to which blast
+  status          text NOT NULL DEFAULT 'unread' CHECK (status IN ('unread','read','replied','archived')),
+  starred         boolean NOT NULL DEFAULT false,
+  has_attachments boolean NOT NULL DEFAULT false,
+  attachments     jsonb NOT NULL DEFAULT '[]'::jsonb,
+  received_at     timestamptz NOT NULL DEFAULT now(),
+  read_at         timestamptz,
+  replied_at      timestamptz
+);
+
+CREATE INDEX inbound_emails_status_idx ON inbound_emails (status);
+CREATE INDEX inbound_emails_lead_idx   ON inbound_emails (lead_id);
+CREATE INDEX inbound_emails_received_idx ON inbound_emails (received_at DESC);
+
+-- =====================================================
 -- ROW LEVEL SECURITY
 -- =====================================================
 ALTER TABLE leads             ENABLE ROW LEVEL SECURITY;
@@ -142,6 +169,7 @@ ALTER TABLE tasks            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE blast_drafts     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE blast_history    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inbound_emails   ENABLE ROW LEVEL SECURITY;
 
 -- Allow all for anon (single-user mode). Tighten later when adding auth.
 GRANT USAGE ON SCHEMA public TO anon;
@@ -156,13 +184,14 @@ CREATE POLICY "anon_all_tasks"         ON tasks         FOR ALL TO anon USING (t
 CREATE POLICY "anon_all_activities"    ON activities    FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all_drafts"        ON blast_drafts  FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all_history"       ON blast_history FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_inbound"       ON inbound_emails FOR ALL TO anon USING (true) WITH CHECK (true);
 
 -- =====================================================
 -- SEED DATA (Indonesian sample data for demos)
 -- =====================================================
 
 -- Clear existing data first (idempotent re-run)
-TRUNCATE leads, tasks, activities, audiences, assets, blast_drafts, blast_history CASCADE;
+TRUNCATE leads, tasks, activities, audiences, assets, blast_drafts, blast_history, inbound_emails CASCADE;
 
 -- 20 sample leads (mix of companies and persons across 6 statuses)
 INSERT INTO leads (id, type, name, company, email, phone, status, sales_value, notes, last_contacted_at, tags) VALUES
@@ -226,3 +255,152 @@ INSERT INTO assets (id, kind, name, url, created_at) VALUES
   ('AS-001','image','Q3 Promo Banner','https://picsum.photos/seed/q3promo/600/250', '2026-08-15T10:00:00Z'),
   ('AS-002','image','Hero Image Sample','https://picsum.photos/seed/hero/600/200', '2026-08-14T11:00:00Z'),
   ('AS-003','file','Pricing PDF','pricing-2026-q3.pdf', '2026-08-13T09:00:00Z');
+
+-- =====================================================
+-- INBOUND EMAIL SEED (mock — replies from real leads)
+-- =====================================================
+INSERT INTO inbound_emails (id, from_email, from_name, to_email, subject, body, snippet, lead_id, blast_id, status, starred, has_attachments, received_at) VALUES
+  ('INB-001','citra.lestari@mitrasehat.com','Citra Lestari','sales@leadsdashboard.id','Re: Proposal Kerjasama CV Mitra Sehat','Halo Tim Sales,
+
+Terima kasih atas proposal v2 yang dikirimkan kemarin. Sudah saya review dan didiskusikan dengan tim finance.
+
+Secara umum kami setuju dengan skema pricing yang ditawarkan, namun ada beberapa hal yang perlu kita bicarakan lebih lanjut:
+
+1. Untuk diskon 7% yang ditawarkan, kami butuh ini dinaikkan menjadi minimal 10% karena budget tahun ini sudah locked.
+2. Modul training implementasi yang disebutkan di halaman 5 — bisa tolong jelaskan apakah ini on-site atau remote?
+3. Apakah bisa ada grace period 30 hari sebelum payment termin pertama?
+
+Mohon konfirmasinya. Saya available untuk call di hari Selasa atau Kamis sore.
+
+Best regards,
+Citra Lestari
+Finance Director, CV Mitra Sehat','Re: Proposal Kerjasama — setuju pricing, minta diskusi diskon & grace period lebih lanjut','L-0003',NULL,'unread',true,false,'2026-09-29T16:42:00Z'),
+
+  ('INB-002','joko.riyanto@logistikcepat.co.id','Joko Riyanto','sales@leadsdashboard.id','Re: Proposal Enterprise - PT Logistik Cepat Indonesia','Selamat pagi,
+
+Setelah saya presentasikan proposal Anda ke board of directors minggu lalu, response-nya positif. Kami tertarik untuk move forward ke tahap POC (proof of concept).
+
+Beberapa pertanyaan teknis:
+- Apakah modul fleet management Anda support integrasi dengan GPS tracking kami saat ini (Geotab)?
+- Berapa lama waktu implementasi typical untuk fleet 50+ vehicles?
+- Apakah ada referensi client di industri logistics/logistik?
+
+Mohon schedule demo dengan technical team kami.
+
+Salam,
+Joko Riyanto
+CTO, PT Logistik Cepat Indonesia','Re: Proposal Enterprise — board approve POC, butuh klarifikasi integrasi GPS & timeline','L-0010',NULL,'unread',true,false,'2026-09-29T14:15:00Z'),
+
+  ('INB-003','maya@salonmaya.id','Maya Anggraini','sales@leadsdashboard.id','Tertarik dengan paket Mobile POS','Halo! Saya Maya dari Salon Maya Beauty di BSD.
+
+Tadi pagi saya lihat iklan Instagram Anda tentang paket Mobile POS untuk salon & beauty business. Saya tertarik banget karena saya lagi struggle sama sistem pencatatan yang masih manual.
+
+Bisa tolong info lebih detail:
+- Harga paket mobile POS berapa ya?
+- Apakah bisa integrasi dengan payment gateway (OVO, GoPay, Dana)?
+- Ada free trial ga?
+
+Mohon dikirim pricelist + demo video nya.
+
+Terima kasih,
+Maya Anggraini
+Owner, Salon Maya Beauty','Inquiry dari Instagram Ads — tertarik Mobile POS, minta pricelist + demo video','L-0013',NULL,'unread',false,false,'2026-09-30T08:22:00Z'),
+
+  ('INB-004','qori@pesantren-h.id','Ustadz Qori Hidayatullah','sales@leadsdashboard.id','Trial Account - Pesantren Hidayatullah','Assalamualaikum,
+
+Saya Ustadz Qori dari Pesantren Hidayatullah Yogyakarta. Kami sedang membutuhkan sistem untuk manage data siswa + pembayaran SPP.
+
+Saya sudah mencoba daftar trial 30 hari sesuai instruksi tim Anda. Namun sampai sekarang (3 hari kemudian) belum ada email konfirmasi yang masuk. Mohon dicekan.
+
+Juga tolong informasikan:
+- Berapa biaya implementasi awal?
+- Apakah ada diskon khusus untuk institusi pendidikan pesantren?
+- Bisa custom modul bahasa Arab?
+
+Wassalam,
+Ustadz Qori','Trial account belum aktif — minta follow up + info harga & diskon pesantren','L-0017',NULL,'unread',false,false,'2026-09-29T10:05:00Z'),
+
+  ('INB-005','indah.sari@sarirasa.id','Indah Sari','sales@leadsdashboard.id','Re: Welcome to LeadsDashboard','Halo,
+
+Terima kasih atas welcome email-nya. Saya Indah dari CV Sari Rasa Catering, di-referensikan oleh Bu Tantri (Tantri Wedding Organizer).
+
+Kami butuh sistem untuk manage:
+1. Order catering harian & event
+2. Schedule kitchen + delivery team
+3. Customer database untuk repeat order
+
+Apakah LeadsDashboard bisa handle use case catering? Beda dengan wedding organizer kan? Mohon penjelasan.
+
+Saya available untuk demo online Kamis depan jam 14:00 WIB.
+
+Salam,
+Indah Sari
+Owner, CV Sari Rasa Catering','Re: Welcome — di-referral Bu Tantri, butuh catering management, available demo Kamis','L-0009',NULL,'read',false,false,'2026-09-28T19:30:00Z'),
+
+  ('INB-006','rini.hartono@hartono-furnitur.id','Rini Hartono','sales@leadsdashboard.id','Re: Termin Pembayaran - CV Hartono Furniture','Dear Tim Sales,
+
+Saya Rini Hartono. Sudah kita sepakati skema termin 30-60-30 untuk kontrak furniture kantor baru.
+
+Namun setelah saya berdiskusi dengan finance team, mereka minta revisi:
+- Termin 1: 40% (sebelumnya 30%)
+- Termin 2: 40% (sebelumnya 60%)
+- Termin 3: 20% (sebelumnya 30%)
+
+Apakah ini bisa di-approve? Kita bisa proceed dengan PO minggu depan kalau sudah deal.
+
+Mohon responnya segera karena vendor lain juga sudah offering skema serupa.
+
+Best,
+Rini Hartono','Re: Termin — finance minta revisi 40-40-20, butuh approval cepat untuk PO minggu depan','L-0018',NULL,'read',false,false,'2026-09-30T09:15:00Z'),
+
+  ('INB-007','noreply@linkedin.com','LinkedIn','sales@leadsdashboard.id','You have 23 new profile views this week','Hi Bagas,
+
+Your profile was viewed by 23 professionals this week, including:
+- Surya Pranata (Energy Industry Manager at PT Surya Energy)
+- Dimas Aryasatya (Owner, Toko Dimas Elektronik)
+
+Upgrade to Premium to see all viewers and reach out directly.
+
+Best,
+The LinkedIn Team','LinkedIn notification — 23 profile views, termasuk 2 leads hot dari inbox Anda',NULL,NULL,'read',false,false,'2026-09-29T07:00:00Z'),
+
+  ('INB-008','lutfi.hakim@hakim-mfg.com','Lutfi Hakim','sales@leadsdashboard.id','Konfirmasi Renewal Kontrak Tahap 2','Halo Tim LeadsDashboard,
+
+Bersamaan dengan email ini saya ingin konfirmasi bahwa PT Hakim Manufacturing akan proceed dengan renewal kontrak tahap 2 untuk periode 2026-2027.
+
+Beberapa hal yang sudah disetujui internal kami:
+- Volume sama dengan kontrak tahun 1
+- Tambahan 5 user seats untuk divisi baru
+- Modul HR integration (sesuai diskusi bulan lalu)
+
+Mohon kirim invoice renewal selambat-lambatnya 1 Oktober 2026.
+
+Terima kasih atas partnership-nya selama ini.
+
+Best regards,
+Lutfi Hakim
+Managing Director, PT Hakim Manufacturing','Konfirmasi renewal kontrak tahun 2 + tambah 5 seats + modul HR','L-0012',NULL,'read',true,true,'2026-09-30T10:45:00Z'),
+
+  ('INB-009','tantri@tantriwo.com','Tantri Wulandari','sales@leadsdashboard.id','Referral: CV Sari Rasa Catering','Halo!
+
+Saya Tantri, customer setia LeadsDashboard sejak 2024. Saya mau referensikan kolega saya, Indah Sari dari CV Sari Rasa Catering.
+
+Mereka butuh sistem manage order catering dan schedule kitchen. Saya sudah kasih tau dia untuk kontak sales@leadsdashboard.id langsung.
+
+Tolong follow up ya. Kalau closing, jangan lupa kasih tahu saya — saya dengar ada program referral bonus kan? 😊
+
+Salam,
+Tantri Wulandari
+Tantri Wedding Organizer','Referral dari Tantri WO — CV Sari Rasa Catering butuh catering management system','L-0020',NULL,'replied',false,false,'2026-09-27T15:20:00Z'),
+
+  ('INB-010','erika.w@solusidigital.asia','Erika Wulandari','sales@leadsdashboard.id','Testimonial & Case Study Permission','Halo Tim,
+
+Saya Erika dari PT Solusi Digital Asia. Kita sudah closing deal 2 minggu lalu dan tim sudah mulai implementasi.
+
+Saya sangat puas dengan onboarding process dan responsiveness tim support Anda. Saya ingin menulis testimonial untuk website Anda dan publish case study kita sebagai referensi.
+
+Apakah tim marketing Anda bisa schedule call 30 menit minggu depan untuk discuss? Saya juga tertarik untuk join sebagai reference customer untuk prospect baru di industri SaaS / digital agency.
+
+Best,
+Erika Wulandari
+CEO, PT Solusi Digital Asia','Post-sale follow up — Erika mau tulis testimonial & jadi reference customer','L-0005',NULL,'replied',true,false,'2026-09-26T11:30:00Z');
