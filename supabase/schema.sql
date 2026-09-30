@@ -144,7 +144,12 @@ ALTER TABLE blast_drafts     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE blast_history    ENABLE ROW LEVEL SECURITY;
 
 -- Allow all for anon (single-user mode). Tighten later when adding auth.
-CREATE POLICY "anon_all_leads"          ON leads          FOR ALL TO anon USING (true) WITH CHECK (true);
+GRANT USAGE ON SCHEMA public TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon;
+
+-- This is critical: without explicit grants, the anon role cannot query tables
+-- even when RLS policies allow it. RLS only filters rows; it does not grant access.CREATE POLICY "anon_all_leads"          ON leads          FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all_audiences"      ON audiences      FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all_assets"        ON assets        FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all_tasks"         ON tasks         FOR ALL TO anon USING (true) WITH CHECK (true);
