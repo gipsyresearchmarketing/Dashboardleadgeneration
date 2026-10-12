@@ -5,7 +5,15 @@
       "Bash(awk '/^  function renderTable/,/^  }$/' \"/Users/bagas/Documents/Dashboard leads generation/dashboard.html\")",
       "Bash(awk 'NR==3446,NR==3905' \"/Users/bagas/Documents/Dashboard leads generation/dashboard.html\")",
       "Bash(git add *)",
-      "Bash(git commit -m 'Add Edit functionality in lead drawer + Contacts as pipeline board *)"
+      "Bash(git commit -m 'Add Edit functionality in lead drawer + Contacts as pipeline board *)",
+      "Bash(git rebase *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git push *)",
+      "Bash(git stash *)",
+      "Bash(git reset *)",
+      "Bash(sleep *)",
+      "Bash(git commit -m 'Fix Contacts view: replace table layout with board host *)"
     ]
   }
 }

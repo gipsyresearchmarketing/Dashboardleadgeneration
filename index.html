@@ -1779,52 +1779,9 @@
         </section>
       </div>
 
-      <!-- ========== View: Contacts (Person / Marketing) ========== -->
+      <!-- ========== View: Contacts (Person / Marketing) — pipeline board ========== -->
       <div class="view-container" id="view-contacts">
-        <div class="card overflow-hidden">
-          <div class="p-5 border-b">
-            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-              <div>
-                <h3 class="font-semibold flex items-center gap-2">
-                  <span class="badge-pill badge-marketing" style="margin-right:0">M</span>
-                  Contacts
-                  <span class="text-xs font-normal text-gray-500">— untuk tim Marketing (produk)</span>
-                </h3>
-                <p class="text-sm text-gray-500 mt-1" id="table-count">— of — shown</p>
-              </div>
-              <div class="flex flex-col sm:flex-row gap-2">
-                <div class="relative">
-                  <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                  <input id="search" type="text" placeholder="Search name or company..." class="input pl-9 w-full sm:w-64" />
-                </div>
-                <div class="relative">
-                  <button id="status-filter-btn" class="btn btn-outline w-full justify-between">
-                    <span id="status-filter-label">All status</span>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="table w-full">
-              <thead>
-                <tr>
-                  <th><button class="sort-btn" data-sort="name">Name <span data-arrow="name">↕</span></button></th>
-                  <th class="table-hide-mobile">Email / Phone</th>
-                  <th>Status</th>
-                  <th class="table-hide-mobile">Produk</th>
-                  <th class="table-hide-mobile">Tgl Transaksi</th>
-                  <th class="text-right"><button class="sort-btn" data-sort="sales_value">Nilai <span data-arrow="sales_value">�</span></button></th>
-                  <th class="table-hide-mobile"><button class="sort-btn" data-sort="last_contacted_at">Last Contact <span data-arrow="last_contacted_at">↕</span></button></th>
-                  <th class="w-12"></th>
-                </tr>
-              </thead>
-              <tbody id="table-body"></tbody>
-            </table>
-          </div>
-        </div>
+        <main id="contacts-host"></main>
       </div>
 
       <!-- ========== View: Tasks ========== -->
@@ -4352,7 +4309,9 @@
 
   /* ----- Board view (kanban of companies) ----- */
   function wsRenderBoard(filterType) {
-    const host = document.getElementById('board-host');
+    // Render into board-host (Companies) or contacts-host (Contacts)
+    const hostId = filterType === 'person' ? 'contacts-host' : 'board-host';
+    const host = document.getElementById(hostId);
     if (!host) return;
     const list = filterType === 'person' ? wsPersons() : wsCompanies();
     const addLabel = filterType === 'person' ? 'Contact' : 'Company';
