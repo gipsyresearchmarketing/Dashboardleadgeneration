@@ -3251,8 +3251,21 @@
     const leadActs  = state.activities.filter(a => a.lead_id === lead.id);
     const isEdit = state.drawerEdit === true;
     return `
+      ${isEdit ? `
+        <div style="background:linear-gradient(90deg,#fef3c7 0%,#fde68a 100%);padding:10px 16px;border-bottom:2px solid #f59e0b;display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">✎</span>
+            <strong style="font-size:13px;color:#92400e">EDIT MODE</strong>
+            <span style="font-size:12px;color:#a16207">— make changes, then click Save</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-primary" id="save-edit-btn-top" style="padding:6px 14px;font-size:12px;font-weight:600">💾 Save</button>
+            <button class="btn btn-outline" id="cancel-edit-btn-top" style="padding:6px 14px;font-size:12px">Cancel</button>
+          </div>
+        </div>
+      ` : ''}
       <section class="drawer-section">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Contact</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">${isEdit ? '✎ Edit Contact' : 'Contact'}</h3>
         ${isEdit ? renderLeadEditForm(lead) : `
         <div class="space-y-2 text-sm">
           ${lead.email ? `<div class="flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg><a class="text-indigo-600 hover:underline truncate" href="mailto:${escapeHTML(lead.email)}">${escapeHTML(lead.email)}</a></div>` : ''}
@@ -3352,6 +3365,15 @@
       document.getElementById('drawer-host').innerHTML = drawerShell();
       renderDrawer();
     });
+    // Top Save/Cancel buttons (in the edit-mode banner)
+    const saveEditBtnTop = document.getElementById('save-edit-btn-top');
+    if (saveEditBtnTop) saveEditBtnTop.addEventListener('click', () => saveLeadEdit(lead));
+    const cancelEditBtnTop = document.getElementById('cancel-edit-btn-top');
+    if (cancelEditBtnTop) cancelEditBtnTop.addEventListener('click', () => {
+      state.drawerEdit = false;
+      document.getElementById('drawer-host').innerHTML = drawerShell();
+      renderDrawer();
+    });
     // Status select in header
     const statusSel = document.querySelector('[data-edit-field="status"]');
     if (statusSel) statusSel.addEventListener('change', () => {
@@ -3366,30 +3388,32 @@
   /* ----- Lead edit form (rendered inside drawer Overview when in edit mode) ----- */
   function renderLeadEditForm(lead) {
     return `
-      <div class="space-y-3 text-sm">
-        <div>
-          <label class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Name</label>
-          <input data-edit-field="name" class="input" style="margin-top:4px" value="${escapeHTML(lead.name || '')}" placeholder="Full name" />
-        </div>
-        <div>
-          <label class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Company</label>
-          <input data-edit-field="company" class="input" style="margin-top:4px" value="${escapeHTML(lead.company || '')}" placeholder="Company name" />
-        </div>
-        <div>
-          <label class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Email</label>
-          <input type="email" data-edit-field="email" class="input" style="margin-top:4px" value="${escapeHTML(lead.email || '')}" placeholder="email@example.com" />
-        </div>
-        <div>
-          <label class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Phone</label>
-          <input data-edit-field="phone" class="input" style="margin-top:4px" value="${escapeHTML(lead.phone || '')}" placeholder="+62 ..." />
-        </div>
-        <div>
-          <label class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Deal value (Rp)</label>
-          <input type="number" data-edit-field="sales_value" class="input" style="margin-top:4px" value="${lead.sales_value || 0}" placeholder="0" />
-        </div>
-        <div class="flex items-center gap-2 pt-2">
-          <button class="btn btn-primary" id="save-edit-btn" style="padding:6px 14px;font-size:12px;font-weight:600">💾 Save changes</button>
-          <button class="btn btn-outline" id="cancel-edit-btn" style="padding:6px 14px;font-size:12px">Cancel</button>
+      <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin-bottom:8px">
+        <div class="space-y-3 text-sm">
+          <div>
+            <label class="text-[11px] font-semibold text-gray-700">Name <span style="color:#dc2626">*</span></label>
+            <input data-edit-field="name" class="input" style="margin-top:4px" value="${escapeHTML(lead.name || '')}" placeholder="Full name" />
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-gray-700">Company</label>
+            <input data-edit-field="company" class="input" style="margin-top:4px" value="${escapeHTML(lead.company || '')}" placeholder="Company name" />
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-gray-700">Email</label>
+            <input type="email" data-edit-field="email" class="input" style="margin-top:4px" value="${escapeHTML(lead.email || '')}" placeholder="email@example.com" />
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-gray-700">Phone</label>
+            <input data-edit-field="phone" class="input" style="margin-top:4px" value="${escapeHTML(lead.phone || '')}" placeholder="+62 ..." />
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-gray-700">Deal value (Rp)</label>
+            <input type="number" data-edit-field="sales_value" class="input" style="margin-top:4px" value="${lead.sales_value || 0}" placeholder="0" />
+          </div>
+          <div class="flex items-center gap-2 pt-2">
+            <button class="btn btn-primary" id="save-edit-btn" style="padding:8px 16px;font-size:13px;font-weight:600">💾 Save changes</button>
+            <button class="btn btn-outline" id="cancel-edit-btn" style="padding:8px 16px;font-size:13px">Cancel</button>
+          </div>
         </div>
       </div>
     `;
@@ -3755,6 +3779,9 @@
       state.drawerEdit = !state.drawerEdit;
       document.getElementById('drawer-host').innerHTML = drawerShell();
       renderDrawer();
+      // Scroll the drawer content to top so the user sees the form immediately
+      const content = document.getElementById('drawer-content');
+      if (content) content.scrollTop = 0;
     });
     document.querySelectorAll('[data-drawer-tab]').forEach(b => {
       b.addEventListener('click', () => {
