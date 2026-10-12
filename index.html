@@ -4279,13 +4279,16 @@
       `<span class="chip ${tagColor(t)}" style="font-size:10px">${escapeHTML(t)}</span>`
     ).join(' ');
     const initials = (lead.name || '?').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+    // Don't show the company line if it's empty OR the same as the name
+    // (avoids "Unpad / Unpad" duplication and "name / -" empty cases)
+    const showCompany = lead.company && lead.company.trim() && lead.company !== lead.name;
     return `
       <div class="task-card" draggable="true" data-ws-lead="${lead.id}">
         <div class="tc-header">
           <div class="tc-avatar" style="background:${avatarColor(lead.id)}">${escapeHTML(initials)}</div>
           <div class="tc-name-info">
             <div class="tc-name" title="${escapeHTML(lead.name)}">${escapeHTML(lead.name)}</div>
-            <div class="tc-company" title="${escapeHTML(lead.company)}">${escapeHTML(lead.company)}</div>
+            ${showCompany ? `<div class="tc-company" title="${escapeHTML(lead.company)}">${escapeHTML(lead.company)}</div>` : ''}
           </div>
         </div>
         <div class="tc-body">
@@ -6785,6 +6788,11 @@
       const get = (r, f) => idx[f] === undefined ? '' : String(r[idx[f]] === undefined ? '' : r[idx[f]]).trim();
       const used = new Set(state.leads.map(l => l.id));
       const out = []; let skipped = 0;
+      // Force type based on the active view: Contacts → person, Companies → company
+      // User explicitly chose which view, so we honor that intent.
+      const viewForcedType = state.view === 'contacts' ? 'person'
+                            : state.view === 'board' ? 'company'
+                            : null;
       rows.slice(1).forEach((r, n) => {
         const name = get(r, 'name'), company = get(r, 'company'), email = get(r, 'email');
         if (!name && !company && !email) { skipped++; return; }
@@ -6792,15 +6800,23 @@
         if (!id || used.has(id)) id = 'L-' + Date.now().toString(36).toUpperCase() + '-' + (n + 1);
         used.add(id);
         const t = get(r, 'type').toLowerCase();
-        // Type detection: explicit > person when name+institution > person when name only > company when company only
-        let type = (t === 'person' || t === 'company') ? t : (name ? 'person' : 'company');
+        // Type detection priority: explicit column > active view > data shape
+        // (If user is on Contacts, default to person; on Companies, default to company;
+        //  otherwise fall back to data-shape heuristic)
+        let type;
+        if (t === 'person' || t === 'company') type = t;
+        else if (viewForcedType) type = viewForcedType;
+        else type = (name ? 'person' : 'company');
+        // If name is missing but company is filled (e.g. user only had institution
+        // name in their CSV), use company as the displayed name.
+        const displayName = name || company || '(no name)';
         // Notes: combine product_name + transaction_date + jurusan if notes is empty
         const baseNotes = get(r, 'notes');
         const extras = [];
         if (idx.transaction_date !== undefined && !baseNotes) extras.push('Tgl: ' + (normDate(get(r, 'transaction_date')) || get(r, 'transaction_date')));
         const combinedNotes = baseNotes || extras.join(' | ');
         out.push({
-          id: id, type: type, name: name || company, company: company, email: email,
+          id: id, type: type, name: displayName, company: company, email: email,
           phone: get(r, 'phone'), status: normStatus(get(r, 'status')),
           sales_value: Math.max(0, parseInt(get(r, 'sales_value').replace(/[^\d]/g, ''), 10) || 0),
           notes: combinedNotes,
