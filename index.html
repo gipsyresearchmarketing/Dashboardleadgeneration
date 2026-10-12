@@ -2940,7 +2940,11 @@
    * ================================================================ */
   function setView(view) {
     state.view = view;
-    const wsViews = ['board','board-list','board-calendar'];
+    // Workspace mode = full-screen workspace (hides CRM topbar)
+    // Both board and contacts use the same pipeline board UI but keep
+    // the CRM topbar so they stay consistent with other CRM views.
+    // Only board-calendar still uses full workspace mode.
+    const wsViews = ['board-calendar'];
     const inWorkspace = wsViews.includes(view);
     document.body.classList.toggle('workspace-mode', inWorkspace);
     document.querySelectorAll('.view-container').forEach(c => c.classList.toggle('active', c.id === `view-${view}`));
