@@ -5,6 +5,5 @@
       "source": "/(.*)",
       "destination": "/$1"
     }
-  ],
-  "cleanUrls": false
+  ]
 }
