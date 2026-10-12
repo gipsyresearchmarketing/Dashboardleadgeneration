@@ -7313,9 +7313,15 @@
       if (keyOk) {
         try {
           sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
-          window.__sb = sb; /* dipakai untuk tes & fitur kirim email */
-          // Anon-mode: skip login modal (single-user mode — anon key + RLS allow-all)
-          await hydrate();
+          window.__sb = sb;
+          // Race the hydrate against a 5s timeout. If Supabase hangs or
+          // the key is invalid (returning 401), we don't want to block
+          // the app boot forever.
+          var hydratePromise = hydrate().catch(function (e) {
+            console.warn('[supabase] hydrate failed:', e.message || e);
+          });
+          var timeout = new Promise(function (resolve) { setTimeout(resolve, 5000); });
+          await Promise.race([hydratePromise, timeout]);
           synced = true;
           hookWrites();
         } catch (e) {
