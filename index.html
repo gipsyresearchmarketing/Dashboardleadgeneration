@@ -3740,7 +3740,8 @@
 
   document.addEventListener('click', closeDropdowns);
 
-  document.getElementById('status-filter-btn').addEventListener('click', (e) => {
+  const statusFilterBtn = document.getElementById('status-filter-btn');
+  if (statusFilterBtn) statusFilterBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (document.getElementById('status-dropdown')) {
       closeDropdowns();
@@ -4085,7 +4086,8 @@
   /* ================================================================
    * Search + sort + reset
    * ================================================================ */
-  document.getElementById('search').addEventListener('input', (e) => {
+  const searchEl = document.getElementById('search');
+  if (searchEl) searchEl.addEventListener('input', (e) => {
     state.query = e.target.value;
     renderTable();
   });
@@ -4141,8 +4143,10 @@
       saveAudiences(audiences);
       state.query = '';
       state.statusFilter = 'all';
-      document.getElementById('search').value = '';
-      document.getElementById('status-filter-label').textContent = 'All status';
+      const sEl = document.getElementById('search');
+      if (sEl) sEl.value = '';
+      const sLabel = document.getElementById('status-filter-label');
+      if (sLabel) sLabel.textContent = 'All status';
       renderAll();
       toast('Data reset');
     }

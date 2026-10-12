@@ -13,7 +13,11 @@
       "Bash(git stash *)",
       "Bash(git reset *)",
       "Bash(sleep *)",
-      "Bash(git commit -m 'Fix Contacts view: replace table layout with board host *)"
+      "Bash(git commit -m 'Fix Contacts view: replace table layout with board host *)",
+      "Bash(curl -sI \"https://dashboardleadgeneration.vercel.app/index.html\")",
+      "Bash(curl -s \"https://dashboardleadgeneration.vercel.app/index.html\")",
+      "Bash(awk NR==1772 *)",
+      "Bash(awk NR>=1765 && NR<=1780 *)"
     ]
   }
 }
