@@ -27,6 +27,7 @@ CREATE TABLE leads (
   status        text NOT NULL DEFAULT 'New Lead',
   sales_value   bigint NOT NULL DEFAULT 0,
   product_name  text NOT NULL DEFAULT '',
+  position      text NOT NULL DEFAULT '',
   transaction_date date,
   notes         text NOT NULL DEFAULT '',
   last_contacted_at timestamptz,
