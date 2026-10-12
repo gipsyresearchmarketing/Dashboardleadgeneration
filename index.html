@@ -6730,16 +6730,16 @@
 
     const ALIAS = {
       id: ['id'], type: ['type', 'tipe', 'jenis'],
-      name: ['name', 'nama', 'nama lengkap', 'full name', 'contact', 'kontak'],
-      company: ['company', 'perusahaan', 'nama perusahaan', 'organisasi', 'bisnis', 'company/kampus', 'company / kampus', 'institusi/universitas', 'institusi / universitas', 'perusahaan/kampus', 'kampus', 'universitas', 'instansi', 'asal instansi', 'sekolah', 'institusi'],
-      email: ['email', 'e-mail', 'surel'],
-      phone: ['phone', 'telepon', 'telp', 'hp', 'no hp', 'no. hp', 'nomor hp', 'whatsapp', 'wa', 'no wa', 'mobile', 'no telepon', 'no. telepon', 'nomor telepon', 'no whatsapp', 'nomor whatsapp', 'no. wa'],
+      name: ['name', 'nama', 'nama lengkap', 'full name', 'contact', 'kontak', 'customer name'],
+      company: ['company', 'perusahaan', 'nama perusahaan', 'organisasi', 'bisnis', 'company/kampus', 'company / kampus', 'institusi/universitas', 'institusi / universitas', 'perusahaan/kampus', 'kampus', 'universitas', 'instansi', 'asal instansi', 'sekolah', 'institusi', 'customer company'],
+      email: ['email', 'e-mail', 'surel', 'customer email'],
+      phone: ['phone', 'telepon', 'telp', 'hp', 'no hp', 'no. hp', 'nomor hp', 'whatsapp', 'wa', 'no wa', 'mobile', 'no telepon', 'no. telepon', 'nomor telepon', 'no whatsapp', 'nomor whatsapp', 'no. wa', 'customer mobile', 'customer phone'],
       status: ['status', 'tahap', 'stage'],
-      sales_value: ['sales_value', 'sales value', 'value', 'nilai', 'nilai deal', 'deal value', 'omzet', 'nilai sales', 'nilai penjualan', 'nilai transaksi', 'harga'],
-      notes: ['notes', 'note', 'catatan', 'keterangan'],
+      sales_value: ['sales_value', 'sales value', 'value', 'nilai', 'nilai deal', 'deal value', 'omzet', 'nilai sales', 'nilai penjualan', 'nilai transaksi', 'harga', 'amount', 'total', 'subtotal', 'grand total'],
+      notes: ['notes', 'note', 'catatan', 'keterangan', 'jurusan', 'jurusan/program studi/pekerjaan', 'program studi', 'pekerjaan', 'position', 'jabatan', 'job title'],
       tags: ['tags', 'tag', 'label'],
-      product_name: ['nama produk', 'produk', 'product', 'product name', 'product_name', 'paket', 'layanan'],
-      transaction_date: ['tanggal transaksi', 'tgl transaksi', 'tanggal', 'tgl', 'transaction date', 'transaction_date', 'date', 'tanggal beli']
+      product_name: ['nama produk', 'produk', 'product', 'product name', 'product_name', 'paket', 'layanan', 'item', 'nama item'],
+      transaction_date: ['tanggal transaksi', 'tgl transaksi', 'tanggal', 'tgl', 'transaction date', 'transaction_date', 'date', 'tanggal beli', 'transaction created at', 'created at', 'tanggal dibuat', 'waktu transaksi']
     };
     function mapHeaders(hdr) {
       const idx = {};
@@ -6766,7 +6766,9 @@
     const BULAN = { jan:1, januari:1, feb:2, februari:2, mar:3, maret:3, apr:4, april:4, mei:5, may:5, jun:6, juni:6, jul:7, juli:7, agu:8, agt:8, agustus:8, aug:8, sep:9, september:9, okt:10, oktober:10, oct:10, nov:11, november:11, des:12, desember:12, dec:12 };
     function normDate(v) {
       v = String(v || '').trim(); if (!v) return null;
-      const pad = n => String(n).padStart(2, '0'); let y, m, d, x;
+      // ISO datetime (e.g. "2026-09-30T14:30:00" or "2026-09-30 14:30") → take date part
+      if ((x = v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})[T\s]/))) { return x[1] + '-' + String(x[2]).padStart(2, '0') + '-' + String(x[3]).padStart(2, '0'); }
+      const pad = n => String(n).padStart(2, '0'); let y, m, d;
       if ((x = v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) { y = +x[1]; m = +x[2]; d = +x[3]; }
       else if ((x = v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/))) { d = +x[1]; m = +x[2]; y = +x[3]; if (y < 100) y += 2000; }
       else if ((x = v.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/)) && BULAN[x[2].toLowerCase()]) { d = +x[1]; m = BULAN[x[2].toLowerCase()]; y = +x[3]; }
@@ -6777,7 +6779,7 @@
     function importRows(rows) {
       const idx = mapHeaders(rows[0]);
       if (idx.name === undefined && idx.company === undefined && idx.email === undefined) {
-        alert('Header CSV tidak dikenali. Minimal harus ada kolom: name (atau nama), company, atau email.');
+        alert('Header CSV tidak dikenali. Minimal harus ada kolom: name (atau nama, customer name), company (atau institusi/universitas), atau email.');
         return;
       }
       const get = (r, f) => idx[f] === undefined ? '' : String(r[idx[f]] === undefined ? '' : r[idx[f]]).trim();
@@ -6790,12 +6792,18 @@
         if (!id || used.has(id)) id = 'L-' + Date.now().toString(36).toUpperCase() + '-' + (n + 1);
         used.add(id);
         const t = get(r, 'type').toLowerCase();
-        const type = (t === 'person' || t === 'company') ? t : (company ? 'company' : 'person');
+        // Type detection: explicit > person when name+institution > person when name only > company when company only
+        let type = (t === 'person' || t === 'company') ? t : (name ? 'person' : 'company');
+        // Notes: combine product_name + transaction_date + jurusan if notes is empty
+        const baseNotes = get(r, 'notes');
+        const extras = [];
+        if (idx.transaction_date !== undefined && !baseNotes) extras.push('Tgl: ' + (normDate(get(r, 'transaction_date')) || get(r, 'transaction_date')));
+        const combinedNotes = baseNotes || extras.join(' | ');
         out.push({
           id: id, type: type, name: name || company, company: company, email: email,
           phone: get(r, 'phone'), status: normStatus(get(r, 'status')),
           sales_value: Math.max(0, parseInt(get(r, 'sales_value').replace(/[^\d]/g, ''), 10) || 0),
-          notes: get(r, 'notes'),
+          notes: combinedNotes,
           product_name: get(r, 'product_name'),
           transaction_date: normDate(get(r, 'transaction_date')),
           tags: get(r, 'tags').split(/[;|,]/).map(x => x.trim()).filter(Boolean),

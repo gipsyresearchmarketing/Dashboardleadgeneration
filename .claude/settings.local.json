@@ -20,7 +20,8 @@
       "Bash(awk NR>=1765 && NR<=1780 *)",
       "Bash(curl -sI \"https://dashboardleadgeneration.vercel.app/index%20%287%29.html\")",
       "Bash(cp *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(awk 'NR>=6780 && NR<=6815' \"index.html\")"
     ]
   }
 }
