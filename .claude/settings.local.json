@@ -23,7 +23,9 @@
       "Bash(python3 *)",
       "Bash(awk 'NR>=6780 && NR<=6815' \"index.html\")",
       "Bash(node *)",
-      "Bash(git commit -m 'Add position field for Jurusan/Program Studi/Pekerjaan + Fix type tool *)"
+      "Bash(git commit -m 'Add position field for Jurusan/Program Studi/Pekerjaan + Fix type tool *)",
+      "Bash(git rm *)",
+      "Bash(git commit -m 'Remove accidentally committed CSV file + add .csv to .gitignore *)"
     ]
   }
 }
