@@ -6833,10 +6833,76 @@
       if ((x = v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) { y = +x[1]; m = +x[2]; d = +x[3]; }
       else if ((x = v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/))) { d = +x[1]; m = +x[2]; y = +x[3]; if (y < 100) y += 2000; }
       else if ((x = v.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/)) && BULAN[x[2].toLowerCase()]) { d = +x[1]; m = BULAN[x[2].toLowerCase()]; y = +x[3]; }
+      else if ((x = v.match(/^(\d{1,2})[\s-]+([A-Za-z]+)[\s-]+(\d{2,4})/)) && BULAN[x[2].toLowerCase()]) { d = +x[1]; m = BULAN[x[2].toLowerCase()]; y = +x[3]; if (y < 100) y += 2000; }
       else return null;
       if (m < 1 || m > 12 || d < 1 || d > 31) return null;
       return y + '-' + pad(m) + '-' + pad(d);
     }
+
+    // Parse Indonesian-style amount: "Rp 0", "Rp10.600", "Rp 1.500.000", "Rp 1,5"
+    // - Strips "Rp", currency symbols, spaces
+    // - Treats "." as thousand separator (Indonesian format) and "," as decimal
+    // - If both are present, assumes "Rp 10.600,50" → 10600 (drop decimal)
+    function parseAmount(v) {
+      if (!v) return 0;
+      let s = String(v).trim();
+      // Remove currency prefix
+      s = s.replace(/^(rp|idr|\$|€|£|¥)\s*/i, '');
+      s = s.replace(/[^\d.,-]/g, '');  // strip everything except digits, dots, commas, minus
+      if (!s) return 0;
+      // If has both . and , → Indonesian "1.500.000,50" → drop decimal
+      if (s.indexOf('.') >= 0 && s.indexOf(',') >= 0) {
+        // Last separator is decimal → drop everything after it
+        const lastComma = s.lastIndexOf(',');
+        const lastDot = s.lastIndexOf('.');
+        if (lastComma > lastDot) {
+          // comma is decimal: 1.500,50 → 1500.50
+          s = s.replace(/\./g, '').replace(',', '.');
+        } else {
+          // dot is decimal: 1,500.50 → 1500.50
+          s = s.replace(/,/g, '');
+        }
+      } else if (s.indexOf(',') >= 0 && !s.indexOf('.')) {
+        // Only commas → could be "1,5" (1.5) or "1,500" (1500)
+        // Heuristic: if 3 digits after last comma, it's thousand sep; else decimal
+        const lastComma = s.lastIndexOf(',');
+        const afterComma = s.length - lastComma - 1;
+        if (afterComma === 3 && /,\d{3}$/.test(s)) {
+          s = s.replace(/,/g, '');  // thousand sep
+        } else {
+          s = s.replace(',', '.');  // decimal
+        }
+      } else {
+        // Only dots → could be decimal OR thousand sep
+        // Heuristic: 3 digits after last dot → thousand sep
+        const lastDot = s.lastIndexOf('.');
+        const afterDot = s.length - lastDot - 1;
+        if (afterDot === 3 && /\.\d{3}$/.test(s)) {
+          s = s.replace(/\./g, '');  // thousand sep
+        }
+      }
+      const n = parseFloat(s);
+      return isNaN(n) ? 0 : Math.max(0, Math.round(n));
+    }
+
+    // Clean phone: remove scientific notation (6,28572E+12 → 6285720000000),
+    // spaces, dashes; keep digits and + sign
+    function cleanPhone(v) {
+      if (!v) return '';
+      let s = String(v).trim();
+      // Handle scientific notation (Excel often exports 6285720000000 as 6.28572E+12)
+      const sciMatch = s.match(/^(\d+[.,]?\d*)[eE]\+?(\d+)$/);
+      if (sciMatch) {
+        const mantissa = parseFloat(sciMatch[1].replace(',', '.'));
+        const exponent = parseInt(sciMatch[2], 10);
+        s = Math.round(mantissa * Math.pow(10, exponent)).toString();
+      } else {
+        // Just remove spaces, dashes, parens
+        s = s.replace(/[\s\-\(\)\.]/g, '');
+      }
+      return s;
+    }
+
     function importRows(rows) {
       const idx = mapHeaders(rows[0]);
       if (idx.name === undefined && idx.company === undefined && idx.email === undefined) {
@@ -6875,8 +6941,9 @@
         const combinedNotes = baseNotes || extras.join(' | ');
         out.push({
           id: id, type: type, name: displayName, company: company, email: email,
-          phone: get(r, 'phone'), status: normStatus(get(r, 'status')),
-          sales_value: Math.max(0, parseInt(get(r, 'sales_value').replace(/[^\d]/g, ''), 10) || 0),
+          phone: cleanPhone(get(r, 'phone')),
+          status: normStatus(get(r, 'status')),
+          sales_value: parseAmount(get(r, 'sales_value')),
           notes: combinedNotes,
           product_name: get(r, 'product_name'),
           position: get(r, 'position'),
