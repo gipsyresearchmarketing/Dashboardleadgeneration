@@ -25,7 +25,10 @@
       "Bash(node *)",
       "Bash(git commit -m 'Add position field for Jurusan/Program Studi/Pekerjaan + Fix type tool *)",
       "Bash(git rm *)",
-      "Bash(git commit -m 'Remove accidentally committed CSV file + add .csv to .gitignore *)"
+      "Bash(git commit -m 'Remove accidentally committed CSV file + add .csv to .gitignore *)",
+      "Bash(awk NR>=2218 && NR<=2230 *)",
+      "Bash(osascript -l JavaScript -e ' *)",
+      "Bash(git commit -m 'Fix boot resilience + add JSON Export/Import backup buttons *)"
     ]
   }
 }
