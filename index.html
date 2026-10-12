@@ -4209,7 +4209,8 @@
       toast('Tidak ada lead dengan type ' + fromType + ' untuk di-convert');
       return;
     }
-    if (!confirm('Convert ' + count + ' lead dari ' + (isContactsView ? 'Contacts' : 'Companies') + ' ke ' + label + '?\n\n(Yang akan dilakukan: ubah type lead dari "' + fromType + '" ke "' + toType + '")) return;
+    const msg = 'Convert ' + count + ' lead dari ' + (isContactsView ? 'Contacts' : 'Companies') + ' ke ' + label + '?\n\n(Yang akan dilakukan: ubah type lead dari "' + fromType + '" ke "' + toType + '")';
+    if (!confirm(msg)) return;
     state.leads = state.leads.map(l => l.type === fromType ? { ...l, type: toType } : l);
     saveLeads(state.leads);
     if (typeof wsRenderBoard === 'function') wsRenderBoard(isContactsView ? 'person' : undefined);

@@ -28,7 +28,11 @@
       "Bash(git commit -m 'Remove accidentally committed CSV file + add .csv to .gitignore *)",
       "Bash(awk NR>=2218 && NR<=2230 *)",
       "Bash(osascript -l JavaScript -e ' *)",
-      "Bash(git commit -m 'Fix boot resilience + add JSON Export/Import backup buttons *)"
+      "Bash(git commit -m 'Fix boot resilience + add JSON Export/Import backup buttons *)",
+      "Bash(curl -s \"https://dashboardleadgeneration.vercel.app/index.html\" -o /tmp/prod-now.html)",
+      "Read(//tmp/**)",
+      "Bash(curl -s https://dashboardleadgeneration.vercel.app/index.html?nocache=__TRACKED_VAR__ -o /tmp/prod-fresh2.html)",
+      "Bash(md5 /tmp/prod-fresh2.html \"index.html\")"
     ]
   }
 }
