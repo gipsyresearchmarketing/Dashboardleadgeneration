@@ -13,6 +13,7 @@
 
   <!-- Chart.js for visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <!-- Inter font -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1715,11 +1716,11 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
             Reset
           </button>
-          <button class="btn btn-outline" id="btn-import" title="Import leads dari file CSV">
+          <button class="btn btn-outline" id="btn-import" title="Import leads dari file CSV / Excel (.xlsx, .xls)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
             Import CSV
           </button>
-          <input type="file" id="csv-file" accept=".csv,text/csv" style="display:none" />
+          <input type="file" id="csv-file" accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none" />
           <button class="btn btn-primary" id="btn-add">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Add Lead
@@ -6818,13 +6819,38 @@
     btn.addEventListener('click', () => inp.click());
     inp.addEventListener('change', () => {
       const f = inp.files && inp.files[0]; if (!f) return;
-      const fr = new FileReader();
-      fr.onload = () => {
-        try { const rows = parseCSV(String(fr.result)); if (rows.length < 2) { alert('File CSV kosong atau hanya berisi header.'); } else importRows(rows); }
-        catch (e) { alert('Gagal membaca CSV: ' + e.message); }
-        inp.value = '';
+      const isExcel = /\.(xlsx|xls)$/i.test(f.name) || /spreadsheetml/.test(f.type) || f.type === 'application/vnd.ms-excel';
+
+      const handleRows = (rows) => {
+        if (rows.length < 2) { alert('File kosong atau hanya berisi header.'); return; }
+        importRows(rows);
       };
-      fr.readAsText(f, 'UTF-8');
+
+      if (isExcel && typeof XLSX !== 'undefined') {
+        // Parse Excel file with SheetJS
+        const fr = new FileReader();
+        fr.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array', cellDates: true });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+            // Normalize — SheetJS returns array of arrays, same as parseCSV
+            handleRows(rows.map(r => r.map(c => String(c == null ? '' : c))));
+          } catch (err) { alert('Gagal membaca file Excel: ' + err.message); }
+          inp.value = '';
+        };
+        fr.readAsArrayBuffer(f);
+      } else {
+        // Parse as CSV (text)
+        const fr = new FileReader();
+        fr.onload = () => {
+          try { handleRows(parseCSV(String(fr.result))); }
+          catch (e) { alert('Gagal membaca CSV: ' + e.message); }
+          inp.value = '';
+        };
+        fr.readAsText(f, 'UTF-8');
+      }
     });
   })();
 
