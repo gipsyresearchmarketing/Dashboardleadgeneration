@@ -3289,17 +3289,17 @@
 
       <section class="drawer-section">
         <div class="grid grid-cols-3 gap-3 text-center">
-          <div class="p-3 bg-gray-50 rounded-lg">
+          <div class="p-3 bg-gray-50 rounded-lg" title="Tasks linked to this lead (auto-counted from Tasks page)">
             <div class="text-lg font-semibold">${leadTasks.length}</div>
             <div class="text-xs text-gray-500">Tasks</div>
           </div>
-          <div class="p-3 bg-gray-50 rounded-lg">
+          <div class="p-3 bg-gray-50 rounded-lg" title="Activities logged for this lead (auto-counted from Activities page)">
             <div class="text-lg font-semibold">${leadActs.length}</div>
             <div class="text-xs text-gray-500">Activities</div>
           </div>
-          <div class="p-3 bg-gray-50 rounded-lg">
+          <div class="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors" id="quick-edit-deal-value" data-lead-id="${escapeHTML(lead.id)}" title="Click to edit Deal value">
             <div class="text-lg font-semibold">${formatIDR(lead.sales_value).replace('Rp','Rp ').slice(0,8)}</div>
-            <div class="text-xs text-gray-500">Deal value</div>
+            <div class="text-xs text-gray-500">Deal value ✎</div>
           </div>
         </div>
       </section>
@@ -3324,6 +3324,23 @@
       state.leads = state.leads.map(l => l.id === lead.id ? { ...l, notes: v } : l);
       saveLeads(state.leads);
       toast('Notes saved');
+    });
+
+    // Quick-edit deal value: click the Deal value card to open a prompt
+    const dealValEl = document.getElementById('quick-edit-deal-value');
+    if (dealValEl) dealValEl.addEventListener('click', () => {
+      const cur = lead.sales_value || 0;
+      const v = prompt('Edit Deal value (Rp):', cur);
+      if (v === null) return; // cancelled
+      const num = Math.max(0, Math.round(parseFloat(String(v).replace(/[^\d.-]/g, '')) || 0));
+      state.leads = state.leads.map(l => l.id === lead.id ? { ...l, sales_value: num } : l);
+      saveLeads(state.leads);
+      // Also update last_contacted_at so the card shows today
+      state.leads = state.leads.map(l => l.id === lead.id ? { ...l, last_contacted_at: new Date().toISOString() } : l);
+      saveLeads(state.leads);
+      renderDrawer();
+      renderAll();
+      toast('✓ Deal value updated to ' + formatIDR(num));
     });
 
     // Edit mode: Save / Cancel buttons + bind change events
