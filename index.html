@@ -2457,9 +2457,10 @@
    * Helpers
    * ================================================================ */
   function formatIDR(value) {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency', currency: 'IDR', maximumFractionDigits: 0
-    }).format(value || 0);
+    // Show "Rp 15000" (no thousand separator) for cleaner display.
+    // Change the format to 'id-ID' (with separator) if you want "Rp 15.000".
+    const n = value || 0;
+    return 'Rp ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
   }
 
   function formatDate(iso) {
@@ -3770,33 +3771,50 @@
   }
 
   function wireDrawerEvents() {
-    document.getElementById('drawer-close').addEventListener('click', () => {
-      state.drawerEdit = false;  // reset edit mode on close
-      closeDrawer();
-    });
-    document.getElementById('drawer-backdrop').addEventListener('click', () => {
-      state.drawerEdit = false;
-      closeDrawer();
-    });
-    const editToggle = document.getElementById('drawer-edit-toggle');
-    if (editToggle) editToggle.addEventListener('click', () => {
-      state.drawerEdit = !state.drawerEdit;
-      document.getElementById('drawer-host').innerHTML = drawerShell();
-      renderDrawer();
-      // Re-bind all drawer event handlers because we just replaced the DOM
-      wireDrawerEvents();
-      // Scroll the drawer content to top so the user sees the form immediately
-      const content = document.getElementById('drawer-content');
-      if (content) content.scrollTop = 0;
-    });
-    document.querySelectorAll('[data-drawer-tab]').forEach(b => {
-      b.addEventListener('click', () => {
-        state.drawerTab = b.getAttribute('data-drawer-tab');
-        // Refresh tab buttons
-        document.querySelectorAll('[data-drawer-tab]').forEach(x => x.classList.toggle('active', x === b));
-        renderDrawer();
+    // Use event delegation on the drawer-host so handlers survive
+    // re-renders of the inner drawer HTML. Idempotent — only
+    // attaches once per drawer-host element.
+    const host = document.getElementById('drawer-host');
+    if (host && !host._drawerDelegated) {
+      host._drawerDelegated = true;
+      host.addEventListener('click', (e) => {
+        // Close (X) button — top-right of header
+        if (e.target.closest('#drawer-close')) {
+          e.preventDefault();
+          e.stopPropagation();
+          state.drawerEdit = false;
+          closeDrawer();
+          return;
+        }
+        // Backdrop click — anywhere outside the panel
+        if (e.target.closest('#drawer-backdrop')) {
+          state.drawerEdit = false;
+          closeDrawer();
+          return;
+        }
+        // Edit / Cancel toggle
+        const editBtn = e.target.closest('#drawer-edit-toggle');
+        if (editBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          state.drawerEdit = !state.drawerEdit;
+          document.getElementById('drawer-host').innerHTML = drawerShell();
+          renderDrawer();
+          // Scroll the drawer content to top so the user sees the form
+          const content = document.getElementById('drawer-content');
+          if (content) content.scrollTop = 0;
+          return;
+        }
+        // Tabs (Overview / Activity / Tasks)
+        const tab = e.target.closest('[data-drawer-tab]');
+        if (tab) {
+          state.drawerTab = tab.getAttribute('data-drawer-tab');
+          document.querySelectorAll('[data-drawer-tab]').forEach(x => x.classList.toggle('active', x === tab));
+          renderDrawer();
+          return;
+        }
       });
-    });
+    }
     document.addEventListener('keydown', escCloseDrawer);
   }
   function escCloseDrawer(e) {
