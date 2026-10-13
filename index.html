@@ -5890,36 +5890,73 @@
     toast('Attachment added: ' + att.type);
   }
 
-  function sendBlast(channel) {
+  /* In-app modal: ask user what to do with no recipients */
+  function showRecipientChoiceModal(opts) {
+    return new Promise((resolve) => {
+      const modalHost = document.getElementById('modal-host');
+      const channelLabel = opts.channel === 'email' ? 'Email' : 'WhatsApp';
+      modalHost.innerHTML = `
+        <div class="modal-backdrop" style="z-index:200;display:flex;align-items:center;justify-content:center">
+          <div class="modal" style="max-width:420px;width:90%">
+            <div class="p-5 border-b">
+              <h2 class="text-lg font-semibold flex items-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                Belum pilih recipient
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">Email-nya udah siap, tapi belum ada recipient yang dipilih. Mau diapain?</p>
+            </div>
+            <div class="p-5 space-y-3">
+              <button type="button" data-recipient-choice="all" class="btn btn-primary" style="width:100%;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11h-6"/><path d="m17 8 4 3-4 3"/></svg>
+                <span>Kirim ke semua <strong>${opts.allCount} ${opts.typeLabel}${opts.allCount > 1 ? 's' : ''}</strong></span>
+              </button>
+              <button type="button" data-recipient-choice="draft" class="btn btn-outline" style="width:100%;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span>Simpan sebagai <strong>draft</strong></span>
+              </button>
+              <button type="button" data-recipient-choice="cancel" class="btn btn-outline" style="width:100%;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                <span>Batal, mau pilih recipient dulu</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      modalHost.querySelectorAll('[data-recipient-choice]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const choice = btn.getAttribute('data-recipient-choice');
+          modalHost.innerHTML = '';
+          resolve(choice);
+        });
+      });
+    });
+  }
+
+  async function sendBlast(channel) {
     const state = channel === 'email' ? emailBlast : waBlast;
     const compose = state.compose;
     if (channel === 'email' && !compose.subject.trim()) { toast('Subject wajib diisi'); return; }
     if (!compose.body && !compose.message) { toast(`${channel==='email'?'Body':'Message'} wajib diisi`); return; }
-    // Recipients are now optional. If none selected, offer to either
-    // (a) send to ALL leads of the matching type (bulk), or
-    // (b) save as draft.
+    // Recipients are now optional. If none selected, show a proper modal
+    // asking user to choose (a) send to all, (b) save as draft, or (c) pick.
     if (compose.recipients.length === 0) {
       const isEmail = channel === 'email';
       const eligibleLeads = state.leads.filter(l => l.type === (isEmail ? 'company' : 'person'));
       const allCount = eligibleLeads.length;
-      const choice = prompt(
-        'Belum ada recipient dipilih.\n\n' +
-        'Ketik salah satu:\n' +
-        '  "all" — kirim ke semua ' + allCount + ' ' + (isEmail ? 'company' : 'person') + ' leads\n' +
-        '  "draft" — simpan sebagai draft (ga kirim)\n' +
-        '  (kosong / cancel) — pilih recipient dulu\n\n' +
-        'Pilihan lo:',
-        'all'
-      );
-      if (choice === null) return; // user clicked Cancel
-      const c = choice.trim().toLowerCase();
-      if (c === 'all' && allCount > 0) {
+      const choice = await showRecipientChoiceModal({
+        allCount: allCount,
+        typeLabel: isEmail ? 'company' : 'person',
+        channel: channel,
+        eligibleCount: allCount,
+      });
+      if (choice === 'cancel' || choice === null) return;
+      if (choice === 'all' && allCount > 0) {
         // Auto-populate recipients with all eligible leads
         compose.recipients = eligibleLeads.map(l => ({ lead_id: l.id }));
         compose.loadedAudienceName = 'ALL ' + (isEmail ? 'Companies' : 'Contacts') + ' (' + allCount + ')';
         toast('✓ Recipients set: all ' + allCount + ' ' + (isEmail ? 'companies' : 'contacts'));
         // Fall through to send below
-      } else if (c === 'draft') {
+      } else if (choice === 'draft') {
         // Save as draft
         const draftEntry = {
           id: 'B-' + Math.floor(Math.random() * 9000 + 1000),
@@ -5939,8 +5976,6 @@
         toast('📝 Saved as draft');
         return;
       } else {
-        // Empty input or anything else → cancel, user wants to pick recipients
-        toast('Pilih recipient dulu atau ketik "all" untuk kirim ke semua');
         return;
       }
     }
