@@ -2457,15 +2457,16 @@
    * Helpers
    * ================================================================ */
   function formatIDR(value) {
-    // Indonesian format: "Rp15.000" — period as thousand separator,
-    // no space between "Rp" and the number, no decimals.
-    //   15000    → "Rp15.000"
-    //   150000   → "Rp150.000"
-    //   1000000  → "Rp1.000.000"
+    // Indonesian format: "Rp 15.000" — period as thousand separator,
+    // a SPACE between "Rp" and the number so it doesn't look like
+    // a $ symbol in some fonts, no decimals.
+    //   15000    → "Rp 15.000"
+    //   150000   → "Rp 150.000"
+    //   1000000  → "Rp 1.000.000"
     const n = value || 0;
     const str = String(Math.round(n));
     const withDots = str.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return 'Rp' + withDots;
+    return 'Rp ' + withDots;
   }
 
   function formatDate(iso) {
