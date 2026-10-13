@@ -5724,39 +5724,53 @@
   function renderBlastComposerShell(channel) {
     const compose = (channel === 'email' ? emailBlast : waBlast).compose;
     const recipientCount = compose.recipients.length;
+    const isEmail = channel === 'email';
+    const eligibleLeads = state.leads.filter(l => l.type === (isEmail ? 'company' : 'person'));
     return `
-      <div style="background:#f8fafc;padding:14px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px">
-        <div class="flex items-center gap-2 mb-2 flex-wrap">
-          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">To</span>
+      <details style="background:#f8fafc;padding:12px 14px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px" ${recipientCount > 0 ? 'open' : ''}>
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11h-6"/><path d="m17 8 4 3-4 3"/><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          <span>Recipients (${recipientCount})</span>
+          <span style="margin-left:auto;font-size:11px;color:${recipientCount > 0 ? '#16a34a' : '#94a3b8'};font-weight:500;text-transform:none;letter-spacing:0">
+            ${recipientCount > 0 ? '✓ ' + recipientCount + ' selected' : 'optional — click to add'}
+          </span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div style="padding-top:10px;display:flex;flex-direction:column;gap:10px">
           ${compose.loadedAudienceName ? `
-            <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#dbeafe;border:1px solid #93c5fd;font-size:13px;font-weight:600;color:#1e40af">
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:#dbeafe;border:1px solid #93c5fd;border-radius:999px;font-size:13px;font-weight:600;color:#1e40af">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
               ${escapeHTML(compose.loadedAudienceName)}
               <span style="color:#60a5fa;margin:0 2px">·</span>
               <span style="color:#1e40af;font-weight:700">${recipientCount}</span>
-            </span>
-            <button type="button" data-blast-action="clear-audience" data-channel="${channel}" style="margin-left:4px;font-size:11px;color:var(--muted);background:transparent;border:none;cursor:pointer;text-decoration:underline">× clear</button>
-          ` : `
-            <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:white;border:1px dashed var(--border);font-size:13px;font-weight:500;color:var(--muted)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-              ${recipientCount} recipient${recipientCount === 1 ? '' : 's'}
-            </span>
-            <span style="font-size:11px;color:var(--muted)">— pick from saved audience or manual</span>
-          `}
+              <button type="button" data-blast-action="clear-audience" data-channel="${channel}" style="margin-left:auto;font-size:11px;color:var(--muted);background:transparent;border:none;cursor:pointer;text-decoration:underline">× clear</button>
+            </div>
+          ` : ''}
+          <div>
+            <label style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#6b7280;display:block;margin-bottom:4px">Load saved audience</label>
+            <select data-blast-action="load-audience" data-channel="${channel}" class="input" style="font-size:12px;padding:6px 10px">
+              <option value="">— Select audience (optional) —</option>
+              ${audiences.map(a => '<option value="' + a.id + '">[' + (a.type === 'company' ? 'B' : 'M') + '] ' + escapeHTML(a.name) + ' (' + ((a.lead_ids || []).length) + ')</option>').join('')}
+            </select>
+          </div>
+          <details>
+            <summary style="cursor:pointer;list-style:none;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;padding:4px 0">
+              Or pick individual leads
+            </summary>
+            <div style="padding-top:6px;display:grid;grid-template-columns:1fr;gap:4px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;background:white">
+              ${eligibleLeads.slice(0, 50).map(c => {
+                const isChecked = compose.recipients.some(x => x.lead_id === c.id);
+                return '<label style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'transparent\'"><input type="checkbox" data-blast-action="pick" data-lead-id="' + c.id + '" ' + (isChecked ? 'checked' : '') + ' style="margin:0"/><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">' + escapeHTML(c.name) + (c.company ? ' <span style="color:#94a3b8">· ' + escapeHTML(c.company) + '</span>' : '') + '</span></label>';
+              }).join('')}
+              ${eligibleLeads.length > 50 ? '<div style="text-align:center;padding:4px;color:var(--muted);font-size:11px">Showing first 50. Use saved audience for more.</div>' : ''}
+            </div>
+          </details>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;padding:4px 0">
+            💡 You can send this email without picking any recipients — it will save as a draft you can come back to. Use the audience or individual picks above when you are ready to send in bulk.
+          </div>
         </div>
-        <select data-blast-action="load-audience" data-channel="${channel}" class="input" style="font-size:12px;padding:6px 10px">
-          <option value="">— Load saved audience —</option>
-          ${audiences.map(a => '<option value="' + a.id + '">[' + (a.type === 'company' ? 'B' : 'M') + '] ' + escapeHTML(a.name) + ' (' + ((a.lead_ids || []).length) + ')</option>').join('')}
-        </select>
-      </div>
-      <div class="flex items-center gap-3 mb-3">
-        <h3 class="text-sm font-semibold">${channel==='email'?'Email':'WhatsApp'} Message</h3>
-        <div class="filter-pills" style="margin-left:auto">
-          <button class="filter-pill ${compose.sendMode==='now'?'active':''}" data-blast-action="send-mode" data-mode="now">Send Now</button>
-          <button class="filter-pill ${compose.sendMode==='scheduled'?'active':''}" data-blast-action="send-mode" data-mode="scheduled">Schedule</button>
-        </div>
-      </div>
-      ${compose.sendMode === 'scheduled' ? `
+      </details>
+      <div class="flex items-center gap-3 mb-3">      ${compose.sendMode === 'scheduled' ? `
         <div class="mb-3 grid grid-cols-2 gap-2">
           <div>
             <label class="label">Schedule date</label>
@@ -5881,7 +5895,30 @@
     const compose = state.compose;
     if (channel === 'email' && !compose.subject.trim()) { toast('Subject wajib diisi'); return; }
     if (!compose.body && !compose.message) { toast(`${channel==='email'?'Body':'Message'} wajib diisi`); return; }
-    if (compose.recipients.length === 0) { toast('Pilih minimal 1 recipient'); return; }
+    // Recipients are now optional. If none selected, save as draft.
+    if (compose.recipients.length === 0) {
+      if (!confirm('Belum ada recipient yang dipilih.\n\nKlik OK untuk simpan sebagai draft.\nKlik Cancel untuk pilih recipient dulu.')) {
+        return;
+      }
+      // Save as draft (no send, no activities)
+      const draftEntry = {
+        id: 'B-' + Math.floor(Math.random() * 9000 + 1000),
+        subject: compose.subject || null,
+        body: compose.body || null,
+        message: compose.message || null,
+        recipients: [],
+        attachments: compose.blocks || [],
+        scheduled_at: null,
+        sent_at: null,
+        status: 'draft',
+        created_at: new Date().toISOString(),
+        channel,
+      };
+      state.drafts = [draftEntry, ...state.drafts];
+      saveBlast(channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA, state);
+      toast('📝 Saved as draft (no recipients)');
+      return;
+    }
     if (compose.sendMode === 'scheduled' && !compose.scheduled_at) { toast('Pilih tanggal & jam schedule'); return; }
 
     const isScheduled = compose.sendMode === 'scheduled';
