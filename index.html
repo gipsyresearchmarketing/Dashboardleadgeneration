@@ -2458,9 +2458,12 @@
    * ================================================================ */
   function formatIDR(value) {
     // Show "Rp 15000" (no thousand separator) for cleaner display.
-    // Change the format to 'id-ID' (with separator) if you want "Rp 15.000".
+    // Use plain String() conversion — toLocaleString would add a comma
+    // (e.g. 15000 → "15,000" with en-US) or a period (with id-ID).
+    // If you want thousand separators later, swap this for
+    // `n.toLocaleString('id-ID')` → "Rp 15.000" or 'en-US' → "Rp 15,000".
     const n = value || 0;
-    return 'Rp ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return 'Rp ' + String(Math.round(n));
   }
 
   function formatDate(iso) {
