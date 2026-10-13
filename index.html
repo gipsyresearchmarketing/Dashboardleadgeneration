@@ -5727,12 +5727,12 @@
     const isEmail = channel === 'email';
     const eligibleLeads = state.leads.filter(l => l.type === (isEmail ? 'company' : 'person'));
     return `
-      <details style="background:#f8fafc;padding:12px 14px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px" ${recipientCount > 0 ? 'open' : ''}>
+            <details style="background:#f8fafc;padding:12px 14px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px" ${(compose.recipients.length > 0 || (compose.cc && compose.cc.length > 0) || (compose.bcc && compose.bcc.length > 0)) ? 'open' : ''}>
         <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11h-6"/><path d="m17 8 4 3-4 3"/><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-          <span>Recipients (${recipientCount})</span>
-          <span style="margin-left:auto;font-size:11px;color:${recipientCount > 0 ? '#16a34a' : '#94a3b8'};font-weight:500;text-transform:none;letter-spacing:0">
-            ${recipientCount > 0 ? '✓ ' + recipientCount + ' selected' : 'optional — click to add'}
+          <span>Recipients (${compose.recipients.length + (compose.cc || '').split(',').filter(s => s.trim()).length + (compose.bcc || '').split(',').filter(s => s.trim()).length})</span>
+          <span style="margin-left:auto;font-size:11px;color:${(compose.recipients.length > 0 || (compose.cc && compose.cc.length > 0) || (compose.bcc && compose.bcc.length > 0)) ? '#16a34a' : '#94a3b8'};font-weight:500;text-transform:none;letter-spacing:0">
+            ${(compose.recipients.length > 0 || (compose.cc && compose.cc.length > 0) || (compose.bcc && compose.bcc.length > 0)) ? '✓ ready' : 'optional — click to add'}
           </span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
         </summary>
@@ -5742,7 +5742,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
               ${escapeHTML(compose.loadedAudienceName)}
               <span style="color:#60a5fa;margin:0 2px">·</span>
-              <span style="color:#1e40af;font-weight:700">${recipientCount}</span>
+              <span style="color:#1e40af;font-weight:700">${compose.recipients.length}</span>
               <button type="button" data-blast-action="clear-audience" data-channel="${channel}" style="margin-left:auto;font-size:11px;color:var(--muted);background:transparent;border:none;cursor:pointer;text-decoration:underline">× clear</button>
             </div>
           ` : ''}
@@ -5765,8 +5765,23 @@
               ${eligibleLeads.length > 50 ? '<div style="text-align:center;padding:4px;color:var(--muted);font-size:11px">Showing first 50. Use saved audience for more.</div>' : ''}
             </div>
           </details>
+          ${isEmail ? `
+          <div style="display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:white">
+            <div style="display:flex;align-items:center;gap:6px">
+              <label style="font-size:11px;font-weight:600;color:var(--muted);min-width:34px">Cc</label>
+              <input type="text" data-ech-cc class="input" placeholder="email1@example.com, email2@example.com" value="${escapeHTML(compose.cc || '')}" style="font-size:12px;flex:1;padding:4px 8px" />
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <label style="font-size:11px;font-weight:600;color:var(--muted);min-width:34px">Bcc</label>
+              <input type="text" data-ech-bcc class="input" placeholder="hidden@example.com" value="${escapeHTML(compose.bcc || '')}" style="font-size:12px;flex:1;padding:4px 8px" />
+            </div>
+            <div style="font-size:11px;color:var(--muted)">
+              Cc/Bcc: pisahkan email dengan koma. Recipients <strong>To</strong> ada di lead picker di atas.
+            </div>
+          </div>
+          ` : ''}
           <div style="font-size:11px;color:var(--muted);line-height:1.5;padding:4px 0">
-            💡 <strong>Tip:</strong> If you click <strong>Send Now</strong> without picking recipients, you'll be asked whether to (a) send to ALL leads, (b) save as draft, or (c) cancel and pick recipients. Use the audience or individual picks above when you want to target a specific group.
+            💡 <strong>Tip:</strong> If you click <strong>Send Now</strong> without picking recipients, you'll be asked whether to (a) send to ALL leads, (b) save as draft, or (c) cancel and pick recipients.${isEmail ? ' Cc/Bcc support comma-separated emails.' : ''}
           </div>
         </div>
       </details>
@@ -5991,6 +6006,8 @@
       body: compose.body || null,
       message: compose.message || null,
       recipients: compose.recipients.map(r => ({ lead_id: r.lead_id })),
+      cc: channel === 'email' ? (compose.cc || '').split(',').map(s => s.trim()).filter(Boolean) : null,
+      bcc: channel === 'email' ? (compose.bcc || '').split(',').map(s => s.trim()).filter(Boolean) : null,
       attachments: compose.blocks || [],
       scheduled_at: isScheduled ? compose.scheduled_at : null,
       sent_at: isScheduled ? null : sentAt,
