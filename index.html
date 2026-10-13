@@ -2820,14 +2820,18 @@
       return;
     }
     el.innerHTML = recent.map(l => `
-      <div class="list-item" data-open-lead="${l.id}">
-        <div class="grid place-items-center w-9 h-9 rounded-full text-white text-xs font-semibold flex-shrink-0" style="background:${avatarColor(l.id)}">${escapeHTML(initials(l.name))}</div>
-        <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium truncate">${escapeHTML(l.name)}</div>
-          <div class="text-xs text-gray-500 truncate">${escapeHTML(l.company)}</div>
+      <div class="list-item" data-open-lead="${l.id}" style="display:flex;align-items:center;gap:12px;padding:12px 4px;cursor:pointer;border-radius:6px;transition:background 120ms" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+        <div class="grid place-items-center w-10 h-10 rounded-full text-white text-sm font-semibold flex-shrink-0" style="background:${avatarColor(l.id)}">${escapeHTML(initials(l.name))}</div>
+        <div class="flex-1 min-w-0" style="overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+            <div style="font-size:13px;font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${escapeHTML(l.name)}</div>
+            <span class="badge ${STATUS_META[l.status].badge}" style="font-size:10px;padding:2px 8px;white-space:nowrap">${l.status}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">${l.company ? escapeHTML(l.company) : '<span style="color:#cbd5e1">—</span>'}</span>
+            ${(l.sales_value && l.sales_value > 0) ? '<span style="font-weight:600;color:var(--fg);white-space:nowrap">' + formatIDR(l.sales_value) + '</span>' : ''}
+          </div>
         </div>
-        <span class="badge ${STATUS_META[l.status].badge}">${l.status}</span>
-        <div class="text-xs text-gray-400 w-20 text-right">${formatIDR(l.sales_value)}</div>
       </div>
     `).join('');
     document.querySelectorAll('[data-open-lead]').forEach(el => {
