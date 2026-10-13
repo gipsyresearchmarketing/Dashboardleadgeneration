@@ -3176,8 +3176,8 @@
     const tabs = ['overview','activity','tasks'];
     const isEdit = state.drawerEdit === true;
     return `
-      <div id="drawer-backdrop" class="drawer-backdrop"></div>
-      <aside id="drawer-panel" class="drawer" role="dialog" aria-label="Lead detail">
+      <div id="drawer-backdrop" class="drawer-backdrop show"></div>
+      <aside id="drawer-panel" class="drawer show" role="dialog" aria-label="Lead detail">
         <header class="px-5 py-4 border-b flex items-start gap-3">
           <div class="grid place-items-center w-11 h-11 rounded-full text-white font-semibold text-sm flex-shrink-0" style="background:${avatarBg}">
             ${escapeHTML(initials(lead.name))}
@@ -3783,6 +3783,8 @@
       state.drawerEdit = !state.drawerEdit;
       document.getElementById('drawer-host').innerHTML = drawerShell();
       renderDrawer();
+      // Re-bind all drawer event handlers because we just replaced the DOM
+      wireDrawerEvents();
       // Scroll the drawer content to top so the user sees the form immediately
       const content = document.getElementById('drawer-content');
       if (content) content.scrollTop = 0;
