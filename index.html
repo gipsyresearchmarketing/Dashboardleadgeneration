@@ -2457,13 +2457,15 @@
    * Helpers
    * ================================================================ */
   function formatIDR(value) {
-    // Show "Rp 15000" (no thousand separator) for cleaner display.
-    // Use plain String() conversion — toLocaleString would add a comma
-    // (e.g. 15000 → "15,000" with en-US) or a period (with id-ID).
-    // If you want thousand separators later, swap this for
-    // `n.toLocaleString('id-ID')` → "Rp 15.000" or 'en-US' → "Rp 15,000".
+    // Indonesian format: "Rp15.000" — period as thousand separator,
+    // no space between "Rp" and the number, no decimals.
+    //   15000    → "Rp15.000"
+    //   150000   → "Rp150.000"
+    //   1000000  → "Rp1.000.000"
     const n = value || 0;
-    return 'Rp ' + String(Math.round(n));
+    const str = String(Math.round(n));
+    const withDots = str.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return 'Rp' + withDots;
   }
 
   function formatDate(iso) {
