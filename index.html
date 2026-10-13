@@ -7328,7 +7328,6 @@
       try {
         // Wrap in IIFE to avoid polluting global scope with var declarations
         (new Function(src))();
-        console.log('Leads Dashboard v2.2 loaded. formatIDR(15000) =', formatIDR(15000));
       } catch (e) {
         console.error('App source failed to load:', e);
         document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#b91c1c"><h2>App failed to load</h2><pre style="text-align:left;background:#fef2f2;padding:16px;border-radius:6px;overflow:auto">' + (e.message || e) + '</pre></div>';
