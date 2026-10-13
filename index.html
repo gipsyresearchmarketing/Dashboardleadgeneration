@@ -2457,14 +2457,14 @@
    * Helpers
    * ================================================================ */
   function formatIDR(value) {
-    // Plain number with period as thousand separator.
-    // No 'Rp' prefix — it can render like a $ in some fonts.
-    //   15000    → "15.000"
-    //   150000   → "150.000"
-    //   1000000  → "1.000.000"
+    // Indonesian format: "Rp 15.000" — period as thousand separator,
+    // space between "Rp" and the number.
+    //   15000    → "Rp 15.000"
+    //   150000   → "Rp 150.000"
+    //   1000000  → "Rp 1.000.000"
     const n = value || 0;
     const str = String(Math.round(n));
-    return str.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return 'Rp ' + str.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
 
   function formatDate(iso) {
