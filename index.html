@@ -4514,7 +4514,7 @@
           <div class="flex items-center justify-between gap-2 flex-wrap">
             <div class="tc-icons">${wsLastContactEl(lead.last_contacted_at, 13)}</div>
             ${(lead.sales_value && lead.sales_value > 0) ? `<div style="display:inline-flex;align-items:center;gap:3px;font-weight:600;color:var(--fg);font-size:12px">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5h4a1.5 1.5 0 0 1 0 3h-3a1.5 1.5 0 0 0 0 3h4.5"/><path d="M12 7v10"/></svg>
               ${formatIDR(lead.sales_value)}
             </div>` : ''}
           </div>
