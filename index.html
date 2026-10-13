@@ -5766,7 +5766,7 @@
             </div>
           </details>
           <div style="font-size:11px;color:var(--muted);line-height:1.5;padding:4px 0">
-            💡 You can send this email without picking any recipients — it will save as a draft you can come back to. Use the audience or individual picks above when you are ready to send in bulk.
+            💡 <strong>Tip:</strong> If you click <strong>Send Now</strong> without picking recipients, you'll be asked whether to (a) send to ALL leads, (b) save as draft, or (c) cancel and pick recipients. Use the audience or individual picks above when you want to target a specific group.
           </div>
         </div>
       </details>
@@ -5895,29 +5895,54 @@
     const compose = state.compose;
     if (channel === 'email' && !compose.subject.trim()) { toast('Subject wajib diisi'); return; }
     if (!compose.body && !compose.message) { toast(`${channel==='email'?'Body':'Message'} wajib diisi`); return; }
-    // Recipients are now optional. If none selected, save as draft.
+    // Recipients are now optional. If none selected, offer to either
+    // (a) send to ALL leads of the matching type (bulk), or
+    // (b) save as draft.
     if (compose.recipients.length === 0) {
-      if (!confirm('Belum ada recipient yang dipilih.\n\nKlik OK untuk simpan sebagai draft.\nKlik Cancel untuk pilih recipient dulu.')) {
+      const isEmail = channel === 'email';
+      const eligibleLeads = state.leads.filter(l => l.type === (isEmail ? 'company' : 'person'));
+      const allCount = eligibleLeads.length;
+      const choice = prompt(
+        'Belum ada recipient dipilih.\n\n' +
+        'Ketik salah satu:\n' +
+        '  "all" — kirim ke semua ' + allCount + ' ' + (isEmail ? 'company' : 'person') + ' leads\n' +
+        '  "draft" — simpan sebagai draft (ga kirim)\n' +
+        '  (kosong / cancel) — pilih recipient dulu\n\n' +
+        'Pilihan lo:',
+        'all'
+      );
+      if (choice === null) return; // user clicked Cancel
+      const c = choice.trim().toLowerCase();
+      if (c === 'all' && allCount > 0) {
+        // Auto-populate recipients with all eligible leads
+        compose.recipients = eligibleLeads.map(l => ({ lead_id: l.id }));
+        compose.loadedAudienceName = 'ALL ' + (isEmail ? 'Companies' : 'Contacts') + ' (' + allCount + ')';
+        toast('✓ Recipients set: all ' + allCount + ' ' + (isEmail ? 'companies' : 'contacts'));
+        // Fall through to send below
+      } else if (c === 'draft') {
+        // Save as draft
+        const draftEntry = {
+          id: 'B-' + Math.floor(Math.random() * 9000 + 1000),
+          subject: compose.subject || null,
+          body: compose.body || null,
+          message: compose.message || null,
+          recipients: [],
+          attachments: compose.blocks || [],
+          scheduled_at: null,
+          sent_at: null,
+          status: 'draft',
+          created_at: new Date().toISOString(),
+          channel,
+        };
+        state.drafts = [draftEntry, ...state.drafts];
+        saveBlast(channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA, state);
+        toast('📝 Saved as draft');
+        return;
+      } else {
+        // Empty input or anything else → cancel, user wants to pick recipients
+        toast('Pilih recipient dulu atau ketik "all" untuk kirim ke semua');
         return;
       }
-      // Save as draft (no send, no activities)
-      const draftEntry = {
-        id: 'B-' + Math.floor(Math.random() * 9000 + 1000),
-        subject: compose.subject || null,
-        body: compose.body || null,
-        message: compose.message || null,
-        recipients: [],
-        attachments: compose.blocks || [],
-        scheduled_at: null,
-        sent_at: null,
-        status: 'draft',
-        created_at: new Date().toISOString(),
-        channel,
-      };
-      state.drafts = [draftEntry, ...state.drafts];
-      saveBlast(channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA, state);
-      toast('📝 Saved as draft (no recipients)');
-      return;
     }
     if (compose.sendMode === 'scheduled' && !compose.scheduled_at) { toast('Pilih tanggal & jam schedule'); return; }
 
