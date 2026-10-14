@@ -6952,15 +6952,59 @@
       });
     });
 
-    // attachment / media add
+    // attachment / media add — trigger file picker
     document.querySelector(`[data-blast-action="add-att"][data-channel="${channel}"]`)?.addEventListener('click', () => {
-      const name = prompt(channel === 'email' ? 'Attachment filename:' : 'Media filename (image.jpg / pdf.pdf):', channel === 'email' ? 'promo.pdf' : 'image.jpg');
-      if (name && name.trim()) {
-        const item = channel === 'email' ? { name: name.trim() } : { name: name.trim(), kind: name.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document' };
-        const list = channel === 'email' ? blastState.compose.files : blastState.compose.media;
-        list.push(item);
-        if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
+      // Use a hidden file input to open the OS file picker
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.style.display = 'none';
+      // Accept images and documents for email; for WA prefer images
+      if (channel === 'email') {
+        fileInput.accept = 'image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip';
+      } else {
+        fileInput.accept = 'image/*';
       }
+      document.body.appendChild(fileInput);
+      fileInput.addEventListener('change', () => {
+        const f = fileInput.files[0];
+        if (!f) {
+          document.body.removeChild(fileInput);
+          return;
+        }
+        // Read file as data URL so we can store it (and optionally preview).
+        // For email: keep both metadata AND the data URL.
+        // For WA media: just keep the file as data URL + name + type.
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          const isImage = (f.type || '').startsWith('image/');
+          if (channel === 'email') {
+            blastState.compose.files.push({
+              name: f.name,
+              size: f.size,
+              type: f.type || '',
+              dataUrl: dataUrl,
+            });
+            renderEmailBlastView();
+          } else {
+            blastState.compose.media.push({
+              name: f.name,
+              size: f.size,
+              kind: isImage ? 'image' : 'document',
+              type: f.type || '',
+              dataUrl: dataUrl,
+            });
+            renderWaBlastView();
+          }
+          document.body.removeChild(fileInput);
+        };
+        reader.onerror = () => {
+          toast('Failed to read file');
+          document.body.removeChild(fileInput);
+        };
+        reader.readAsDataURL(f);
+      });
+      fileInput.click();
     });
     // attachment remove
     document.querySelectorAll(`[data-blast-action="remove-att"][data-channel="${channel}"]`).forEach(btn => btn.addEventListener('click', () => {
