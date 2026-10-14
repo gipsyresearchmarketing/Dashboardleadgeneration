@@ -1727,21 +1727,9 @@
           <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
         </div>
         <div class="topbar-actions">
-          <button class="btn btn-outline" id="btn-export-json" title="Download all data as JSON file (backup)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
-            Export
-          </button>
-          <button class="btn btn-outline" id="btn-import-json" title="Restore data from a JSON backup file">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
-            Import
-          </button>
           <button class="btn btn-outline" id="btn-fix-type" title="Convert leads to the correct type (Company ↔ Contact)" style="display:none">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
             Fix type
-          </button>
-          <button class="btn btn-outline" id="btn-sync-supabase" title="Pull latest data from Supabase (overrides local)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-            Sync
           </button>
           <button class="btn btn-outline" id="btn-import" title="Import leads dari file CSV / Excel (.xlsx, .xls)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
@@ -4299,30 +4287,7 @@
   const _origSetView = setView;
   window.setView = ((v) => { _origSetView(v); updateAddLabel(); });
 
-  // (Reset and Clear All buttons removed — per-row delete is enough)
-
-  // Pull latest data from Supabase (overrides local)
-  document.getElementById('btn-sync-supabase')?.addEventListener('click', async () => {
-    if (!confirm('Pull latest from Supabase?\n\nThis will:\n1. Wipe localStorage\n2. Fetch all data from Supabase\n3. Reload the app\n\nContinue?')) return;
-    try {
-      // Wipe local
-      Object.keys(localStorage).filter(k => k.indexOf('leads-dashboard:') === 0).forEach(k => localStorage.removeItem(k));
-      // Wipe state
-      state.leads = []; state.activities = []; state.tasks = [];
-      audiences = []; assets = [];
-      emailBlast.drafts = []; emailBlast.history = [];
-      waBlast.drafts = []; waBlast.history = [];
-      state.inboxEmails = [];
-      saveLeads(state.leads); saveActivities(state.activities); saveTasks(state.tasks);
-      saveAudiences(audiences); saveAssets(assets);
-      saveBlast(STORAGE_KEY_BLAST_EMAIL, emailBlast); saveBlast(STORAGE_KEY_BLAST_WA, waBlast);
-      saveInboundEmails(state.inboxEmails);
-      // Reload to trigger fresh hydrate
-      location.reload();
-    } catch (e) {
-      alert('Sync failed: ' + e.message);
-    }
-  });
+  // (Reset, Clear All, Export, Import, Sync buttons removed — only per-row delete and Add Lead/Import CSV remain)
 
   // "Fix type" — convert all leads on the current view to the OTHER type.
   // Use case: user uploaded a CSV while on Companies view but meant for Contacts
@@ -4348,80 +4313,6 @@
     renderAll();
     updateSidebarCounts();
     toast('✓ ' + count + ' lead di-convert ke ' + label);
-  });
-
-  /* ================================================================
-   * Export / Import JSON (data backup)
-   * ================================================================ */
-  document.getElementById('btn-export-json')?.addEventListener('click', () => {
-    const data = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      leads: state.leads,
-      activities: state.activities,
-      tasks: state.tasks,
-      audiences: audiences,
-      assets: assets,
-      blastEmailDrafts: emailBlast.drafts,
-      blastEmailHistory: emailBlast.history,
-      blastWaDrafts: waBlast.drafts,
-      blastWaHistory: waBlast.history,
-      inboxEmails: state.inboxEmails,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'leads-backup-' + new Date().toISOString().slice(0, 10) + '.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast('✓ Backup downloaded (' + state.leads.length + ' leads, ' + state.activities.length + ' activities)');
-  });
-
-  document.getElementById('btn-import-json')?.addEventListener('click', () => {
-    const inp = document.createElement('input');
-    inp.type = 'file';
-    inp.accept = '.json,application/json';
-    inp.onchange = (e) => {
-      const f = e.target.files[0];
-      if (!f) return;
-      const fr = new FileReader();
-      fr.onload = () => {
-        try {
-          const data = JSON.parse(fr.result);
-          if (!data || !Array.isArray(data.leads)) {
-            alert('File JSON tidak valid: harus ada array "leads"');
-            return;
-          }
-          if (!confirm('Restore ' + data.leads.length + ' leads dari backup?\n\nData yang ada sekarang akan DITIMPA dengan isi backup.')) return;
-          if (Array.isArray(data.leads)) { state.leads = data.leads; saveLeads(state.leads); }
-          if (Array.isArray(data.activities)) { state.activities = data.activities; saveActivities(state.activities); }
-          if (Array.isArray(data.tasks)) { state.tasks = data.tasks; saveTasks(state.tasks); }
-          if (Array.isArray(data.audiences)) { audiences = data.audiences; saveAudiences(audiences); }
-          if (Array.isArray(data.assets)) { assets = data.assets; saveAssets(assets); }
-          if (Array.isArray(data.inboxEmails)) { state.inboxEmails = data.inboxEmails; saveInboundEmails(state.inboxEmails); }
-          if (emailBlast) {
-            if (Array.isArray(data.blastEmailDrafts)) emailBlast.drafts = data.blastEmailDrafts;
-            if (Array.isArray(data.blastEmailHistory)) emailBlast.history = data.blastEmailHistory;
-            saveBlast(STORAGE_KEY_BLAST_EMAIL, emailBlast);
-          }
-          if (waBlast) {
-            if (Array.isArray(data.blastWaDrafts)) waBlast.drafts = data.blastWaDrafts;
-            if (Array.isArray(data.blastWaHistory)) waBlast.history = data.blastWaHistory;
-            saveBlast(STORAGE_KEY_BLAST_WA, waBlast);
-          }
-          renderAll();
-          updateSidebarCounts();
-          toast('✓ Data restored from backup');
-        } catch (e) {
-          alert('Gagal membaca file JSON: ' + e.message);
-        }
-      };
-      fr.readAsText(f);
-    };
-    inp.click();
   });
 
   /* ================================================================
