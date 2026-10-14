@@ -1185,10 +1185,14 @@
     }
     .canvas-col .email-card-header .ech-chip-x:hover { background: rgba(55,48,163,0.15); }
     .canvas-col .email-card-header .ech-input-inline {
-      flex: 1; min-width: 120px;
-      border: none; outline: none; background: transparent;
-      font-size: 13px; color: #1f2937; padding: 3px 4px;
+      flex: 1; min-width: 160px;
+      border: 1px solid #e5e7eb; outline: none; background: white;
+      font-size: 13px; color: #1f2937; padding: 6px 10px; border-radius: 4px;
       font-family: inherit;
+      margin-left: 4px;
+    }
+    .canvas-col .email-card-header .ech-input-inline:focus {
+      border-color: #3b82f6; background: #eff6ff;
     }
     .canvas-col .email-card-header .ech-input-inline::placeholder {
       color: #9ca3af; font-style: italic;
@@ -5498,7 +5502,7 @@
                 '</span>';
               }).join('') +
               // Free-text input for adding more recipients (type then comma/enter)
-              '<input type="text" class="ech-input-inline" data-ech-add placeholder="' + (recipientCount === 0 ? 'Add recipients…' : '') + '" />' +
+              '<input type="text" class="ech-input-inline" data-ech-add placeholder="' + (recipientCount === 0 ? 'recipient@email.com' : '+ add more') + '" />' +
             '</div>' +
             '<span class="ech-cc">' +
               '<button type="button" data-ech-toggle="cc" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">Cc</button>' +
