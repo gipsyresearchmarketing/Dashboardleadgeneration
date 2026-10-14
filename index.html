@@ -1743,10 +1743,6 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
             Sync
           </button>
-          <button class="btn btn-outline" id="btn-clear-all" title="Delete ALL data (local + Supabase)" style="color:var(--danger);border-color:#fecaca">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-            Clear All
-          </button>
           <button class="btn btn-outline" id="btn-import" title="Import leads dari file CSV / Excel (.xlsx, .xls)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
             Import CSV
@@ -4303,51 +4299,7 @@
   const _origSetView = setView;
   window.setView = ((v) => { _origSetView(v); updateAddLabel(); });
 
-  // (Reset button removed — use per-row delete buttons and Clear All instead)
-
-  // Clear all data — deletes from both localStorage AND Supabase
-  document.getElementById('btn-clear-all')?.addEventListener('click', async () => {
-    if (!confirm('⚠️ DELETE ALL DATA?\n\nThis will permanently remove:\n• All leads, activities, tasks, audiences, assets\n• All email/WA drafts and history\n\nFrom THIS browser AND from Supabase (so all other browsers/devices will also be empty).\n\nContinue?')) return;
-    if (!confirm('Are you REALLY sure? This cannot be undone.')) return;
-
-    // 1. Clear localStorage FIRST so reload shows empty regardless
-    const allLsKeys = Object.keys(localStorage).filter(k => k.indexOf('leads-dashboard:') === 0);
-    allLsKeys.forEach(k => localStorage.removeItem(k));
-
-    // 2. Delete from Supabase - await each table
-    let supabaseErrors = [];
-    if (typeof sb !== 'undefined' && sb) {
-      const TABLES = ['leads', 'tasks', 'activities', 'audiences', 'assets', 'blast_history', 'blast_drafts'];
-      for (const table of TABLES) {
-        try {
-          // Fetch all IDs first, then delete by ID list (more reliable than neq with synthetic value)
-          const { data: rows, error: fetchErr } = await sb.from(table).select('id');
-          if (fetchErr) {
-            supabaseErrors.push(table + ': ' + fetchErr.message);
-            continue;
-          }
-          if (rows && rows.length > 0) {
-            const ids = rows.map(r => r.id);
-            const { error: delErr } = await sb.from(table).delete().in('id', ids);
-            if (delErr) supabaseErrors.push(table + ': ' + delErr.message);
-          }
-        } catch (e) {
-          supabaseErrors.push(table + ': ' + (e.message || String(e)));
-        }
-      }
-    }
-
-    // 3. Show feedback BEFORE reload
-    if (supabaseErrors.length) {
-      console.warn('Supabase delete errors:', supabaseErrors);
-      alert('Local data cleared, but Supabase had errors:\n' + supabaseErrors.join('\n') + '\n\n(Check RLS policy: needs DELETE permission for anon role)');
-    } else {
-      toast('✓ All data cleared (local + Supabase)');
-    }
-
-    // 4. Reload to show empty state
-    setTimeout(() => location.reload(), 100);
-  });
+  // (Reset and Clear All buttons removed — per-row delete is enough)
 
   // Pull latest data from Supabase (overrides local)
   document.getElementById('btn-sync-supabase')?.addEventListener('click', async () => {
