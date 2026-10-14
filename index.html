@@ -1743,10 +1743,6 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
             Sync
           </button>
-          <button class="btn btn-outline" id="btn-reset" title="Reset data to mock">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-            Reset
-          </button>
           <button class="btn btn-outline" id="btn-clear-all" title="Delete ALL data (local + Supabase)" style="color:var(--danger);border-color:#fecaca">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
             Clear All
@@ -4307,32 +4303,7 @@
   const _origSetView = setView;
   window.setView = ((v) => { _origSetView(v); updateAddLabel(); });
 
-  document.getElementById('btn-reset').addEventListener('click', () => {
-    if (confirm('Reset semua data ke mock awal?')) {
-      state.leads = MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
-      state.activities = [...MOCK_ACTIVITIES];
-      state.tasks = [...MOCK_TASKS];
-      saveLeads(state.leads);
-      saveActivities(state.activities);
-      saveTasks(state.tasks);
-      // Reset blast drafts/history too
-      emailBlast = { ...emailBlast, drafts: [], history: [] };
-      waBlast    = { ...waBlast,    drafts: [], history: [] };
-      saveBlast(STORAGE_KEY_BLAST_EMAIL, emailBlast);
-      saveBlast(STORAGE_KEY_BLAST_WA,    waBlast);
-      // Reset audiences too
-      audiences = [];
-      saveAudiences(audiences);
-      state.query = '';
-      state.statusFilter = 'all';
-      const sEl = document.getElementById('search');
-      if (sEl) sEl.value = '';
-      const sLabel = document.getElementById('status-filter-label');
-      if (sLabel) sLabel.textContent = 'All status';
-      renderAll();
-      toast('Data reset');
-    }
-  });
+  // (Reset button removed — use per-row delete buttons and Clear All instead)
 
   // Clear all data — deletes from both localStorage AND Supabase
   document.getElementById('btn-clear-all')?.addEventListener('click', async () => {
@@ -4514,6 +4485,16 @@
     renderActivitiesView();
     renderEmailBlastView();
     renderWaBlastView();
+    // Re-render workspace board if Contacts or Companies is the active view
+    if (state.view === 'contacts') {
+      wsState.wsView = 'contacts';
+      if (typeof wsRenderBoard === 'function') wsRenderBoard('person');
+      if (typeof syncWsTabs === 'function') syncWsTabs();
+    } else if (state.view === 'board') {
+      wsState.wsView = 'board';
+      if (typeof wsRenderBoard === 'function') wsRenderBoard();
+      if (typeof syncWsTabs === 'function') syncWsTabs();
+    }
     renderAudiencesView();
     renderSidebarCounts();
     if (state.drawerLeadId) renderDrawer();
