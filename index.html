@@ -1743,6 +1743,10 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
             Reset
           </button>
+          <button class="btn btn-outline" id="btn-clear-all" title="Delete ALL data (local + Supabase)" style="color:var(--danger);border-color:#fecaca">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+            Clear All
+          </button>
           <button class="btn btn-outline" id="btn-import" title="Import leads dari file CSV / Excel (.xlsx, .xls)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
             Import CSV
@@ -3110,9 +3114,12 @@
         <td class="table-hide-mobile text-gray-500">${lead.transaction_date ? formatDate(lead.transaction_date) : '-'}</td>
         <td class="text-right font-medium tabular-nums">${formatIDR(lead.sales_value)}</td>
         <td class="table-hide-mobile text-gray-500">${formatDate(lead.last_contacted_at)}</td>
-        <td class="text-right">
-          <button class="btn btn-ghost p-1.5" data-action="${lead.id}" title="Open menu" onclick="event.stopPropagation()">
+        <td class="text-right" style="white-space:nowrap">
+          <button class="btn btn-ghost p-1" data-action="${lead.id}" title="Open menu" onclick="event.stopPropagation()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+          </button>
+          <button class="btn btn-ghost p-1" data-delete-lead="${lead.id}" title="Delete lead" onclick="event.stopPropagation()" style="color:var(--danger)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
         </td>
       </tr>
@@ -3125,6 +3132,26 @@
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         openRowMenu(btn.getAttribute('data-action'), btn);
+      });
+    });
+    // Delete lead button (per-row)
+    document.querySelectorAll('[data-delete-lead]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-delete-lead');
+        const lead = state.leads.find(l => l.id === id);
+        if (!lead) return;
+        if (!confirm('Delete "' + lead.name + '"?\n\nThis will be removed from all browsers and Supabase.')) return;
+        state.leads = state.leads.filter(l => l.id !== id);
+        saveLeads(state.leads);
+        // Also remove related activities and tasks
+        state.activities = state.activities.filter(a => a.lead_id !== id);
+        saveActivities(state.activities);
+        state.tasks = state.tasks.filter(t => t.lead_id !== id);
+        saveTasks(state.tasks);
+        renderAll();
+        updateSidebarCounts();
+        toast('🗑 ' + lead.name + ' deleted');
       });
     });
     document.querySelectorAll('[data-status-trigger]').forEach(btn => {
@@ -3208,6 +3235,9 @@
                 <p class="text-xs text-gray-500 truncate">${escapeHTML(lead.company)}</p>
               </div>
               <div class="flex items-center gap-1 flex-shrink-0">
+                <button class="btn btn-ghost p-1.5" id="drawer-delete" aria-label="Delete lead" title="Delete this lead" style="color:var(--danger)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                </button>
                 <button class="btn ${isEdit ? 'btn-primary' : 'btn-outline'}" id="drawer-edit-toggle" title="${isEdit ? 'Cancel edit' : 'Edit this lead'}" style="padding:6px 14px;font-size:13px;font-weight:600;border-width:2px">
                   ${isEdit ? '✕ Cancel edit' : '✎ Edit lead'}
                 </button>
@@ -3796,6 +3826,26 @@
     if (host && !host._drawerDelegated) {
       host._drawerDelegated = true;
       host.addEventListener('click', (e) => {
+        // Delete lead from drawer header
+        if (e.target.closest('#drawer-delete')) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!state.drawerLeadId) return;
+          const lead = state.leads.find(l => l.id === state.drawerLeadId);
+          if (!lead) return;
+          if (!confirm('Delete "' + lead.name + '"?\n\nThis will be removed from all browsers and Supabase.')) return;
+          state.leads = state.leads.filter(l => l.id !== lead.id);
+          saveLeads(state.leads);
+          state.activities = state.activities.filter(a => a.lead_id !== lead.id);
+          saveActivities(state.activities);
+          state.tasks = state.tasks.filter(t => t.lead_id !== lead.id);
+          saveTasks(state.tasks);
+          closeDrawer();
+          renderAll();
+          updateSidebarCounts();
+          toast('🗑 ' + lead.name + ' deleted');
+          return;
+        }
         // Close (X) button — top-right of header
         if (e.target.closest('#drawer-close')) {
           e.preventDefault();
@@ -4278,6 +4328,31 @@
       renderAll();
       toast('Data reset');
     }
+  });
+
+  // Clear all data — deletes from both localStorage AND Supabase
+  document.getElementById('btn-clear-all')?.addEventListener('click', async () => {
+    if (!confirm('⚠️ DELETE ALL DATA?\n\nThis will permanently remove:\n• All leads, activities, tasks, audiences, assets\n• All inbox emails, email/WA drafts and history\n\nFrom THIS browser AND from Supabase (so all other browsers/devices will also be empty).\n\nContinue?')) return;
+    if (!confirm('Are you REALLY sure? This cannot be undone.')) return;
+    const allLsKeys = Object.keys(localStorage).filter(k => k.indexOf('leads-dashboard:') === 0);
+    allLsKeys.forEach(k => localStorage.removeItem(k));
+    if (typeof sb !== 'undefined' && sb) {
+      // Delete from Supabase
+      try {
+        const SPECS_FOR_DELETE = [
+          { table: 'leads' }, { table: 'tasks' }, { table: 'activities' },
+          { table: 'audiences' }, { table: 'assets' },
+          { table: 'blast_history' }, { table: 'blast_drafts' },
+        ];
+        for (const s of SPECS_FOR_DELETE) {
+          const { error } = await sb.from(s.table).delete().neq('id', '__never__');
+          if (error) console.warn('Supabase delete error for ' + s.table + ':', error.message);
+        }
+      } catch (e) {
+        console.warn('Supabase clear error:', e);
+      }
+    }
+    location.reload();
   });
 
   // "Fix type" — convert all leads on the current view to the OTHER type.
