@@ -1703,6 +1703,12 @@
       </nav>
 
       <div class="sidebar-footer">
+        <span id="supabase-status" style="display:none;background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-bottom:4px">
+          ☁️ Synced to Supabase
+        </span>
+        <span id="supabase-status-error" style="display:none;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-bottom:4px" title="Check console for details">
+          ⚠️ Supabase offline
+        </span>
         Data persisted to localStorage
       </div>
     </aside>
@@ -7513,8 +7519,14 @@
           await Promise.race([hydratePromise, timeout]);
           synced = true;
           hookWrites();
+          // Show success indicator in sidebar footer
+          var okEl = document.getElementById('supabase-status');
+          if (okEl) okEl.style.display = 'inline-block';
         } catch (e) {
           console.warn('[supabase] offline / error, pakai localStorage saja:', e.message || e);
+          // Show error indicator in sidebar footer
+          var errEl = document.getElementById('supabase-status-error');
+          if (errEl) errEl.style.display = 'inline-block';
         }
       } else {
         console.warn('[supabase] anonKey belum diisi, pakai localStorage saja.');
