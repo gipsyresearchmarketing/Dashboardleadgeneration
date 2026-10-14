@@ -7381,18 +7381,27 @@
     async function hydrate() {
       var blast = {};
       try {
+        // Query each spec, but catch per-table errors so one missing
+        // table doesn't kill the whole hydrate.
         var results = await withTimeout(Promise.all(SPECS.map(function (s) {
-          var q = sb.from(s.table).select('*');
-          if (s.channel) q = q.eq('channel', s.channel);
-          return q.order('created_at', { ascending: false }).order('id', { ascending: true });
+          try {
+            var q = sb.from(s.table).select('*');
+            if (s.channel) q = q.eq('channel', s.channel);
+            return q.order('created_at', { ascending: false }).order('id', { ascending: true });
+          } catch (e) {
+            return { error: { message: e.message || 'query failed' } };
+          }
         })), 10000);
-        results.forEach(function (res) {
+        results.forEach(function (res, i) {
           if (res.error) {
-            console.warn('[supabase] ' + res.error.message + ' (table=' + (res.error.details || '?') + ') — using localStorage only');
+            console.warn('[supabase] ' + res.error.message + ' (table=' + (SPECS[i] ? SPECS[i].table : '?') + ') — using localStorage only');
           }
         });
         SPECS.forEach(function (s, i) {
-          var rows = (results[i] && results[i].data) || [];
+          var res = results[i];
+          // If the table doesn't exist (404) or any other error, skip it.
+          if (!res || res.error) return;
+          var rows = res.data || [];
           known[specKey(s)] = rows.map(function (r) { return r.id; });
           if (!rows.length) return;  // Don't overwrite localStorage with empty cloud data
           if (s.part) {
