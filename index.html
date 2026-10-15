@@ -1702,14 +1702,22 @@
         </div>
       </nav>
 
+      <div class="nav-section-label">Account</div>
+      <nav>
+        <div class="nav-item" data-view="profile">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Profile
+        </div>
+      </nav>
+
       <div class="sidebar-footer">
         <span id="supabase-status" style="display:none;background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-bottom:4px">
-          ☁️ Synced to Supabase
+          ● Live sync
         </span>
         <span id="supabase-status-error" style="display:none;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-bottom:4px" title="Check console for details">
           ⚠️ Supabase offline
         </span>
-        Data persisted to localStorage
+        Data tersimpan di Supabase
       </div>
     </aside>
 
@@ -1725,23 +1733,8 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
-          <button id="btn-force-login" class="btn btn-primary" style="padding:4px 12px;font-size:12px;font-weight:600;margin-left:8px">Sign in</button>
         </div>
         <div class="topbar-actions">
-          <div id="brand-switcher-wrap" style="display:none;position:relative">
-            <button id="brand-switcher-btn" class="btn btn-outline" style="padding:4px 10px;font-size:12px;font-weight:600">
-              <span id="brand-switcher-label">Brand</span>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:4px"><path d="m6 9 6 6 6-6"/></svg>
-            </button>
-            <div id="brand-switcher-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);min-width:220px;z-index:50"></div>
-          </div>
-          <div id="user-menu-wrap" style="display:none;position:relative">
-            <button id="user-menu-btn" class="btn btn-outline" style="padding:4px 10px;font-size:12px;font-weight:600">
-              <span id="user-menu-label">User</span>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:4px"><path d="m6 9 6 6 6-6"/></svg>
-            </button>
-            <div id="user-menu-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);min-width:200px;z-index:50"></div>
-          </div>
           <button class="btn btn-outline" id="btn-fix-type" title="Convert leads to the correct type (Company ↔ Contact)" style="display:none">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
             Fix type
@@ -1969,8 +1962,13 @@
         <div id="assets-host"></div>
       </div>
 
+      <!-- ========== View: Profile ========== -->
+      <div class="view-container" id="view-profile">
+        <div id="profile-host"></div>
+      </div>
+
       <footer class="border-t py-4 mt-2">
-        <p class="text-center text-xs text-gray-500">Leads CRM + Marketing Workspace — single-file app. Data persisted to localStorage.</p>
+        <p class="text-center text-xs text-gray-500">Leads CRM + Marketing Workspace — Data tersimpan di Supabase &amp; tersinkron realtime.</p>
       </footer>
 
     </div>
@@ -2114,140 +2112,258 @@
     { id:'INB-010', from_email:'erika.w@solusidigital.asia', from_name:'Erika Wulandari', to_email:'sales@leadsdashboard.id', subject:'Testimonial & Case Study Permission', body:'Halo Tim,\n\nSaya Erika dari PT Solusi Digital Asia. Kita sudah closing deal 2 minggu lalu dan tim sudah mulai implementasi.\n\nSaya sangat puas dengan onboarding process dan responsiveness tim support Anda. Saya ingin menulis testimonial untuk website Anda dan publish case study kita sebagai referensi.\n\nApakah tim marketing Anda bisa schedule call 30 menit minggu depan untuk discuss? Saya juga tertarik untuk join sebagai reference customer untuk prospect baru di industri SaaS / digital agency.\n\nBest,\nErika Wulandari\nCEO, PT Solusi Digital Asia', snippet:'Post-sale follow up — Erika mau tulis testimonial & jadi reference customer', lead_id:'L-0005', blast_id:null, status:'replied', starred:true,  has_attachments:false, attachments:[], received_at:'2026-09-26T11:30:00.000Z', read_at:'2026-09-26T12:00:00.000Z', replied_at:'2026-09-26T14:30:00.000Z' }
   ];
 
-  function loadInboundEmails() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_INBOX);
-      if (!raw) return MOCK_INBOUND_EMAILS.map(e => ({ ...e }));
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return MOCK_INBOUND_EMAILS.map(e => ({ ...e }));
-      return parsed;
-    } catch { return MOCK_INBOUND_EMAILS.map(e => ({ ...e })); }
-  }
-  function saveInboundEmails(items) {
-    try {
-      if (window.currentBrand && window.currentBrand.id) {
-        items = items.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
-      }
-      localStorage.setItem(STORAGE_KEY_INBOX, JSON.stringify(items));
-    } catch {}
+
+  /* ================================================================
+   * Persistence: Supabase = single source of truth (+ realtime)
+   * localStorage TIDAK dipakai untuk data user.
+   * ================================================================ */
+  function uid(prefix) {
+    return prefix + '-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
   }
 
-  function loadLeads() {
-    // Supabase is the source of truth. localStorage is just a write cache.
-    // First try to fetch fresh data from Supabase; if that fails, fall
-    // back to localStorage (offline mode).
-    if (typeof sb !== 'undefined' && sb && window.currentBrand && window.currentBrand.id) {
-      // Note: this is sync (bad — should be async), but for backward compat
-      // we still use the old localStorage path until we refactor to async.
-      // The real fix is at boot: hydrate pulls from Supabase.
+  const CLOUD_SPECS = {
+    leads:        { table: 'leads', order: 'created_at',
+      cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at','product_name','position','transaction_date','brand_id'],
+      get: () => state.leads, set: (r) => { state.leads = r; } },
+    activities:   { table: 'activities', order: 'created_at',
+      cols: ['id','lead_id','type','title','notes','created_at','brand_id'],
+      get: () => state.activities, set: (r) => { state.activities = r; } },
+    tasks:        { table: 'tasks', order: 'created_at',
+      cols: ['id','lead_id','title','due_at','completed','completed_at','notes','created_at','brand_id'],
+      get: () => state.tasks, set: (r) => { state.tasks = r; } },
+    assets:       { table: 'assets', order: 'created_at',
+      cols: ['id','kind','name','url','created_at','last_used','brand_id'],
+      get: () => assets, set: (r) => { assets = r; } },
+    audiences:    { table: 'audiences', order: 'created_at',
+      cols: ['id','name','type','description','lead_ids','created_at','last_used','brand_id'],
+      get: () => audiences, set: (r) => { audiences = r; } },
+    drafts_email: { table: 'blast_drafts', channel: 'email', order: 'created_at',
+      cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at','brand_id'],
+      get: () => emailBlast.drafts, set: (r) => { emailBlast.drafts = r; } },
+    history_email:{ table: 'blast_history', channel: 'email', order: 'created_at',
+      cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at','brand_id'],
+      get: () => emailBlast.history, set: (r) => { emailBlast.history = r; } },
+    drafts_wa:    { table: 'blast_drafts', channel: 'wa', order: 'created_at',
+      cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at','brand_id'],
+      get: () => waBlast.drafts, set: (r) => { waBlast.drafts = r; } },
+    history_wa:   { table: 'blast_history', channel: 'wa', order: 'created_at',
+      cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at','brand_id'],
+      get: () => waBlast.history, set: (r) => { waBlast.history = r; } },
+    inbox:        { table: 'inbound_emails', order: 'id',
+      cols: ['id','from_email','from_name','to_email','subject','body','snippet','lead_id','blast_id','status','starred','has_attachments','attachments','received_at','read_at','replied_at','brand_id'],
+      get: () => state.inboxEmails, set: (r) => { state.inboxEmails = r; } },
+  };
+  const CLOUD_NULLABLE = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, sent_at:1, last_used:1, audience_id:1, lead_id:1, blast_id:1, read_at:1, replied_at:1 };
+
+  const cloud = { ready: false, brandId: null, known: {}, sent: {}, timers: {}, pullTimers: {}, chains: {}, rev: {}, dirty: {}, channel: null, errToast: 0 };
+
+  function cloudClean(spec, r) {
+    const o = {};
+    spec.cols.forEach(function (c) {
+      const v = (c === 'channel') ? spec.channel : r[c];
+      if (v === undefined) return;
+      if (v === null && !CLOUD_NULLABLE[c]) return;
+      o[c] = v;
+    });
+    if (o.tags !== undefined && !Array.isArray(o.tags)) o.tags = [];
+    return o;
+  }
+
+  function setSyncStatus(st) {
+    const ok = document.getElementById('supabase-status');
+    const er = document.getElementById('supabase-status-error');
+    if (!ok || !er) return;
+    if (st === 'error') { ok.style.display = 'none'; er.style.display = 'inline-block'; }
+    else { er.style.display = 'none'; ok.style.display = 'inline-block'; ok.textContent = (st === 'live') ? '● Live sync' : '… Menghubungkan'; }
+    window.cloudStatus = st;
+    if (state && state.view === 'profile' && typeof renderProfileView === 'function') renderProfileView();
+  }
+
+  /* ---- push (local -> Supabase) ---- */
+  function cloudSave(key, items) {
+    const spec = CLOUD_SPECS[key];
+    if (items && Array.isArray(items)) spec.set(items);
+    if (!cloud.ready) return;
+    cloud.rev[key] = (cloud.rev[key] || 0) + 1;
+    cloud.dirty[key] = true;
+    clearTimeout(cloud.timers[key]);
+    cloud.timers[key] = setTimeout(function () { cloudPush(key); }, 350);
+  }
+
+  function cloudPush(key) {
+    const spec = CLOUD_SPECS[key];
+    const brandId = cloud.brandId;
+    cloud.chains[key] = (cloud.chains[key] || Promise.resolve()).then(async function () {
+      if (!cloud.ready || brandId !== cloud.brandId || !window.sb) return;
+      const revAtStart = cloud.rev[key];
+      try {
+        const rows = (spec.get() || []).filter(function (r) { return r && r.id; });
+        const payload = rows.map(function (r) { return cloudClean(spec, Object.assign({}, r, { brand_id: brandId })); });
+        const ids = payload.map(function (r) { return r.id; });
+        const sent = cloud.sent[key] || (cloud.sent[key] = {});
+        const changed = payload.filter(function (r) { return sent[r.id] !== JSON.stringify(r); });
+        for (let i = 0; i < changed.length; i += 200) {
+          const chunk = changed.slice(i, i + 200);
+          const u = await window.sb.from(spec.table).upsert(chunk);
+          if (u.error) throw u.error;
+          chunk.forEach(function (r) { sent[r.id] = JSON.stringify(r); });
+        }
+        const gone = (cloud.known[key] || []).filter(function (id) { return ids.indexOf(id) < 0; });
+        if (gone.length) {
+          const d = await window.sb.from(spec.table).delete().eq('brand_id', brandId).in('id', gone);
+          if (d.error) throw d.error;
+          gone.forEach(function (id) { delete sent[id]; });
+        }
+        cloud.known[key] = ids;
+      } catch (e) {
+        console.warn('[supabase] sync gagal:', spec.table, e && e.message || e);
+        setSyncStatus('error');
+        if (Date.now() - cloud.errToast > 8000) { cloud.errToast = Date.now(); toast('⚠ Gagal simpan ke Supabase: ' + (e && e.message || 'network error')); }
+      } finally {
+        if (cloud.rev[key] === revAtStart) cloud.dirty[key] = false;
+      }
+    });
+  }
+
+  /* ---- pull (Supabase -> local) ---- */
+  async function cloudPull(key) {
+    const spec = CLOUD_SPECS[key];
+    const brandId = cloud.brandId;
+    if (!window.sb || !brandId) return 'skip';
+    const revAtStart = cloud.rev[key] || 0;
+    let all = [];
+    for (let from = 0; ; from += 1000) {
+      let q = window.sb.from(spec.table).select('*').eq('brand_id', brandId);
+      if (spec.channel) q = q.eq('channel', spec.channel);
+      if (spec.order === 'created_at') q = q.order('created_at', { ascending: false });
+      q = q.order('id', { ascending: true }).range(from, from + 999);
+      const res = await q;
+      if (res.error) throw res.error;
+      all = all.concat(res.data || []);
+      if (!res.data || res.data.length < 1000) break;
     }
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      let result = parsed.map(l => ({ ...l, tags: l.tags || [], type: l.type || 'company' }));
-      if (window.currentBrand && window.currentBrand.id) {
-        result = result.filter(l => l.brand_id === window.currentBrand.id || !l.brand_id);
-      } else {
-        result = [];
-      }
-      return result;
-    } catch { return []; }
-  }
-  function saveLeads(leads) {
-    try {
-      // Auto-tag with current brand if not already set
-      if (window.currentBrand && window.currentBrand.id) {
-        leads = leads.map(l => l.brand_id ? l : { ...l, brand_id: window.currentBrand.id });
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
-    } catch {}
+    if (brandId !== cloud.brandId) return 'skip';
+    if (cloud.dirty[key] || (cloud.rev[key] || 0) !== revAtStart) return 'busy';  // ada edit lokal yang belum terkirim
+    spec.set(spec.channel ? all.map(function (r) { return Object.assign({}, r, { channel: spec.channel }); }) : all);
+    cloud.known[key] = all.map(function (r) { return r.id; });
+    const sent = cloud.sent[key] = {};
+    all.forEach(function (r) { sent[r.id] = JSON.stringify(cloudClean(spec, r)); });
+    return 'ok';
   }
 
-  function loadActivities() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_ACTIVITIES);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      if (window.currentBrand && window.currentBrand.id) {
-        return parsed.filter(a => a.brand_id === window.currentBrand.id || !a.brand_id);
-      }
-      return [];
-    } catch { return []; }
-  }
-  function saveActivities(items) {
-    try {
-      if (window.currentBrand && window.currentBrand.id) {
-        items = items.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
-      }
-      localStorage.setItem(STORAGE_KEY_ACTIVITIES, JSON.stringify(items));
-    } catch {}
+  let cloudRenderTimer = null;
+  function cloudRender() {
+    clearTimeout(cloudRenderTimer);
+    cloudRenderTimer = setTimeout(function attempt() {
+      const a = document.activeElement;
+      const typing = a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable) && a.id !== 'search';
+      if (typing || state.drawerEdit) { cloudRenderTimer = setTimeout(attempt, 1500); return; }  // jangan ganggu user yang lagi ngetik
+      try { renderAll(); } catch (e) { console.error('render error', e); }
+    }, 120);
   }
 
-  function loadTasks() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_TASKS);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      if (window.currentBrand && window.currentBrand.id) {
-        return parsed.filter(t => t.brand_id === window.currentBrand.id || !t.brand_id);
-      }
-      return [];
-    } catch { return []; }
-  }
-  function saveTasks(items) {
-    try {
-      if (window.currentBrand && window.currentBrand.id) {
-        items = items.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
-      }
-      localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(items));
-    } catch {}
+  function cloudSchedulePull(keys, delay) {
+    keys.forEach(function (k) {
+      clearTimeout(cloud.pullTimers[k]);
+      cloud.pullTimers[k] = setTimeout(async function () {
+        if (!cloud.ready) return;
+        try {
+          const r = await cloudPull(k);
+          if (r === 'ok') cloudRender();
+          else if (r === 'busy') cloudSchedulePull([k], 800);
+        } catch (e) { console.warn('[supabase] pull gagal:', k, e && e.message || e); }
+      }, delay);
+    });
   }
 
+  /* ---- realtime ---- */
+  function cloudUnsubscribe() {
+    if (cloud.channel && window.sb) { try { window.sb.removeChannel(cloud.channel); } catch (e) {} }
+    cloud.channel = null;
+  }
+  function cloudSubscribe() {
+    cloudUnsubscribe();
+    const brandId = cloud.brandId;
+    const byTable = {};
+    Object.keys(CLOUD_SPECS).forEach(function (k) { (byTable[CLOUD_SPECS[k].table] = byTable[CLOUD_SPECS[k].table] || []).push(k); });
+    let ch = window.sb.channel('brand-' + brandId);
+    Object.keys(byTable).forEach(function (t) {
+      const h = function () { cloudSchedulePull(byTable[t], 250); };
+      ['INSERT', 'UPDATE'].forEach(function (ev) {
+        ch = ch.on('postgres_changes', { event: ev, schema: 'public', table: t, filter: 'brand_id=eq.' + brandId }, h);
+      });
+      // DELETE event tidak bisa difilter by kolom non-PK, jadi dengerin semua lalu re-pull (RLS tetap jaga data)
+      ch = ch.on('postgres_changes', { event: 'DELETE', schema: 'public', table: t }, h);
+    });
+    ch.subscribe(function (status) {
+      if (brandId !== cloud.brandId) return;
+      if (status === 'SUBSCRIBED') { setSyncStatus('live'); cloudSchedulePull(Object.keys(CLOUD_SPECS), 50); }  // catch-up setelah (re)connect
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setSyncStatus('error');
+    });
+    cloud.channel = ch;
+  }
+
+  function cloudReset() {
+    Object.keys(cloud.timers).forEach(function (k) { clearTimeout(cloud.timers[k]); });
+    Object.keys(cloud.pullTimers).forEach(function (k) { clearTimeout(cloud.pullTimers[k]); });
+    cloud.ready = false; cloud.known = {}; cloud.sent = {}; cloud.timers = {}; cloud.pullTimers = {}; cloud.chains = {}; cloud.rev = {}; cloud.dirty = {};
+    Object.keys(CLOUD_SPECS).forEach(function (k) { CLOUD_SPECS[k].set([]); });
+  }
+  window.cloudStop = function () {
+    cloudUnsubscribe(); cloudReset(); cloud.brandId = null;
+    try { renderAll(); } catch (e) {}
+  };
+  window.cloudStart = async function () {
+    const brand = window.currentBrand;
+    if (!brand || !brand.id || !window.sb) return;
+    cloudUnsubscribe(); cloudReset();
+    cloud.brandId = brand.id;
+    setSyncStatus('connecting');
+    try {
+      await Promise.all(Object.keys(CLOUD_SPECS).map(function (k) { return cloudPull(k); }));
+      if (cloud.brandId !== brand.id) return;
+      cloud.ready = true;
+      try { renderAll(); } catch (re) { console.error('render error', re); }
+      cloudSubscribe();
+    } catch (e) {
+      console.warn('[supabase] load gagal:', e && e.message || e);
+      setSyncStatus('error');
+      toast('⚠ Gagal load data: ' + (e && e.message || 'network error'));
+    }
+  };
+  // Balik ke tab / koneksi balik → catch-up (jaga-jaga kalau websocket sempat putus)
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden || !cloud.brandId) return;
+    if (!cloud.ready) window.cloudStart(); else cloudSchedulePull(Object.keys(CLOUD_SPECS), 100);
+  });
+  window.addEventListener('online', function () { if (cloud.brandId) { if (!cloud.ready) window.cloudStart(); else cloudSchedulePull(Object.keys(CLOUD_SPECS), 100); } });
+
+  // State awal kosong — diisi window.cloudStart() setelah login
+  function loadInboundEmails() { return []; }
+  function loadLeads() { return []; }
+  function loadActivities() { return []; }
+  function loadTasks() { return []; }
+  function loadAssets() { return []; }
+  function loadAudiences() { return []; }
   function loadBlast(key) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return { drafts: [], history: [] };
-      const parsed = JSON.parse(raw);
-      const drafts = Array.isArray(parsed.drafts) ? parsed.drafts : [];
-      const history = Array.isArray(parsed.history) ? parsed.history : [];
-      const brandId = window.currentBrand && window.currentBrand.id;
-      const filter = (arr) => brandId ? arr.filter(x => x.brand_id === brandId || !x.brand_id) : [];
-      return { drafts: filter(drafts), history: filter(history) };
-    } catch { return { drafts: [], history: [] }; }
+    const b = (key === STORAGE_KEY_BLAST_EMAIL) ? emailBlast : waBlast;
+    return { drafts: (b && b.drafts) || [], history: (b && b.history) || [] };
   }
+  function saveInboundEmails(items) { cloudSave('inbox', items); }
+  function saveLeads(items)         { cloudSave('leads', items); }
+  function saveActivities(items)    { cloudSave('activities', items); }
+  function saveTasks(items)         { cloudSave('tasks', items); }
+  function saveAssets(items)        { cloudSave('assets', items); }
+  function saveAudiences(items)     { cloudSave('audiences', items); }
   function saveBlast(key, data) {
-    try {
-      if (window.currentBrand && window.currentBrand.id) {
-        data.drafts = (data.drafts || []).map(d => d.brand_id ? d : { ...d, brand_id: window.currentBrand.id });
-        data.history = (data.history || []).map(h => h.brand_id ? h : { ...h, brand_id: window.currentBrand.id });
-      }
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch {}
-  }
-
-  function loadAssets() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_ASSETS);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      if (window.currentBrand && window.currentBrand.id) {
-        return parsed.filter(a => a.brand_id === window.currentBrand.id || !a.brand_id);
-      }
-      return [];
-    } catch { return []; }
-  }
-  function saveAssets(items) {
-    try {
-      if (window.currentBrand && window.currentBrand.id) {
-        items = items.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
-      }
-      localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(items));
-    } catch {}
+    const ch = (key === STORAGE_KEY_BLAST_EMAIL) ? 'email' : 'wa';
+    const target = (ch === 'email') ? emailBlast : waBlast;
+    if (data && data !== target) {
+      if (Array.isArray(data.drafts))  target.drafts = data.drafts;
+      if (Array.isArray(data.history)) target.history = data.history;
+    }
+    cloudSave('drafts_' + ch);
+    cloudSave('history_' + ch);
   }
 
   /* =================================================================
@@ -2390,7 +2506,7 @@
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target).entries());
       const entry = {
-        id: 'AS-' + Math.floor(Math.random() * 9000 + 1000),
+        id: uid('AS'),
         kind: data.asset_kind,
         name: data.name.trim(),
         url: data.url.trim(),
@@ -2448,27 +2564,6 @@
       }
     }
     toast('Inserted: ' + asset.name);
-  }
-
-  function loadAudiences() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_AUDIENCES);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      if (window.currentBrand && window.currentBrand.id) {
-        return parsed.filter(a => a.brand_id === window.currentBrand.id || !a.brand_id);
-      }
-      return [];
-    } catch { return []; }
-  }
-  function saveAudiences(list) {
-    try {
-      if (window.currentBrand && window.currentBrand.id) {
-        list = list.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
-      }
-      localStorage.setItem(STORAGE_KEY_AUDIENCES, JSON.stringify(list));
-    } catch {}
   }
 
   let state = {
@@ -2565,13 +2660,13 @@
   }
 
   function generateId() {
-    return 'L-' + Math.floor(Math.random() * 9000 + 1000);
+    return uid('L');
   }
   function generateActivityId() {
-    return 'A-' + Math.floor(Math.random() * 9000 + 1000);
+    return uid('A');
   }
   function generateTaskId() {
-    return 'T-' + Math.floor(Math.random() * 9000 + 1000);
+    return uid('T');
   }
 
   /* Color chip class per tag — keeps colors deterministic */
@@ -3060,7 +3155,7 @@
     document.body.classList.toggle('workspace-mode', inWorkspace);
     document.querySelectorAll('.view-container').forEach(c => c.classList.toggle('active', c.id === `view-${view}`));
     document.querySelectorAll('[data-view]').forEach(n => n.classList.toggle('active', n.getAttribute('data-view') === view));
-    const titles = { dashboard:'Dashboard', contacts:'Contacts', board:'Companies', tasks:'Lead Tasks', activities:'Activity Log', 'board-calendar':'Calendar', 'email-blast':'Email', 'wa-blast':'WhatsApp Blast', audiences:'Audiences', inbox:'Email · Inbox' };
+    const titles = { profile:'Profile', dashboard:'Dashboard', contacts:'Contacts', board:'Companies', tasks:'Lead Tasks', activities:'Activity Log', 'board-calendar':'Calendar', 'email-blast':'Email', 'wa-blast':'WhatsApp Blast', audiences:'Audiences', inbox:'Email · Inbox' };
     document.getElementById('topbar-title').textContent = titles[view] || view;
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebar-backdrop').classList.remove('open');
@@ -3075,6 +3170,7 @@
     if (view === 'board')         { wsState.wsView = 'board';     wsRenderBoard();    syncWsTabs(); }
     if (view === 'board-calendar'){ wsState.wsView = 'calendar';  wsRenderCalendar(); syncWsTabs(); }
     if (view === 'assets')        { renderAssetsView(); }
+    if (view === 'profile')       { renderProfileView(); }
   }
   function syncWsTabs() {
     document.querySelectorAll('[data-ws-tab]').forEach(x => x.classList.toggle('active', x.getAttribute('data-ws-tab') === wsState.wsView));
@@ -4086,11 +4182,6 @@
    * Add Lead modal
    * ================================================================ */
   document.getElementById('btn-add').addEventListener('click', () => openAddModal());
-  // Manual "Sign in" trigger button in topbar (fallback if initAuth didn't auto-show)
-  document.getElementById('btn-force-login')?.addEventListener('click', () => {
-    if (typeof showAuthScreen === 'function') showAuthScreen('login');
-    else location.reload();
-  });
 
   function openAddModal() {
     const modal = document.getElementById('modal-host');
@@ -4319,25 +4410,42 @@
   window.initAuth = async function () {
     var authScreen = document.getElementById('auth-screen');
     if (!authScreen) return;
-    // Always show the auth screen first - safer UX.
-    // If user already has a valid session, hide it after we check.
-    showAuthScreen('login');
-    if (!sb) {
-      console.warn('[initAuth] Supabase client not initialized');
-      return;
-    }
-    // Check existing session
-    try {
-      var session = await sb.auth.getSession();
-      if (session && session.data && session.data.session && session.data.session.user) {
-        window.currentUser = session.data.session.user;
-        authScreen.style.display = 'none';
-        await loadUserBrands();
+    // Cover sementara supaya dashboard kosong tidak sempat kelihatan sebelum session dicek
+    authScreen.style.display = 'block';
+    authScreen.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;color:#64748b;font-size:14px">Memuat…</div>';
+    var client = window.sb;
+    if (client) {
+      try {
+        var res = await client.auth.getSession();
+        var sess = res && res.data && res.data.session;
+        if (sess && sess.user) {
+          window.currentUser = sess.user;
+          authScreen.style.display = 'none';
+          await loadUserBrands();
+          wireAuthListener();
+          return;
+        }
+      } catch (e) {
+        console.warn('[initAuth] getSession failed:', e.message);
       }
-    } catch (e) {
-      console.warn('[initAuth] getSession failed:', e.message);
+    } else {
+      console.warn('[initAuth] Supabase client not initialized');
     }
+    showAuthScreen('login');
+    wireAuthListener();
   };
+
+  var authListenerWired = false;
+  function wireAuthListener() {
+    if (authListenerWired || !window.sb) return;
+    authListenerWired = true;
+    // Kalau sign out dari tab lain, tab ini ikut keluar
+    window.sb.auth.onAuthStateChange(function (evt) {
+      if (evt === 'SIGNED_OUT' && window.currentUser) {
+        handleSignedOut();
+      }
+    });
+  }
 
   function showAuthScreen(mode) {
     var authScreen = document.getElementById('auth-screen');
@@ -4392,9 +4500,10 @@
         } else {
           var { data, error } = await client.auth.signUp({ email: email, password: password });
           if (error) throw error;
+          if (!data.session) throw new Error('Akun dibuat. Cek email lu untuk konfirmasi, lalu sign in.');
           window.currentUser = data.user;
           // Auto-create a brand for new user
-          var brandId = 'B-' + Math.floor(Math.random() * 9000 + 1000);
+          var brandId = uid('B');
           var { error: brandErr } = await sb.from('brands').insert({
             id: brandId, name: brandName || 'My Brand', owner_user_id: data.user.id
           });
@@ -4424,160 +4533,91 @@
         role: m.role,
         owner: m.brands.owner_user_id === window.currentUser.id
       }));
-      // Set current brand to first (owner's first brand)
-      if (window.userBrands.length > 0) {
-        window.currentBrand = window.userBrands[0];
-        document.title = 'Leads Dashboard — ' + window.currentBrand.name;
-      } else {
-        window.currentBrand = null;
-      }
-      // Re-render with new brand context
-      if (typeof window.refreshBrandUI === 'function') window.refreshBrandUI();
-      if (typeof renderUserMenu === 'function') renderUserMenu();
-      // Pull fresh data from Supabase for this brand
-      if (typeof window.syncFromCloud === 'function') await window.syncFromCloud();
+      var saved = null;
+      try { saved = localStorage.getItem('leads-dashboard:last-brand'); } catch (e) {}
+      window.currentBrand = window.userBrands.find(b => b.id === saved) || window.userBrands[0] || null;
+      if (window.currentBrand) document.title = 'Leads Dashboard — ' + window.currentBrand.name;
+      renderProfileView();
+      // Tarik data dari Supabase + nyalain realtime
+      await window.cloudStart();
     } catch (e) {
       console.warn('loadUserBrands error:', e.message);
+      toast('⚠ ' + (e.message || 'Gagal load brand'));
     }
   };
 
-  // Pull latest data for current brand from Supabase (overwrites localStorage)
-  window.syncFromCloud = async function () {
-    if (!window.currentBrand || !window.currentBrand.id) return;
-    if (typeof sb === 'undefined' || !sb) return;
-    const brandId = window.currentBrand.id;
-    try {
-      // Pull all data tables in parallel
-      const [leadsR, actsR, tasksR, audsR, astsR, dE, hE, dW, hW, ie] = await Promise.all([
-        sb.from('leads').select('*').eq('brand_id', brandId),
-        sb.from('activities').select('*').eq('brand_id', brandId),
-        sb.from('tasks').select('*').eq('brand_id', brandId),
-        sb.from('audiences').select('*').eq('brand_id', brandId),
-        sb.from('assets').select('*').eq('brand_id', brandId),
-        sb.from('blast_drafts').select('*').eq('brand_id', brandId).eq('channel', 'email'),
-        sb.from('blast_history').select('*').eq('brand_id', brandId).eq('channel', 'email'),
-        sb.from('blast_drafts').select('*').eq('brand_id', brandId).eq('channel', 'wa'),
-        sb.from('blast_history').select('*').eq('brand_id', brandId).eq('channel', 'wa'),
-        sb.from('inbound_emails').select('*').eq('brand_id', brandId),
-      ]);
-      if (leadsR.data)  { localStorage.setItem(STORAGE_KEY,              JSON.stringify(leadsR.data));  state.leads      = loadLeads();  }
-      if (actsR.data)   { localStorage.setItem(STORAGE_KEY_ACTIVITIES,   JSON.stringify(actsR.data));   state.activities = loadActivities(); }
-      if (tasksR.data)  { localStorage.setItem(STORAGE_KEY_TASKS,         JSON.stringify(tasksR.data));  state.tasks      = loadTasks(); }
-      if (audsR.data)   { localStorage.setItem(STORAGE_KEY_AUDIENCES,     JSON.stringify(audsR.data));   audiences        = audsR.data; }
-      if (astsR.data)   { localStorage.setItem(STORAGE_KEY_ASSETS,        JSON.stringify(astsR.data));   assets           = astsR.data; }
-      if (dE.data) {
-        const drs = (dE.data || []).map(d => ({ ...d, channel: 'email' }));
-        const his = (hE.data || []).map(d => ({ ...d, channel: 'email' }));
-        localStorage.setItem(STORAGE_KEY_BLAST_EMAIL, JSON.stringify({ drafts: drs, history: his }));
-        emailBlast.drafts = drs; emailBlast.history = his;
-      }
-      if (dW.data) {
-        const drs = (dW.data || []).map(d => ({ ...d, channel: 'wa' }));
-        const his = (hW.data || []).map(d => ({ ...d, channel: 'wa' }));
-        localStorage.setItem(STORAGE_KEY_BLAST_WA, JSON.stringify({ drafts: drs, history: his }));
-        waBlast.drafts = drs; waBlast.history = his;
-      }
-      if (ie.data) {
-        localStorage.setItem(STORAGE_KEY_INBOX, JSON.stringify(ie.data));
-        state.inboxEmails = loadInboundEmails();
-      }
-      if (typeof renderAll === 'function') renderAll();
-      toast('✓ Synced from Supabase (' + (leadsR.data || []).length + ' leads)');
-    } catch (e) {
-      console.warn('syncFromCloud error:', e.message);
-      toast('⚠ Sync failed: ' + (e.message || 'network error'));
-    }
-  };
+  async function switchBrand(id) {
+    var b = (window.userBrands || []).find(x => x.id === id);
+    if (!b || (window.currentBrand && window.currentBrand.id === id)) return;
+    window.currentBrand = b;
+    try { localStorage.setItem('leads-dashboard:last-brand', id); } catch (e) {}
+    document.title = 'Leads Dashboard — ' + b.name;
+    renderProfileView();
+    await window.cloudStart();
+    toast('✓ Brand: ' + b.name);
+  }
 
-  window.signOut = async function () {
-    if (sb) await sb.auth.signOut();
+  function handleSignedOut() {
     window.currentUser = null;
     window.currentBrand = null;
     window.userBrands = [];
-    // Clear local data
-    Object.keys(localStorage).filter(k => k.indexOf('leads-dashboard:') === 0).forEach(k => localStorage.removeItem(k));
+    window.cloudStop();
+    // bersihin sisa cache lama (versi sebelumnya nyimpen data di localStorage)
+    try { Object.keys(localStorage).filter(k => k.indexOf('leads-dashboard:') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    state.drawerLeadId = null;
+    var host = document.getElementById('modal-host'); if (host) host.innerHTML = '';
+    setView('dashboard');
     showAuthScreen('login');
-  };
-
-  /* Render brand switcher menu (top-right) */
-  window.refreshBrandUI = function () {
-    var wrap = document.getElementById('brand-switcher-wrap');
-    var label = document.getElementById('brand-switcher-label');
-    var menu = document.getElementById('brand-switcher-menu');
-    if (!wrap || !label || !menu) return;
-    if (!window.userBrands || window.userBrands.length === 0) {
-      wrap.style.display = 'none';
-      return;
-    }
-    wrap.style.display = 'inline-block';
-    if (window.currentBrand) {
-      label.textContent = window.currentBrand.name;
-    }
-    menu.innerHTML = window.userBrands.map(b =>
-      '<div data-brand-id="' + b.id + '" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:4px;background:' + (window.currentBrand && b.id === window.currentBrand.id ? '#eef2ff' : 'transparent') + '" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'' + (window.currentBrand && b.id === window.currentBrand.id ? '#eef2ff' : 'transparent') + '\'">' +
-      '<div style="min-width:0"><div style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + b.name + '</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">' + b.role + '</div></div>' +
-      (window.currentBrand && b.id === window.currentBrand.id ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:#4f46e5"><path d="M20 6 9 17l-5-5"/></svg>' : '') +
-      '</div>'
-    ).join('');
-    menu.querySelectorAll('[data-brand-id]').forEach(el => {
-      el.addEventListener('click', async () => {
-        window.currentBrand = window.userBrands.find(b => b.id === el.getAttribute('data-brand-id'));
-        menu.style.display = 'none';
-        document.getElementById('brand-switcher-label').textContent = window.currentBrand.name;
-        document.title = 'Leads Dashboard — ' + window.currentBrand.name;
-        if (typeof renderAll === 'function') renderAll();
-        toast('✓ Brand: ' + window.currentBrand.name);
-      });
-    });
-  };
-
-  /* Render user menu (sign out) */
-  function renderUserMenu() {
-    var wrap = document.getElementById('user-menu-wrap');
-    var label = document.getElementById('user-menu-label');
-    var menu = document.getElementById('user-menu-menu');
-    if (!wrap || !label || !menu) return;
-    if (!window.currentUser) {
-      wrap.style.display = 'none';
-      return;
-    }
-    wrap.style.display = 'inline-block';
-    label.textContent = window.currentUser.email.split('@')[0];
-    menu.innerHTML = '<div style="padding:10px 12px;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">' + window.currentUser.email + '</div></div>' +
-      '<div id="user-menu-signout" data-action="signout" style="padding:10px 12px;cursor:pointer;font-size:13px;color:#b91c1c;display:flex;align-items:center;gap:8px" onmouseover="this.style.background=\'#fef2f2\'" onmouseout="this.style.background=\'transparent\'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</div>';
-    menu.querySelector('#user-menu-signout').addEventListener('click', () => {
-      window.signOut();
-    });
   }
 
-  // Wire brand switcher + user menu toggle (event delegation)
-  document.addEventListener('click', (e) => {
-    var bsb = e.target.closest('#brand-switcher-btn');
-    if (bsb) {
-      e.stopPropagation();
-      var m = document.getElementById('brand-switcher-menu');
-      var um = document.getElementById('user-menu-menu');
-      if (um) um.style.display = 'none';
-      if (m) m.style.display = m.style.display === 'block' ? 'none' : 'block';
-      return;
-    }
-    var ub = e.target.closest('#user-menu-btn');
-    if (ub) {
-      e.stopPropagation();
-      var m2 = document.getElementById('brand-switcher-menu');
-      var um2 = document.getElementById('user-menu-menu');
-      if (m2) m2.style.display = 'none';
-      if (um2) um2.style.display = um2.style.display === 'block' ? 'none' : 'block';
-      return;
-    }
-    // close menus when clicking elsewhere
-    if (!e.target.closest('#brand-switcher-menu') && !e.target.closest('#user-menu-menu')) {
-      var bm = document.getElementById('brand-switcher-menu');
-      var um3 = document.getElementById('user-menu-menu');
-      if (bm) bm.style.display = 'none';
-      if (um3) um3.style.display = 'none';
-    }
-  });
+  window.signOut = async function () {
+    try { if (window.sb) await window.sb.auth.signOut(); } catch (e) { console.warn('signOut:', e.message); }
+    if (window.currentUser) handleSignedOut();
+  };
+
+  /* Profile view: info akun, ganti brand, sign out */
+  function escHtml(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function renderProfileView() {
+    var host = document.getElementById('profile-host');
+    if (!host) return;
+    var u = window.currentUser;
+    if (!u) { host.innerHTML = ''; return; }
+    var email = u.email || '';
+    var initial = (email.charAt(0) || '?').toUpperCase();
+    var brands = window.userBrands || [];
+    var cur = window.currentBrand;
+    var st = window.cloudStatus;
+    var stLabel = st === 'live' ? 'Tersambung — sinkron realtime' : st === 'error' ? 'Offline / gagal sync' : 'Menghubungkan…';
+    var stColor = st === 'live' ? '#059669' : st === 'error' ? '#dc2626' : '#d97706';
+    var brandRows = brands.map(function (b) {
+      var active = cur && b.id === cur.id;
+      return '<div data-switch-brand="' + escHtml(b.id) + '" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid ' + (active ? '#6366f1' : 'var(--border)') + ';background:' + (active ? '#eef2ff' : 'white') + ';border-radius:8px;cursor:' + (active ? 'default' : 'pointer') + '">'
+        + '<div style="min-width:0"><div style="font-size:14px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(b.name) + '</div>'
+        + '<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">' + escHtml(b.role) + '</div></div>'
+        + (active ? '<span style="font-size:12px;font-weight:600;color:#4f46e5">Aktif</span>' : '<span style="font-size:12px;color:#6b7280">Pindah</span>')
+        + '</div>';
+    }).join('');
+    host.innerHTML =
+      '<div style="max-width:560px;display:flex;flex-direction:column;gap:16px">'
+      + '<div class="card p-5" style="display:flex;align-items:center;gap:16px">'
+      +   '<div style="width:56px;height:56px;border-radius:50%;background:#4f46e5;color:white;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex:none">' + escHtml(initial) + '</div>'
+      +   '<div style="min-width:0"><div style="font-size:16px;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(email) + '</div>'
+      +   '<div style="font-size:12px;color:#6b7280;margin-top:2px">' + (cur ? 'Brand aktif: ' + escHtml(cur.name) : 'Belum ada brand') + '</div></div>'
+      + '</div>'
+      + '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Brand</div>'
+      +   '<div style="display:flex;flex-direction:column;gap:8px">' + (brandRows || '<div style="font-size:13px;color:#6b7280">Belum ada brand.</div>') + '</div></div>'
+      + '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Sinkronisasi</div>'
+      +   '<div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#1f2937"><span style="width:8px;height:8px;border-radius:50%;background:' + stColor + '"></span>' + stLabel + '</div></div>'
+      + '<div><button id="profile-signout" class="btn btn-outline" style="color:#b91c1c;border-color:#fecaca;font-weight:600">'
+      +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'
+      +   'Sign out</button></div>'
+      + '</div>';
+    var so = document.getElementById('profile-signout');
+    if (so) so.addEventListener('click', function () { window.signOut(); });
+    host.querySelectorAll('[data-switch-brand]').forEach(function (el) {
+      el.addEventListener('click', function () { switchBrand(el.getAttribute('data-switch-brand')); });
+    });
+  }
 
   function showFormError(msg) {
     const el = document.getElementById('form-error');
@@ -5315,7 +5355,7 @@
         if (!e) return;
         const tomorrow = new Date(Date.now() + 86400000);
         const task = {
-          id: 'T-' + Math.floor(Math.random() * 9000 + 1000),
+          id: uid('T'),
           lead_id: e.lead_id || null,
           title: 'Follow up: ' + (e.subject || '').slice(0, 60),
           due_at: tomorrow.toISOString(),
@@ -5336,7 +5376,7 @@
         const e = state.inboxEmails.find(x => x.id === id);
         if (!e || !e.lead_id) { toast('Email ini belum ter-link ke lead'); return; }
         const activity = {
-          id: 'A-' + Math.floor(Math.random() * 9000 + 1000),
+          id: uid('A'),
           lead_id: e.lead_id,
           type: 'email',
           title: 'Email received: ' + (e.subject || '').slice(0, 60),
@@ -5608,7 +5648,7 @@
           return;
         }
         errEl.classList.add('hidden');
-        const id = isEdit ? editing.id : 'A-' + Math.floor(Math.random() * 9000 + 1000);
+        const id = isEdit ? editing.id : uid('A');
         audiences = isEdit ? audiences.map(function(a) { return a.id === id ? { id: id, name: name, type: type, description: description, lead_ids: Array.from(selected), created_at: a.created_at, last_used: a.last_used } : a; }) : [{ id: id, name: name, type: type, description: description, lead_ids: Array.from(selected), created_at: new Date().toISOString(), last_used: null }].concat(audiences);
         saveAudiences(audiences);
         host.innerHTML = '';
@@ -6178,15 +6218,15 @@
     if (type === 'image') {
       const url = prompt('Image URL:', 'https://via.placeholder.com/500x200?text=Promo+Banner');
       if (!url) return;
-      att = { id: 'AT-' + Math.floor(Math.random() * 9000 + 1000), type: 'image', data: { url: url, alt: '' } };
+      att = { id: uid('AT'), type: 'image', data: { url: url, alt: '' } };
     } else if (type === 'button') {
       const text = prompt('Button text:', 'Klik untuk lihat') || 'Klik untuk lihat';
       const link = prompt('Button link (URL):', 'https://') || '#';
-      att = { id: 'AT-' + Math.floor(Math.random() * 9000 + 1000), type: 'button', data: { text: text, link: link } };
+      att = { id: uid('AT'), type: 'button', data: { text: text, link: link } };
     } else if (type === 'divider') {
-      att = { id: 'AT-' + Math.floor(Math.random() * 9000 + 1000), type: 'divider', data: {} };
+      att = { id: uid('AT'), type: 'divider', data: {} };
     } else if (type === 'spacer') {
-      att = { id: 'AT-' + Math.floor(Math.random() * 9000 + 1000), type: 'spacer', data: {} };
+      att = { id: uid('AT'), type: 'spacer', data: {} };
     } else if (type === 'library') {
       if (assets.length === 0) { toast('Image Library kosong. Tambah asset dulu.'); return; }
       // Open library picker
@@ -6197,8 +6237,8 @@
         const asset = assets.find(x => x.id === id);
         if (!asset) return;
         const newAtt = asset.kind === 'image'
-          ? { id: 'AT-' + Math.floor(Math.random() * 9000 + 1000), type: 'image', data: { url: asset.url, alt: asset.name } }
-          : { id: 'AT-' + Math.floor(Math.random() * 9000 + 1000), type: 'divider', data: { label: asset.name } };
+          ? { id: uid('AT'), type: 'image', data: { url: asset.url, alt: asset.name } }
+          : { id: uid('AT'), type: 'divider', data: { label: asset.name } };
         emailBlast.compose.blocks.push(newAtt);
         host.innerHTML = '';
         // Re-render composer to show new attachment
@@ -6286,7 +6326,7 @@
       } else if (choice === 'draft') {
         // Save as draft
         const draftEntry = {
-          id: 'B-' + Math.floor(Math.random() * 9000 + 1000),
+          id: uid('B'),
           subject: compose.subject || null,
           body: compose.body || null,
           message: compose.message || null,
@@ -6310,7 +6350,7 @@
 
     const isScheduled = compose.sendMode === 'scheduled';
     const sentAt = new Date().toISOString();
-    const blastId = 'B-' + Math.floor(Math.random() * 9000 + 1000);
+    const blastId = uid('B');
 
     const entry = {
       id: blastId,
@@ -6528,7 +6568,7 @@
           let lead = state.leads.find(l => (l.email && l.email.toLowerCase() === raw.toLowerCase()) ||
                                             l.name.toLowerCase() === raw.toLowerCase());
           if (!lead) {
-            const newId = 'L-' + Math.floor(Math.random() * 9000 + 1000);
+            const newId = uid('L');
             const isEmailLike = /@/.test(raw);
             lead = {
               id: newId,
@@ -7238,7 +7278,7 @@
         const h = blastState.history.find(x => x.id === id);
         if (!h) return;
         const newDraft = {
-          id: 'D-' + Math.floor(Math.random() * 9000 + 1000),
+          id: uid('D'),
           subject: h.subject || null,
           body: h.body || null,
           message: h.message || null,
@@ -7336,8 +7376,8 @@
         : compose.message.trim();
       if (!hasContent) { toast('Nothing to save'); return; }
       const draft = channel === 'email'
-        ? { id:'D-' + Math.floor(Math.random()*9000+1000), subject:compose.subject, body:compose.body, recipients:compose.recipients, blocks:compose.blocks||[], files:compose.files||[], sendMode:compose.sendMode, scheduled_at:compose.scheduled_at, created_at:new Date().toISOString() }
-        : { id:'D-' + Math.floor(Math.random()*9000+1000), message:compose.message, media:compose.media, recipients:compose.recipients, sendMode:compose.sendMode, scheduled_at:compose.scheduled_at, created_at:new Date().toISOString() };
+        ? { id:uid('D'), subject:compose.subject, body:compose.body, recipients:compose.recipients, blocks:compose.blocks||[], files:compose.files||[], sendMode:compose.sendMode, scheduled_at:compose.scheduled_at, created_at:new Date().toISOString() }
+        : { id:uid('D'), message:compose.message, media:compose.media, recipients:compose.recipients, sendMode:compose.sendMode, scheduled_at:compose.scheduled_at, created_at:new Date().toISOString() };
       blastState.drafts = [draft, ...blastState.drafts];
       saveBlast(storageKey, state);
       if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
@@ -7639,242 +7679,26 @@
   wsRenderAll();
   </script>
   <script>
-  /* ===== Supabase sync layer: localStorage = cache, Supabase = source of truth ===== */
+  /* Bootstrap: init Supabase client -> jalankan app -> app cek session (login screen kalau belum login) */
   (function () {
     var cfg = window.SUPABASE_CONFIG || {};
-    var sb = null, synced = false;
-    var P = 'leads-dashboard:';
-    var SPECS = [
-      { ls: P + 'v1', table: 'leads', cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at','product_name','position','transaction_date','brand_id'] },
-      { ls: P + 'activities:v1', table: 'activities', cols: ['id','lead_id','type','title','notes','created_at','brand_id'] },
-      { ls: P + 'tasks:v1', table: 'tasks', cols: ['id','lead_id','title','due_at','completed','completed_at','notes','created_at','brand_id'] },
-      { ls: P + 'assets:v1', table: 'assets', cols: ['id','kind','name','url','created_at','last_used','brand_id'] },
-      { ls: P + 'audiences:v1', table: 'audiences', cols: ['id','name','type','description','lead_ids','created_at','last_used','brand_id'] },
-      { ls: P + 'blast-email:v1', table: 'blast_drafts', part: 'drafts', channel: 'email', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at','brand_id'] },
-      { ls: P + 'blast-email:v1', table: 'blast_history', part: 'history', channel: 'email', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at','brand_id'] },
-      { ls: P + 'blast-wa:v1', table: 'blast_drafts', part: 'drafts', channel: 'wa', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at','brand_id'] },
-      { ls: P + 'blast-wa:v1', table: 'blast_history', part: 'history', channel: 'wa', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at','brand_id'] }
-    ];
-    var NULLABLE = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, last_used:1, audience_id:1, lead_id:1 };
-    var known = {}; /* "table|channel" -> array of ids known on server */
-
-    function specKey(s) { return s.table + '|' + (s.channel || ''); }
-    function rowsOf(s, raw) {
-      var d; try { d = JSON.parse(raw); } catch (e) { return null; }
-      if (s.part) d = d && d[s.part];
-      return Array.isArray(d) ? d : null;
-    }
-    function clean(s, r) {
-      var o = {};
-      s.cols.forEach(function (c) {
-        var v = (c === 'channel') ? s.channel : r[c];
-        if (v === undefined) return;
-        if (v === null && !NULLABLE[c]) return;
-        o[c] = v;
+    try {
+      if (!window.supabase) throw new Error('supabase-js gagal dimuat (cek koneksi internet)');
+      window.sb = window.supabase.createClient(cfg.url, cfg.anonKey, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
       });
-      if (o.tags !== undefined && !Array.isArray(o.tags)) o.tags = [];
-      return o;
+    } catch (e) {
+      console.error('[supabase] init gagal:', e.message || e);
     }
-    function withTimeout(p, ms) {
-      return Promise.race([p, new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms); })]);
+    var src = document.getElementById('app-src').textContent;
+    try {
+      (new Function(src))();
+    } catch (e) {
+      console.error('App source failed to load:', e);
+      document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#b91c1c"><h2>App failed to load</h2><pre style="text-align:left;background:#fef2f2;padding:16px;border-radius:6px;overflow:auto">' + (e.message || e) + '</pre></div>';
+      return;
     }
-
-    async function hydrate() {
-      var blast = {};
-      try {
-        // Query each spec, but catch per-table errors so one missing
-        // table doesn't kill the whole hydrate.
-        var results = await withTimeout(Promise.all(SPECS.map(function (s) {
-          try {
-            var q = sb.from(s.table).select('*');
-            if (s.channel) q = q.eq('channel', s.channel);
-            return q.order('created_at', { ascending: false }).order('id', { ascending: true });
-          } catch (e) {
-            return { error: { message: e.message || 'query failed' } };
-          }
-        })), 10000);
-        results.forEach(function (res, i) {
-          if (res.error) {
-            console.warn('[supabase] ' + res.error.message + ' (table=' + (SPECS[i] ? SPECS[i].table : '?') + ') — using localStorage only');
-          }
-        });
-        SPECS.forEach(function (s, i) {
-          var res = results[i];
-          // If the table doesn't exist (404) or any other error, skip it.
-          if (!res || res.error) return;
-          var rows = res.data || [];
-          known[specKey(s)] = rows.map(function (r) { return r.id; });
-          if (!rows.length) return;  // Don't overwrite localStorage with empty cloud data
-          if (s.part) {
-            blast[s.ls] = blast[s.ls] || (function () { try { return JSON.parse(localStorage.getItem(s.ls)) || {}; } catch (e) { return {}; } })();
-            blast[s.ls][s.part] = rows.map(function (r) { var c = Object.assign({}, r); delete c.channel; return c; });
-          } else {
-            localStorage.setItem(s.ls, JSON.stringify(rows));
-          }
-        });
-      } catch (e) {
-        // Supabase unreachable or auth error — fully fall back to localStorage
-        console.warn('[supabase] hydrate failed, pakai localStorage saja:', e.message || e);
-      }
-      Object.keys(blast).forEach(function (k) {
-        var cur = blast[k]; cur.drafts = cur.drafts || []; cur.history = cur.history || [];
-        localStorage.setItem(k, JSON.stringify(cur));
-      });
-    }
-
-    var chains = {}, timers = {};
-    function pushSpec(s, raw) {
-      var rows = rowsOf(s, raw); if (!rows) return;
-      var k = specKey(s);
-      var payload = rows.filter(function (r) { return r && r.id; }).map(function (r) { return clean(s, r); });
-      var ids = payload.map(function (r) { return r.id; });
-      chains[k] = (chains[k] || Promise.resolve()).then(async function () {
-        try {
-          if (payload.length) {
-            var u = await sb.from(s.table).upsert(payload);
-            if (u.error && /product_name|transaction_date|position/.test(u.error.message || '')) {
-              console.warn('[supabase] kolom product_name/position/transaction_date belum ada di tabel. Jalankan SQL ALTER TABLE dulu.');
-              u = await sb.from(s.table).upsert(payload.map(function (r) { var c = Object.assign({}, r); delete c.product_name; delete c.position; delete c.transaction_date; return c; }));
-            }
-            if (u.error) throw u.error;
-          }
-          var gone = (known[k] || []).filter(function (id) { return ids.indexOf(id) < 0; });
-          if (gone.length) { var d = await sb.from(s.table).delete().in('id', gone); if (d.error) throw d.error; }
-          known[k] = ids;
-        } catch (e) { console.warn('[supabase] sync gagal:', s.table, e.message || e); }
-      });
-    }
-
-    function hookWrites() {
-      var orig = Storage.prototype.setItem;
-      Storage.prototype.setItem = function (key, val) {
-        orig.call(this, key, val);
-        if (!synced || this !== window.localStorage) return;
-        SPECS.forEach(function (s) {
-          if (s.ls !== key) return;
-          var t = specKey(s);
-          clearTimeout(timers[t]);
-          timers[t] = setTimeout(function () { pushSpec(s, val); }, 400);
-        });
-      };
-    }
-
-    async function ensureLogin() {
-      var cur = await sb.auth.getSession();
-      if (cur.data && cur.data.session) return;
-      await new Promise(function (resolve) {
-        var st = 'width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:10px;font-size:14px;box-sizing:border-box';
-        var ov = document.createElement('div');
-        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif';
-        ov.innerHTML = '<form style="background:#fff;padding:28px;border-radius:14px;border:1px solid #e2e8f0;width:min(360px,90vw)">'
-          + '<div style="font-weight:700;font-size:18px;margin-bottom:4px">Leads CRM</div>'
-          + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">Masuk untuk melanjutkan</div>'
-          + '<input name="e" type="email" placeholder="Email" required autocomplete="username" style="' + st + '">'
-          + '<input name="p" type="password" placeholder="Password" required autocomplete="current-password" style="' + st + '">'
-          + '<div data-err style="color:#e11d48;font-size:13px;min-height:18px;margin-bottom:8px"></div>'
-          + '<button type="submit" style="width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;font-size:14px;cursor:pointer">Masuk</button></form>';
-        document.body.appendChild(ov);
-        var f = ov.querySelector('form');
-        f.addEventListener('submit', async function (e) {
-          e.preventDefault();
-          var b = f.querySelector('button'); b.disabled = true;
-          var r = await sb.auth.signInWithPassword({ email: f.querySelector('[name=e]').value.trim(), password: f.querySelector('[name=p]').value });
-          if (r.error) { f.querySelector('[data-err]').textContent = 'Email atau password salah.'; b.disabled = false; return; }
-          ov.remove(); resolve();
-        });
-      });
-    }
-
-    async function ensureLogin() {
-      var cur = await sb.auth.getSession();
-      if (cur.data && cur.data.session) return;
-      await new Promise(function (resolve) {
-        var st = 'width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:10px;font-size:14px;box-sizing:border-box';
-        var ov = document.createElement('div');
-        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif';
-        ov.innerHTML = '<form style="background:#fff;padding:28px;border-radius:14px;border:1px solid #e2e8f0;width:min(360px,90vw)">'
-          + '<div style="font-weight:700;font-size:18px;margin-bottom:4px">Leads CRM</div>'
-          + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">Masuk untuk melanjutkan</div>'
-          + '<input name="e" type="email" placeholder="Email" required autocomplete="username" style="' + st + '">'
-          + '<input name="p" type="password" placeholder="Password" required autocomplete="current-password" style="' + st + '">'
-          + '<div data-err style="color:#e11d48;font-size:13px;min-height:18px;margin-bottom:8px"></div>'
-          + '<button type="submit" style="width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;font-size:14px;cursor:pointer">Masuk</button></form>';
-        document.body.appendChild(ov);
-        var f = ov.querySelector('form');
-        f.addEventListener('submit', async function (e) {
-          e.preventDefault();
-          var b = f.querySelector('button'); b.disabled = true;
-          var r = await sb.auth.signInWithPassword({ email: f.querySelector('[name=e]').value.trim(), password: f.querySelector('[name=p]').value });
-          if (r.error) { f.querySelector('[data-err]').textContent = 'Email atau password salah.'; b.disabled = false; return; }
-          ov.remove(); resolve();
-        });
-      });
-    }
-
-    function addLogout() {
-      var b = document.createElement('button');
-      b.textContent = 'Keluar';
-      b.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:9999;padding:6px 12px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;font-size:12px;cursor:pointer;color:#475569';
-      b.addEventListener('click', async function () {
-        await sb.auth.signOut();
-        Object.keys(localStorage).filter(function (k) { return k.indexOf('leads-dashboard:') === 0; }).forEach(function (k) { localStorage.removeItem(k); });
-        location.reload();
-      });
-      document.body.appendChild(b);
-    }
-
-    function startApp() {
-      // Inject the app source as a script. Use type='text/plain' so the
-      // browser doesn't try to parse/execute it — the source is
-      // a single string of code that we eval manually below.
-      // (Previously we used createElement('script') + appendChild which
-      // can fail on certain content like </div> inside template literals.)
-      var src = document.getElementById('app-src').textContent;
-      try {
-        // Wrap in IIFE to avoid polluting global scope with var declarations
-        (new Function(src))();
-      } catch (e) {
-        console.error('App source failed to load:', e);
-        document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#b91c1c"><h2>App failed to load</h2><pre style="text-align:left;background:#fef2f2;padding:16px;border-radius:6px;overflow:auto">' + (e.message || e) + '</pre></div>';
-      }
-      window.sb = window.__sb || sb;
-      // After app is loaded, check auth and show login if needed
-      if (typeof window.initAuth === 'function') {
-        window.initAuth();
-      }
-    }
-
-    (async function () {
-      var keyOk = cfg.anonKey && !/PASTE/.test(cfg.anonKey) && window.supabase;
-      if (keyOk) {
-        try {
-          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true } });
-          window.__sb = sb;
-          // Race the hydrate against a 5s timeout. If Supabase hangs or
-          // the key is invalid (returning 401), we don't want to block
-          // the app boot forever.
-          var hydratePromise = hydrate().catch(function (e) {
-            console.warn('[supabase] hydrate failed:', e.message || e);
-          });
-          var timeout = new Promise(function (resolve) { setTimeout(resolve, 5000); });
-          await Promise.race([hydratePromise, timeout]);
-          synced = true;
-          hookWrites();
-          // Show success indicator in sidebar footer
-          var okEl = document.getElementById('supabase-status');
-          if (okEl) okEl.style.display = 'inline-block';
-        } catch (e) {
-          console.warn('[supabase] offline / error, pakai localStorage saja:', e.message || e);
-          // Show error indicator in sidebar footer
-          var errEl = document.getElementById('supabase-status-error');
-          if (errEl) errEl.style.display = 'inline-block';
-        }
-      } else {
-        console.warn('[supabase] anonKey belum diisi, pakai localStorage saja.');
-      }
-      startApp();
-      // No logout button in anon mode (no user session to log out of)
-    })();
+    if (typeof window.initAuth === 'function') window.initAuth();
   })();
   </script>
 </body>
