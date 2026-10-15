@@ -2179,20 +2179,36 @@
     if (state && state.view === 'profile' && typeof renderProfileView === 'function') renderProfileView();
   }
 
+  var BUILD_ID = 'build-2026-10-15-c';
+  function cloudBanner(msg) {
+    var el = document.getElementById('cloud-banner');
+    if (!msg) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div'); el.id = 'cloud-banner';
+      el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9998;background:#b91c1c;color:#fff;padding:10px 16px;font-size:13px;font-weight:600;display:flex;gap:12px;align-items:center;justify-content:space-between';
+      document.body.appendChild(el);
+    }
+    el.innerHTML = '<span>⚠ Data BELUM tersimpan di Supabase: ' + escHtml(msg) + '</span><button style="background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:4px;padding:2px 8px;cursor:pointer" onclick="this.parentNode.remove()">Tutup</button>';
+  }
+  window.addEventListener('beforeunload', function (e) {
+    var pending = Object.keys(cloud.dirty).some(function (k) { return cloud.dirty[k]; });
+    if (pending) { e.preventDefault(); e.returnValue = ''; }
+  });
+
   /* ---- push (local -> Supabase) ---- */
   function cloudSave(key, items) {
     const spec = CLOUD_SPECS[key];
     if (items && Array.isArray(items)) spec.set(items);
     if (!cloud.ready || cloud.failed[key]) {
       const why = !cloud.ready ? 'Belum tersambung ke Supabase' : ('Tabel "' + spec.table + '" error: ' + cloud.failed[key]);
-      cloud.lastError = why;
+      cloud.lastError = why; cloudBanner(why);
       if (Date.now() - cloud.errToast > 8000) { cloud.errToast = Date.now(); toast('⚠ Data BELUM tersimpan — ' + why + '. Cek menu Profile.'); }
       return;
     }
     cloud.rev[key] = (cloud.rev[key] || 0) + 1;
     cloud.dirty[key] = true;
     clearTimeout(cloud.timers[key]);
-    cloud.timers[key] = setTimeout(function () { cloudPush(key); }, 350);
+    cloud.timers[key] = setTimeout(function () { cloudPush(key); }, 120);
   }
 
   function cloudPush(key) {
@@ -2213,6 +2229,16 @@
           if (u.error) throw u.error;
           chunk.forEach(function (r) { sent[r.id] = JSON.stringify(r); });
         }
+        if (changed.length) {
+          const probe = changed.slice(0, 50).map(function (r) { return r.id; });
+          const v = await window.sb.from(spec.table).select('id').eq('brand_id', brandId).in('id', probe);
+          if (v.error) throw v.error;
+          if ((v.data || []).length < probe.length) {
+            changed.forEach(function (r) { delete sent[r.id]; });
+            throw new Error('data tertulis tapi tidak bisa dibaca balik (cek policy SELECT / brand_id di tabel ' + spec.table + ')');
+          }
+          cloudBanner(null); toast('✓ Tersimpan ke Supabase');
+        }
         const gone = (cloud.known[key] || []).filter(function (id) { return ids.indexOf(id) < 0; });
         if (gone.length) {
           const d = await window.sb.from(spec.table).delete().eq('brand_id', brandId).in('id', gone);
@@ -2223,6 +2249,7 @@
       } catch (e) {
         console.warn('[supabase] sync gagal:', spec.table, e && e.message || e);
         cloud.lastError = spec.table + ': ' + (e && e.message || e);
+        cloudBanner(cloud.lastError);
         setSyncStatus('error');
         if (Date.now() - cloud.errToast > 8000) { cloud.errToast = Date.now(); toast('⚠ Gagal simpan ke Supabase: ' + (e && e.message || 'network error')); }
       } finally {
@@ -4604,7 +4631,7 @@
     var errs = Object.keys(cloud.failed).map(function (k) { return escHtml(CLOUD_SPECS[k].table + ': ' + cloud.failed[k]); });
     errs = Array.from(new Set(errs));
     return '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Diagnosa sync</div>'
-      + '<div style="font-size:12px;color:#374151;line-height:1.7">Brand ID: <b>' + escHtml(cur ? cur.id : '-') + '</b><br>User ID: ' + escHtml(((window.currentUser && window.currentUser.id) || '-').slice(0, 8)) + '…<br>Realtime: <b>' + escHtml(cloud.rtStatus) + '</b></div>'
+      + '<div style="font-size:12px;color:#374151;line-height:1.7">Brand ID: <b>' + escHtml(cur ? cur.id : '-') + '</b><br>User ID: ' + escHtml(((window.currentUser && window.currentUser.id) || '-').slice(0, 8)) + '…<br>Realtime: <b>' + escHtml(cloud.rtStatus) + '</b><br>Versi: ' + BUILD_ID + '</div>'
       + '<div style="margin:8px 0;border-top:1px solid var(--border);padding-top:8px">' + rows + '</div>'
       + (errs.length ? '<div style="font-size:12px;color:#b91c1c;background:#fef2f2;border-radius:6px;padding:8px;margin-bottom:8px;word-break:break-word">' + errs.join('<br>') + '</div>' : '')
       + (cloud.lastError ? '<div style="font-size:12px;color:#b91c1c;margin-bottom:8px;word-break:break-word">Error terakhir: ' + escHtml(cloud.lastError) + '</div>' : '')
