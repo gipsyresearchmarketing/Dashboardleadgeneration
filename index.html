@@ -2179,7 +2179,7 @@
     if (state && state.view === 'profile' && typeof renderProfileView === 'function') renderProfileView();
   }
 
-  var BUILD_ID = 'build-2026-10-15-c';
+  var BUILD_ID = 'build-2026-10-15-d';
   function cloudBanner(msg) {
     var el = document.getElementById('cloud-banner');
     if (!msg) { if (el) el.remove(); return; }
@@ -4567,27 +4567,42 @@
 
   window.loadUserBrands = async function () {
     try {
-      var { data: memberships, error: mErr } = await sb.from('brand_members')
-        .select('brand_id, role, brands!inner(id, name, owner_user_id)')
-        .eq('user_id', window.currentUser.id);
-      if (mErr) throw mErr;
-      window.userBrands = memberships.map(m => ({
-        id: m.brand_id,
-        name: m.brands.name,
-        role: m.role,
-        owner: m.brands.owner_user_id === window.currentUser.id
-      }));
+      var uidv = window.currentUser.id;
+      var m = await sb.from('brand_members').select('brand_id, role').eq('user_id', uidv);
+      if (m.error) throw new Error('brand_members: ' + m.error.message);
+      var memberships = m.data || [];
+      if (!memberships.length) {
+        // Akun ini belum punya brand -> bikin otomatis supaya data bisa disimpan
+        var bid = uid('B');
+        var nm = ((window.currentUser.email || 'My').split('@')[0]) + ' Brand';
+        var b1 = await sb.from('brands').insert({ id: bid, name: nm, owner_user_id: uidv });
+        if (b1.error) throw new Error('buat brand: ' + b1.error.message);
+        var b2 = await sb.from('brand_members').insert({ brand_id: bid, user_id: uidv, role: 'owner' });
+        if (b2.error) throw new Error('buat membership: ' + b2.error.message);
+        memberships = [{ brand_id: bid, role: 'owner' }];
+        toast('✓ Brand "' + nm + '" dibuat otomatis');
+      }
+      var br = await sb.from('brands').select('id, name, owner_user_id').in('id', memberships.map(function (x) { return x.brand_id; }));
+      if (br.error) throw new Error('brands: ' + br.error.message);
+      var byId = {};
+      (br.data || []).forEach(function (b) { byId[b.id] = b; });
+      window.userBrands = memberships.filter(function (x) { return byId[x.brand_id]; }).map(function (x) {
+        return { id: x.brand_id, name: byId[x.brand_id].name, role: x.role, owner: byId[x.brand_id].owner_user_id === uidv };
+      });
+      if (!window.userBrands.length) throw new Error('brand ada tapi tidak bisa dibaca (cek policy SELECT tabel brands)');
       window.userBrands.sort(function (a, b) { return (b.owner - a.owner) || String(a.id).localeCompare(String(b.id)); });
       var saved = null;
       try { saved = localStorage.getItem('leads-dashboard:last-brand'); } catch (e) {}
-      window.currentBrand = window.userBrands.find(b => b.id === saved) || window.userBrands[0] || null;
-      if (window.currentBrand) document.title = 'Leads Dashboard — ' + window.currentBrand.name;
+      window.currentBrand = window.userBrands.find(function (b) { return b.id === saved; }) || window.userBrands[0];
+      document.title = 'Leads Dashboard — ' + window.currentBrand.name;
       renderProfileView();
       // Tarik data dari Supabase + nyalain realtime
       await window.cloudStart();
     } catch (e) {
       console.warn('loadUserBrands error:', e.message);
-      toast('⚠ ' + (e.message || 'Gagal load brand'));
+      cloud.lastError = 'Gagal load brand — ' + e.message;
+      cloudBanner(cloud.lastError);
+      setSyncStatus('error');
     }
   };
 
@@ -4622,21 +4637,6 @@
 
   /* Profile view: info akun, ganti brand, sign out */
   function escHtml(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-  function diagHtml() {
-    var cur = window.currentBrand;
-    var rows = Object.keys(CLOUD_SPECS).map(function (k) {
-      var sp = CLOUD_SPECS[k], n = (sp.get() || []).length, f = cloud.failed[k];
-      return '<div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:2px 0;color:' + (f ? '#b91c1c' : '#374151') + '"><span>' + escHtml(sp.table + (sp.channel ? ' (' + sp.channel + ')' : '')) + '</span><span>' + (f ? 'ERROR' : n + ' row') + '</span></div>';
-    }).join('');
-    var errs = Object.keys(cloud.failed).map(function (k) { return escHtml(CLOUD_SPECS[k].table + ': ' + cloud.failed[k]); });
-    errs = Array.from(new Set(errs));
-    return '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Diagnosa sync</div>'
-      + '<div style="font-size:12px;color:#374151;line-height:1.7">Brand ID: <b>' + escHtml(cur ? cur.id : '-') + '</b><br>User ID: ' + escHtml(((window.currentUser && window.currentUser.id) || '-').slice(0, 8)) + '…<br>Realtime: <b>' + escHtml(cloud.rtStatus) + '</b><br>Versi: ' + BUILD_ID + '</div>'
-      + '<div style="margin:8px 0;border-top:1px solid var(--border);padding-top:8px">' + rows + '</div>'
-      + (errs.length ? '<div style="font-size:12px;color:#b91c1c;background:#fef2f2;border-radius:6px;padding:8px;margin-bottom:8px;word-break:break-word">' + errs.join('<br>') + '</div>' : '')
-      + (cloud.lastError ? '<div style="font-size:12px;color:#b91c1c;margin-bottom:8px;word-break:break-word">Error terakhir: ' + escHtml(cloud.lastError) + '</div>' : '')
-      + '<button id="profile-resync" class="btn btn-outline" style="font-size:12px">Sync ulang sekarang</button></div>';
-  }
   function renderProfileView() {
     var host = document.getElementById('profile-host');
     if (!host) return;
@@ -4667,8 +4667,9 @@
       + '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Brand</div>'
       +   '<div style="display:flex;flex-direction:column;gap:8px">' + (brandRows || '<div style="font-size:13px;color:#6b7280">Belum ada brand.</div>') + '</div></div>'
       + '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Sinkronisasi</div>'
-      +   '<div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#1f2937"><span style="width:8px;height:8px;border-radius:50%;background:' + stColor + '"></span>' + stLabel + '</div></div>'
-      + diagHtml()
+      +   '<div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#1f2937"><span style="width:8px;height:8px;border-radius:50%;background:' + stColor + '"></span>' + stLabel + '</div>'
+      +   (st === 'error' && cloud.lastError ? '<div style="font-size:12px;color:#b91c1c;margin-top:8px;word-break:break-word">' + escHtml(cloud.lastError) + '</div>' : '')
+      +   '<button id="profile-resync" class="btn btn-outline" style="font-size:12px;margin-top:10px">Sync ulang</button></div>'
       + '<div><button id="profile-signout" class="btn btn-outline" style="color:#b91c1c;border-color:#fecaca;font-weight:600">'
       +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'
       +   'Sign out</button></div>'
@@ -6362,6 +6363,94 @@
     });
   }
 
+  /* ====================================================
+   * REAL EMAIL SENDING (via Vercel function /api/send-email)
+   * ==================================================== */
+  function appLeads() { return CLOUD_SPECS.leads.get() || []; }
+  function appPrependActivities(items) { saveActivities(items.concat(CLOUD_SPECS.activities.get() || [])); }
+
+  function safeLink(u) { u = String(u || '').trim(); return /^(https?:\/\/|mailto:)/i.test(u) ? u : '#'; }
+
+  function buildEmailHtml(compose) {
+    const blocks = (compose.blocks || []).map(b => {
+      const d = b.data || {};
+      if (b.type === 'image') {
+        return '<div style="text-align:center;margin:8px 0"><img src="' + escapeHTML(d.url || '') + '" alt="' + escapeHTML(d.alt || '') + '" style="max-width:' + (d.size || '100%') + ';height:auto;border-radius:4px"></div>';
+      } else if (b.type === 'button') {
+        const sz = d.size || 'md';
+        const padding = sz === 'sm' ? '6px 14px' : sz === 'lg' ? '16px 36px' : '12px 28px';
+        const fontSize = sz === 'sm' ? '12px' : sz === 'lg' ? '16px' : '14px';
+        return '<div style="text-align:center;margin:14px 0"><a href="' + escapeHTML(safeLink(d.link)) + '" style="display:inline-block;background:#2563eb;color:#ffffff;padding:' + padding + ';border-radius:6px;font-size:' + fontSize + ';font-weight:600;text-decoration:none">' + escapeHTML(d.text || 'Button') + '</a></div>';
+      } else if (b.type === 'divider') {
+        return '<hr style="border:0;border-top:1px solid #e5e7eb;margin:16px 0">';
+      } else if (b.type === 'spacer') {
+        return '<div style="height:' + (parseInt(d.size, 10) || 24) + 'px"></div>';
+      }
+      return '';
+    }).join('');
+    return '<!doctype html><html><body style="margin:0;padding:0;background:#f3f4f6">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0"><tr><td align="center">'
+      + '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px"><tr>'
+      + '<td style="padding:28px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#111827">'
+      + (compose.body || '') + blocks
+      + '</td></tr></table></td></tr></table></body></html>';
+  }
+
+  /** Return { okRecipients, failed[], skipped[] } atau null kalau dibatalkan / gagal total. */
+  async function sendEmailsViaApi(compose) {
+    const leads = appLeads();
+    const targets = [], skipped = [], seen = {};
+    compose.recipients.forEach(r => {
+      const lead = leads.find(l => l.id === r.lead_id);
+      const em = lead ? String(lead.email || '').trim() : '';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { skipped.push(lead ? lead.name : r.lead_id); return; }
+      if (seen[em.toLowerCase()]) return;
+      seen[em.toLowerCase()] = 1;
+      targets.push({ lead_id: lead.id, email: em, name: lead.name || '' });
+    });
+    if (!targets.length) { toast('Tidak ada recipient dengan email yang valid'); return null; }
+    if (!window.currentBrand) { toast('Brand belum ke-load, coba refresh'); return null; }
+    if ((compose.blocks || []).some(b => b.type === 'image' && /^data:/i.test((b.data && b.data.url) || ''))) {
+      if (!confirm('Ada gambar yang disimpan sebagai data: URL — gambar ini TIDAK akan tampil di sebagian besar email.\n\nPakai URL gambar publik (https://...). Tetap kirim?')) return null;
+    }
+    const msg = 'Kirim email "' + compose.subject.trim() + '" ke ' + targets.length + ' penerima?' + (skipped.length ? '\n\n' + skipped.length + ' lead dilewati karena email kosong/tidak valid.' : '') + '\n\nEmail yang sudah terkirim tidak bisa ditarik kembali.';
+    if (!confirm(msg)) return null;
+
+    let token = null;
+    try { const ss = await window.sb.auth.getSession(); token = ss && ss.data && ss.data.session && ss.data.session.access_token; } catch (e) {}
+    if (!token) { alert('Sesi login habis. Sign in ulang dulu.'); return null; }
+
+    toast('Mengirim ' + targets.length + ' email…');
+    const html = buildEmailHtml(compose);
+    const cc = compose.cc || '', bcc = compose.bcc || '';
+    const okIds = {}, failed = [];
+    for (let i = 0; i < targets.length; i += 25) {
+      const batch = targets.slice(i, i + 25);
+      try {
+        const resp = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ brand_id: window.currentBrand.id, subject: compose.subject.trim(), html: html, recipients: batch, cc: i === 0 ? cc : '', bcc: i === 0 ? bcc : '' }),
+        });
+        let data = null; try { data = await resp.json(); } catch (e) {}
+        if (!resp.ok || !data || !Array.isArray(data.results)) {
+          let why = (data && data.error) || ('HTTP ' + resp.status);
+          if (resp.status === 404) why = 'Endpoint /api/send-email tidak ditemukan — pastikan folder api/ dan package.json ikut ke-deploy di Vercel';
+          throw new Error(why);
+        }
+        data.results.forEach(r => { if (r.ok) okIds[r.lead_id] = 1; else failed.push({ email: r.email, error: r.error || 'gagal' }); });
+      } catch (e) {
+        batch.forEach(t => failed.push({ email: t.email, error: e.message }));
+      }
+    }
+    const okRecipients = targets.filter(t => okIds[t.lead_id]).map(t => ({ lead_id: t.lead_id }));
+    if (!okRecipients.length) {
+      alert('Email GAGAL terkirim.\n\n' + failed.slice(0, 5).map(f => '• ' + f.email + ' — ' + f.error).join('\n'));
+      return null;
+    }
+    return { okRecipients: okRecipients, failed: failed, skipped: skipped };
+  }
+
   async function sendBlast(channel) {
     const state = channel === 'email' ? emailBlast : waBlast;
     const compose = state.compose;
@@ -6371,7 +6460,7 @@
     // asking user to choose (a) send to all, (b) save as draft, or (c) pick.
     if (compose.recipients.length === 0) {
       const isEmail = channel === 'email';
-      const eligibleLeads = state.leads.filter(l => l.type === (isEmail ? 'company' : 'person'));
+      const eligibleLeads = appLeads().filter(l => l.type === (isEmail ? 'company' : 'person'));
       const allCount = eligibleLeads.length;
       const choice = await showRecipientChoiceModal({
         allCount: allCount,
@@ -6415,12 +6504,21 @@
     const sentAt = new Date().toISOString();
     const blastId = uid('B');
 
+    // Email: kirim BENERAN lewat /api/send-email. Channel lain / scheduled tetap seperti sebelumnya.
+    let sentRecipients = compose.recipients;
+    let sendSummary = null;
+    if (channel === 'email' && !isScheduled) {
+      sendSummary = await sendEmailsViaApi(compose);
+      if (!sendSummary) return;           // dibatalkan / gagal total (pesan sudah ditampilkan)
+      sentRecipients = sendSummary.okRecipients;
+    }
+
     const entry = {
       id: blastId,
       subject: compose.subject || null,
       body: compose.body || null,
       message: compose.message || null,
-      recipients: compose.recipients.map(r => ({ lead_id: r.lead_id })),
+      recipients: sentRecipients.map(r => ({ lead_id: r.lead_id })),
       cc: channel === 'email' ? (compose.cc || '').split(',').map(s => s.trim()).filter(Boolean) : null,
       bcc: channel === 'email' ? (compose.bcc || '').split(',').map(s => s.trim()).filter(Boolean) : null,
       attachments: compose.blocks || [],
@@ -6434,8 +6532,8 @@
 
     if (!isScheduled) {
       const newActivities = [];
-      compose.recipients.forEach(r => {
-        const lead = state.leads.find(l => l.id === r.lead_id);
+      sentRecipients.forEach(r => {
+        const lead = appLeads().find(l => l.id === r.lead_id);
         if (!lead) return;
         newActivities.push({
           id: generateActivityId(),
@@ -6446,8 +6544,7 @@
           created_at: sentAt,
         });
       });
-      state.activities = [...newActivities, ...state.activities];
-      saveActivities(state.activities);
+      appPrependActivities(newActivities);
     }
 
     saveBlast(channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA, state);
@@ -6463,7 +6560,13 @@
     if (channel === 'email') renderEmailBlastView();
     else renderWaBlastView();
     renderAll();
-    toast(isScheduled ? `⏰ ${channel==='email'?'Email':'WA'} Blast scheduled` : `✉ ${channel==='email'?'Email':'WA'} Blast sent ke ${compose.recipients.length} recipient`);
+    if (sendSummary) {
+      const nFail = sendSummary.failed.length;
+      toast('✉ Email terkirim ke ' + sentRecipients.length + ' penerima' + (nFail ? ' · ' + nFail + ' gagal' : ''));
+      if (nFail) alert('Sebagian email gagal terkirim (' + nFail + '):\n\n' + sendSummary.failed.slice(0, 8).map(f => '• ' + f.email + ' — ' + f.error).join('\n') + (nFail > 8 ? '\n…dan ' + (nFail - 8) + ' lainnya' : ''));
+    } else {
+      toast(isScheduled ? `⏰ ${channel==='email'?'Email':'WA'} Blast dijadwalkan (belum ada pengirim otomatis — belum akan terkirim sendiri)` : `✉ ${channel==='email'?'Email':'WA'} Blast sent ke ${compose.recipients.length} recipient`);
+    }
   }
 
   /* ====================================================
