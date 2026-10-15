@@ -1727,6 +1727,20 @@
           <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
         </div>
         <div class="topbar-actions">
+          <div id="brand-switcher-wrap" style="display:none;position:relative">
+            <button id="brand-switcher-btn" class="btn btn-outline" style="padding:4px 10px;font-size:12px;font-weight:600">
+              <span id="brand-switcher-label">Brand</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:4px"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div id="brand-switcher-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);min-width:220px;z-index:50"></div>
+          </div>
+          <div id="user-menu-wrap" style="display:none;position:relative">
+            <button id="user-menu-btn" class="btn btn-outline" style="padding:4px 10px;font-size:12px;font-weight:600">
+              <span id="user-menu-label">User</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:4px"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div id="user-menu-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);min-width:200px;z-index:50"></div>
+          </div>
           <button class="btn btn-outline" id="btn-fix-type" title="Convert leads to the correct type (Company ↔ Contact)" style="display:none">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
             Fix type
@@ -1969,6 +1983,9 @@
 
   <!-- Lead Detail Drawer (rendered dynamically) -->
   <div id="drawer-host"></div>
+
+  <!-- Auth screen (login/signup) -->
+  <div id="auth-screen" style="display:none;position:fixed;inset:0;z-index:9999;background:#f8fafc;overflow-y:auto;font-family:Inter,system-ui,sans-serif"></div>
 
   <!-- Activity/Task sub-modal host (rendered dynamically) -->
   <div id="submodal-host"></div>
@@ -4221,6 +4238,210 @@
       toast('Lead saved');
     });
   }
+
+  /* ================================================================
+   * Auth + Brand management (multi-tenant)
+   * ================================================================ */
+  window.initAuth = async function () {
+    var authScreen = document.getElementById('auth-screen');
+    if (!authScreen || !sb) return;
+    // Check existing session
+    var session = null;
+    try { session = await sb.auth.getSession(); } catch (e) {}
+    if (session && session.data && session.data.session && session.data.session.user) {
+      window.currentUser = session.data.session.user;
+      authScreen.style.display = 'none';
+      await loadUserBrands();
+      return;
+    }
+    // Show auth screen
+    showAuthScreen('login');
+  };
+
+  function showAuthScreen(mode) {
+    var authScreen = document.getElementById('auth-screen');
+    if (!authScreen) return;
+    var isLogin = mode === 'login';
+    authScreen.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e3a8a 0%,#7c3aed 100%);padding:20px">'
+      + '<div style="max-width:420px;width:100%;background:white;border-radius:12px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">'
+      + '<div style="text-align:center;margin-bottom:24px">'
+      + '<h1 style="font-size:24px;font-weight:700;color:#1f2937;margin:0 0 4px">📊 Leads CRM</h1>'
+      + '<p style="font-size:13px;color:#6b7280;margin:0">' + (isLogin ? 'Sign in to your account' : 'Create a new account') + '</p>'
+      + '</div>'
+      + '<div id="auth-error" style="display:none;background:#fee2e2;color:#991b1b;padding:10px 12px;border-radius:6px;margin-bottom:12px;font-size:13px"></div>'
+      + '<form id="auth-form" style="display:flex;flex-direction:column;gap:12px">'
+      + (!isLogin ? '<div><label style="font-size:11px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Brand name</label><input name="brand_name" type="text" required placeholder="PT Acme Corp" class="auth-input" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px"></div>' : '')
+      + '<div><label style="font-size:11px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Email</label><input name="email" type="email" required placeholder="you@example.com" class="auth-input" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px"></div>'
+      + '<div><label style="font-size:11px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Password</label><input name="password" type="password" required minlength="6" placeholder="Min 6 characters" class="auth-input" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px"></div>'
+      + '<button type="submit" style="margin-top:8px;padding:11px;background:#4f46e5;color:white;border:0;border-radius:6px;font-weight:600;font-size:14px;cursor:pointer">' + (isLogin ? 'Sign in' : 'Create account') + '</button>'
+      + '</form>'
+      + '<div style="text-align:center;margin-top:16px;font-size:13px;color:#6b7280">'
+      + (isLogin
+        ? 'Belum punya akun? <a href="#" id="auth-toggle" style="color:#4f46e5;font-weight:600">Sign up</a>'
+        : 'Sudah punya akun? <a href="#" id="auth-toggle" style="color:#4f46e5;font-weight:600">Sign in</a>')
+      + '</div>'
+      + '</div></div>';
+    authScreen.style.display = 'block';
+    document.getElementById('auth-toggle').addEventListener('click', (e) => {
+      e.preventDefault();
+      showAuthScreen(isLogin ? 'signup' : 'login');
+    });
+    document.getElementById('auth-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      var form = e.target;
+      var fd = new FormData(form);
+      var email = fd.get('email').trim();
+      var password = fd.get('password');
+      var brandName = fd.get('brand_name');
+      var errEl = document.getElementById('auth-error');
+      errEl.style.display = 'none';
+      try {
+        if (isLogin) {
+          var { data, error } = await sb.auth.signInWithPassword({ email: email, password: password });
+          if (error) throw error;
+          window.currentUser = data.user;
+          authScreen.style.display = 'none';
+          await loadUserBrands();
+        } else {
+          var { data, error } = await sb.auth.signUp({ email: email, password: password });
+          if (error) throw error;
+          window.currentUser = data.user;
+          // Auto-create a brand for new user
+          var brandId = 'B-' + Math.floor(Math.random() * 9000 + 1000);
+          var { error: brandErr } = await sb.from('brands').insert({
+            id: brandId, name: brandName || 'My Brand', owner_user_id: data.user.id
+          });
+          if (brandErr) throw brandErr;
+          await sb.from('brand_members').insert({
+            brand_id: brandId, user_id: data.user.id, role: 'owner'
+          });
+          authScreen.style.display = 'none';
+          await loadUserBrands();
+        }
+      } catch (err) {
+        errEl.textContent = err.message || String(err);
+        errEl.style.display = 'block';
+      }
+    });
+  }
+
+  window.loadUserBrands = async function () {
+    try {
+      var { data: memberships, error: mErr } = await sb.from('brand_members')
+        .select('brand_id, role, brands!inner(id, name, owner_user_id)')
+        .eq('user_id', window.currentUser.id);
+      if (mErr) throw mErr;
+      window.userBrands = memberships.map(m => ({
+        id: m.brand_id,
+        name: m.brands.name,
+        role: m.role,
+        owner: m.brands.owner_user_id === window.currentUser.id
+      }));
+      // Set current brand to first (owner's first brand)
+      if (window.userBrands.length > 0) {
+        window.currentBrand = window.userBrands[0];
+        document.title = 'Leads Dashboard — ' + window.currentBrand.name;
+      } else {
+        window.currentBrand = null;
+      }
+      // Re-render with new brand context
+      if (typeof window.refreshBrandUI === 'function') window.refreshBrandUI();
+      if (typeof renderUserMenu === 'function') renderUserMenu();
+      if (typeof renderAll === 'function') renderAll();
+    } catch (e) {
+      console.warn('loadUserBrands error:', e.message);
+    }
+  };
+
+  window.signOut = async function () {
+    if (sb) await sb.auth.signOut();
+    window.currentUser = null;
+    window.currentBrand = null;
+    window.userBrands = [];
+    // Clear local data
+    Object.keys(localStorage).filter(k => k.indexOf('leads-dashboard:') === 0).forEach(k => localStorage.removeItem(k));
+    showAuthScreen('login');
+  };
+
+  /* Render brand switcher menu (top-right) */
+  window.refreshBrandUI = function () {
+    var wrap = document.getElementById('brand-switcher-wrap');
+    var label = document.getElementById('brand-switcher-label');
+    var menu = document.getElementById('brand-switcher-menu');
+    if (!wrap || !label || !menu) return;
+    if (!window.userBrands || window.userBrands.length === 0) {
+      wrap.style.display = 'none';
+      return;
+    }
+    wrap.style.display = 'inline-block';
+    if (window.currentBrand) {
+      label.textContent = window.currentBrand.name;
+    }
+    menu.innerHTML = window.userBrands.map(b =>
+      '<div data-brand-id="' + b.id + '" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;border-radius:4px;background:' + (window.currentBrand && b.id === window.currentBrand.id ? '#eef2ff' : 'transparent') + '" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'' + (window.currentBrand && b.id === window.currentBrand.id ? '#eef2ff' : 'transparent') + '\'">' +
+      '<div style="min-width:0"><div style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + b.name + '</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">' + b.role + '</div></div>' +
+      (window.currentBrand && b.id === window.currentBrand.id ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:#4f46e5"><path d="M20 6 9 17l-5-5"/></svg>' : '') +
+      '</div>'
+    ).join('');
+    menu.querySelectorAll('[data-brand-id]').forEach(el => {
+      el.addEventListener('click', async () => {
+        window.currentBrand = window.userBrands.find(b => b.id === el.getAttribute('data-brand-id'));
+        menu.style.display = 'none';
+        document.getElementById('brand-switcher-label').textContent = window.currentBrand.name;
+        document.title = 'Leads Dashboard — ' + window.currentBrand.name;
+        if (typeof renderAll === 'function') renderAll();
+        toast('✓ Brand: ' + window.currentBrand.name);
+      });
+    });
+  };
+
+  /* Render user menu (sign out) */
+  function renderUserMenu() {
+    var wrap = document.getElementById('user-menu-wrap');
+    var label = document.getElementById('user-menu-label');
+    var menu = document.getElementById('user-menu-menu');
+    if (!wrap || !label || !menu) return;
+    if (!window.currentUser) {
+      wrap.style.display = 'none';
+      return;
+    }
+    wrap.style.display = 'inline-block';
+    label.textContent = window.currentUser.email.split('@')[0];
+    menu.innerHTML = '<div style="padding:10px 12px;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">' + window.currentUser.email + '</div></div>' +
+      '<div id="user-menu-signout" data-action="signout" style="padding:10px 12px;cursor:pointer;font-size:13px;color:#b91c1c;display:flex;align-items:center;gap:8px" onmouseover="this.style.background=\'#fef2f2\'" onmouseout="this.style.background=\'transparent\'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</div>';
+    menu.querySelector('#user-menu-signout').addEventListener('click', () => {
+      window.signOut();
+    });
+  }
+
+  // Wire brand switcher + user menu toggle (event delegation)
+  document.addEventListener('click', (e) => {
+    var bsb = e.target.closest('#brand-switcher-btn');
+    if (bsb) {
+      e.stopPropagation();
+      var m = document.getElementById('brand-switcher-menu');
+      var um = document.getElementById('user-menu-menu');
+      if (um) um.style.display = 'none';
+      if (m) m.style.display = m.style.display === 'block' ? 'none' : 'block';
+      return;
+    }
+    var ub = e.target.closest('#user-menu-btn');
+    if (ub) {
+      e.stopPropagation();
+      var m2 = document.getElementById('brand-switcher-menu');
+      var um2 = document.getElementById('user-menu-menu');
+      if (m2) m2.style.display = 'none';
+      if (um2) um2.style.display = um2.style.display === 'block' ? 'none' : 'block';
+      return;
+    }
+    // close menus when clicking elsewhere
+    if (!e.target.closest('#brand-switcher-menu') && !e.target.closest('#user-menu-menu')) {
+      var bm = document.getElementById('brand-switcher-menu');
+      var um3 = document.getElementById('user-menu-menu');
+      if (bm) bm.style.display = 'none';
+      if (um3) um3.style.display = 'none';
+    }
+  });
 
   function showFormError(msg) {
     const el = document.getElementById('form-error');
@@ -7454,6 +7675,10 @@
       } catch (e) {
         console.error('App source failed to load:', e);
         document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#b91c1c"><h2>App failed to load</h2><pre style="text-align:left;background:#fef2f2;padding:16px;border-radius:6px;overflow:auto">' + (e.message || e) + '</pre></div>';
+      }
+      // After app is loaded, check auth and show login if needed
+      if (typeof window.initAuth === 'function') {
+        window.initAuth();
       }
     }
 
