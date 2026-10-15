@@ -6452,6 +6452,13 @@
   }
 
   async function sendBlast(channel) {
+    // Auto-commit teks yang masih diketik di kolom To (belum Enter/koma)
+    {
+      const pending = document.querySelector('[data-ech-add]');
+      if (pending && pending.value.trim()) {
+        pending.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      }
+    }
     const state = channel === 'email' ? emailBlast : waBlast;
     const compose = state.compose;
     if (channel === 'email' && !compose.subject.trim()) { toast('Subject wajib diisi'); return; }
