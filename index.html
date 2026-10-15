@@ -4376,15 +4376,21 @@
       var brandName = fd.get('brand_name');
       var errEl = document.getElementById('auth-error');
       errEl.style.display = 'none';
+      var client = window.sb || sb;
+      if (!client) {
+        errEl.textContent = 'Supabase not initialized. Refresh page.';
+        errEl.style.display = 'block';
+        return;
+      }
       try {
         if (isLogin) {
-          var { data, error } = await sb.auth.signInWithPassword({ email: email, password: password });
+          var { data, error } = await client.auth.signInWithPassword({ email: email, password: password });
           if (error) throw error;
           window.currentUser = data.user;
           authScreen.style.display = 'none';
           await loadUserBrands();
         } else {
-          var { data, error } = await sb.auth.signUp({ email: email, password: password });
+          var { data, error } = await client.auth.signUp({ email: email, password: password });
           if (error) throw error;
           window.currentUser = data.user;
           // Auto-create a brand for new user
@@ -7831,6 +7837,7 @@
         console.error('App source failed to load:', e);
         document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#b91c1c"><h2>App failed to load</h2><pre style="text-align:left;background:#fef2f2;padding:16px;border-radius:6px;overflow:auto">' + (e.message || e) + '</pre></div>';
       }
+      window.sb = window.__sb || sb;
       // After app is loaded, check auth and show login if needed
       if (typeof window.initAuth === 'function') {
         window.initAuth();
