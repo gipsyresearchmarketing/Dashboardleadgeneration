@@ -2123,7 +2123,12 @@
     } catch { return MOCK_INBOUND_EMAILS.map(e => ({ ...e })); }
   }
   function saveInboundEmails(items) {
-    try { localStorage.setItem(STORAGE_KEY_INBOX, JSON.stringify(items)); } catch {}
+    try {
+      if (window.currentBrand && window.currentBrand.id) {
+        items = items.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
+      }
+      localStorage.setItem(STORAGE_KEY_INBOX, JSON.stringify(items));
+    } catch {}
   }
 
   function loadLeads() {
@@ -2133,37 +2138,66 @@
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
       // Backfill tags + type on older records
-      return parsed.map(l => ({ ...l, tags: l.tags || [], type: l.type || 'company' }));
+      let result = parsed.map(l => ({ ...l, tags: l.tags || [], type: l.type || 'company' }));
+      // Filter by current brand (if no current brand, show nothing = first-time UX)
+      if (window.currentBrand && window.currentBrand.id) {
+        result = result.filter(l => l.brand_id === window.currentBrand.id || !l.brand_id);
+      } else {
+        result = [];
+      }
+      return result;
     } catch { return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] })); }
   }
   function saveLeads(leads) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(leads)); } catch {}
+    try {
+      // Auto-tag with current brand if not already set
+      if (window.currentBrand && window.currentBrand.id) {
+        leads = leads.map(l => l.brand_id ? l : { ...l, brand_id: window.currentBrand.id });
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+    } catch {}
   }
 
   function loadActivities() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_ACTIVITIES);
-      if (!raw) return [...MOCK_ACTIVITIES];
+      if (!raw) return [];
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [...MOCK_ACTIVITIES];
-      return parsed;
-    } catch { return [...MOCK_ACTIVITIES]; }
+      if (!Array.isArray(parsed)) return [];
+      if (window.currentBrand && window.currentBrand.id) {
+        return parsed.filter(a => a.brand_id === window.currentBrand.id || !a.brand_id);
+      }
+      return [];
+    } catch { return []; }
   }
   function saveActivities(items) {
-    try { localStorage.setItem(STORAGE_KEY_ACTIVITIES, JSON.stringify(items)); } catch {}
+    try {
+      if (window.currentBrand && window.currentBrand.id) {
+        items = items.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
+      }
+      localStorage.setItem(STORAGE_KEY_ACTIVITIES, JSON.stringify(items));
+    } catch {}
   }
 
   function loadTasks() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_TASKS);
-      if (!raw) return [...MOCK_TASKS];
+      if (!raw) return [];
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [...MOCK_TASKS];
-      return parsed;
-    } catch { return [...MOCK_TASKS]; }
+      if (!Array.isArray(parsed)) return [];
+      if (window.currentBrand && window.currentBrand.id) {
+        return parsed.filter(t => t.brand_id === window.currentBrand.id || !t.brand_id);
+      }
+      return [];
+    } catch { return []; }
   }
   function saveTasks(items) {
-    try { localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(items)); } catch {}
+    try {
+      if (window.currentBrand && window.currentBrand.id) {
+        items = items.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
+      }
+      localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(items));
+    } catch {}
   }
 
   function loadBlast(key) {
@@ -2171,11 +2205,21 @@
       const raw = localStorage.getItem(key);
       if (!raw) return { drafts: [], history: [] };
       const parsed = JSON.parse(raw);
-      return { drafts: Array.isArray(parsed.drafts) ? parsed.drafts : [], history: Array.isArray(parsed.history) ? parsed.history : [] };
+      const drafts = Array.isArray(parsed.drafts) ? parsed.drafts : [];
+      const history = Array.isArray(parsed.history) ? parsed.history : [];
+      const brandId = window.currentBrand && window.currentBrand.id;
+      const filter = (arr) => brandId ? arr.filter(x => x.brand_id === brandId || !x.brand_id) : [];
+      return { drafts: filter(drafts), history: filter(history) };
     } catch { return { drafts: [], history: [] }; }
   }
   function saveBlast(key, data) {
-    try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+    try {
+      if (window.currentBrand && window.currentBrand.id) {
+        data.drafts = (data.drafts || []).map(d => d.brand_id ? d : { ...d, brand_id: window.currentBrand.id });
+        data.history = (data.history || []).map(h => h.brand_id ? h : { ...h, brand_id: window.currentBrand.id });
+      }
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch {}
   }
 
   function loadAssets() {
@@ -2183,11 +2227,20 @@
       const raw = localStorage.getItem(STORAGE_KEY_ASSETS);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      if (window.currentBrand && window.currentBrand.id) {
+        return parsed.filter(a => a.brand_id === window.currentBrand.id || !a.brand_id);
+      }
+      return [];
     } catch { return []; }
   }
   function saveAssets(items) {
-    try { localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(items)); } catch {}
+    try {
+      if (window.currentBrand && window.currentBrand.id) {
+        items = items.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
+      }
+      localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(items));
+    } catch {}
   }
 
   /* =================================================================
@@ -2395,11 +2448,20 @@
       const raw = localStorage.getItem(STORAGE_KEY_AUDIENCES);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      if (window.currentBrand && window.currentBrand.id) {
+        return parsed.filter(a => a.brand_id === window.currentBrand.id || !a.brand_id);
+      }
+      return [];
     } catch { return []; }
   }
   function saveAudiences(list) {
-    try { localStorage.setItem(STORAGE_KEY_AUDIENCES, JSON.stringify(list)); } catch {}
+    try {
+      if (window.currentBrand && window.currentBrand.id) {
+        list = list.map(i => i.brand_id ? i : { ...i, brand_id: window.currentBrand.id });
+      }
+      localStorage.setItem(STORAGE_KEY_AUDIENCES, JSON.stringify(list));
+    } catch {}
   }
 
   let state = {
@@ -7509,16 +7571,15 @@
     var sb = null, synced = false;
     var P = 'leads-dashboard:';
     var SPECS = [
-      { ls: P + 'v1', table: 'leads', cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at','product_name','position','transaction_date'] },
-      { ls: P + 'activities:v1', table: 'activities', cols: ['id','lead_id','type','title','notes','created_at'] },
-      { ls: P + 'tasks:v1', table: 'tasks', cols: ['id','lead_id','title','due_at','completed','completed_at','notes','created_at'] },
-      { ls: P + 'assets:v1', table: 'assets', cols: ['id','kind','name','url','created_at','last_used'] },
-      { ls: P + 'audiences:v1', table: 'audiences', cols: ['id','name','type','description','lead_ids','created_at','last_used'] },
-      { ls: P + 'blast-email:v1', table: 'blast_drafts', part: 'drafts', channel: 'email', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at'] },
-      { ls: P + 'blast-email:v1', table: 'blast_history', part: 'history', channel: 'email', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] },
-      { ls: P + 'blast-wa:v1', table: 'blast_drafts', part: 'drafts', channel: 'wa', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at'] },
-      { ls: P + 'blast-wa:v1', table: 'blast_history', part: 'history', channel: 'wa', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at'] },
-      { ls: P + 'inbox:v1', table: 'inbound_emails', cols: ['id','from_email','from_name','to_email','subject','body','snippet','lead_id','blast_id','status','starred','has_attachments','attachments','received_at','read_at','replied_at'] }
+      { ls: P + 'v1', table: 'leads', cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at','product_name','position','transaction_date','brand_id'] },
+      { ls: P + 'activities:v1', table: 'activities', cols: ['id','lead_id','type','title','notes','created_at','brand_id'] },
+      { ls: P + 'tasks:v1', table: 'tasks', cols: ['id','lead_id','title','due_at','completed','completed_at','notes','created_at','brand_id'] },
+      { ls: P + 'assets:v1', table: 'assets', cols: ['id','kind','name','url','created_at','last_used','brand_id'] },
+      { ls: P + 'audiences:v1', table: 'audiences', cols: ['id','name','type','description','lead_ids','created_at','last_used','brand_id'] },
+      { ls: P + 'blast-email:v1', table: 'blast_drafts', part: 'drafts', channel: 'email', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at','brand_id'] },
+      { ls: P + 'blast-email:v1', table: 'blast_history', part: 'history', channel: 'email', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at','brand_id'] },
+      { ls: P + 'blast-wa:v1', table: 'blast_drafts', part: 'drafts', channel: 'wa', cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at','brand_id'] },
+      { ls: P + 'blast-wa:v1', table: 'blast_history', part: 'history', channel: 'wa', cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at','brand_id'] }
     ];
     var NULLABLE = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, last_used:1, audience_id:1, lead_id:1 };
     var known = {}; /* "table|channel" -> array of ids known on server */
@@ -7686,7 +7747,7 @@
       var keyOk = cfg.anonKey && !/PASTE/.test(cfg.anonKey) && window.supabase;
       if (keyOk) {
         try {
-          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+          sb = window.supabase.createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true } });
           window.__sb = sb;
           // Race the hydrate against a 5s timeout. If Supabase hangs or
           // the key is invalid (returning 401), we don't want to block
