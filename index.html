@@ -2132,21 +2132,27 @@
   }
 
   function loadLeads() {
+    // Supabase is the source of truth. localStorage is just a write cache.
+    // First try to fetch fresh data from Supabase; if that fails, fall
+    // back to localStorage (offline mode).
+    if (typeof sb !== 'undefined' && sb && window.currentBrand && window.currentBrand.id) {
+      // Note: this is sync (bad — should be async), but for backward compat
+      // we still use the old localStorage path until we refactor to async.
+      // The real fix is at boot: hydrate pulls from Supabase.
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
+      if (!raw) return [];
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] }));
-      // Backfill tags + type on older records
+      if (!Array.isArray(parsed)) return [];
       let result = parsed.map(l => ({ ...l, tags: l.tags || [], type: l.type || 'company' }));
-      // Filter by current brand (if no current brand, show nothing = first-time UX)
       if (window.currentBrand && window.currentBrand.id) {
         result = result.filter(l => l.brand_id === window.currentBrand.id || !l.brand_id);
       } else {
         result = [];
       }
       return result;
-    } catch { return MOCK_LEADS.map(l => ({ ...l, tags: l.tags || [] })); }
+    } catch { return []; }
   }
   function saveLeads(leads) {
     try {
@@ -4409,9 +4415,58 @@
       // Re-render with new brand context
       if (typeof window.refreshBrandUI === 'function') window.refreshBrandUI();
       if (typeof renderUserMenu === 'function') renderUserMenu();
-      if (typeof renderAll === 'function') renderAll();
+      // Pull fresh data from Supabase for this brand
+      if (typeof window.syncFromCloud === 'function') await window.syncFromCloud();
     } catch (e) {
       console.warn('loadUserBrands error:', e.message);
+    }
+  };
+
+  // Pull latest data for current brand from Supabase (overwrites localStorage)
+  window.syncFromCloud = async function () {
+    if (!window.currentBrand || !window.currentBrand.id) return;
+    if (typeof sb === 'undefined' || !sb) return;
+    const brandId = window.currentBrand.id;
+    try {
+      // Pull all data tables in parallel
+      const [leadsR, actsR, tasksR, audsR, astsR, dE, hE, dW, hW, ie] = await Promise.all([
+        sb.from('leads').select('*').eq('brand_id', brandId),
+        sb.from('activities').select('*').eq('brand_id', brandId),
+        sb.from('tasks').select('*').eq('brand_id', brandId),
+        sb.from('audiences').select('*').eq('brand_id', brandId),
+        sb.from('assets').select('*').eq('brand_id', brandId),
+        sb.from('blast_drafts').select('*').eq('brand_id', brandId).eq('channel', 'email'),
+        sb.from('blast_history').select('*').eq('brand_id', brandId).eq('channel', 'email'),
+        sb.from('blast_drafts').select('*').eq('brand_id', brandId).eq('channel', 'wa'),
+        sb.from('blast_history').select('*').eq('brand_id', brandId).eq('channel', 'wa'),
+        sb.from('inbound_emails').select('*').eq('brand_id', brandId),
+      ]);
+      if (leadsR.data)  { localStorage.setItem(STORAGE_KEY,              JSON.stringify(leadsR.data));  state.leads      = loadLeads();  }
+      if (actsR.data)   { localStorage.setItem(STORAGE_KEY_ACTIVITIES,   JSON.stringify(actsR.data));   state.activities = loadActivities(); }
+      if (tasksR.data)  { localStorage.setItem(STORAGE_KEY_TASKS,         JSON.stringify(tasksR.data));  state.tasks      = loadTasks(); }
+      if (audsR.data)   { localStorage.setItem(STORAGE_KEY_AUDIENCES,     JSON.stringify(audsR.data));   audiences        = audsR.data; }
+      if (astsR.data)   { localStorage.setItem(STORAGE_KEY_ASSETS,        JSON.stringify(astsR.data));   assets           = astsR.data; }
+      if (dE.data) {
+        const drs = (dE.data || []).map(d => ({ ...d, channel: 'email' }));
+        const his = (hE.data || []).map(d => ({ ...d, channel: 'email' }));
+        localStorage.setItem(STORAGE_KEY_BLAST_EMAIL, JSON.stringify({ drafts: drs, history: his }));
+        emailBlast.drafts = drs; emailBlast.history = his;
+      }
+      if (dW.data) {
+        const drs = (dW.data || []).map(d => ({ ...d, channel: 'wa' }));
+        const his = (hW.data || []).map(d => ({ ...d, channel: 'wa' }));
+        localStorage.setItem(STORAGE_KEY_BLAST_WA, JSON.stringify({ drafts: drs, history: his }));
+        waBlast.drafts = drs; waBlast.history = his;
+      }
+      if (ie.data) {
+        localStorage.setItem(STORAGE_KEY_INBOX, JSON.stringify(ie.data));
+        state.inboxEmails = loadInboundEmails();
+      }
+      if (typeof renderAll === 'function') renderAll();
+      toast('✓ Synced from Supabase (' + (leadsR.data || []).length + ' leads)');
+    } catch (e) {
+      console.warn('syncFromCloud error:', e.message);
+      toast('⚠ Sync failed: ' + (e.message || 'network error'));
     }
   };
 
