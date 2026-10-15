@@ -2155,7 +2155,7 @@
   };
   const CLOUD_NULLABLE = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, sent_at:1, last_used:1, audience_id:1, lead_id:1, blast_id:1, read_at:1, replied_at:1 };
 
-  const cloud = { ready: false, brandId: null, known: {}, sent: {}, timers: {}, pullTimers: {}, chains: {}, rev: {}, dirty: {}, channel: null, errToast: 0 };
+  const cloud = { ready: false, brandId: null, known: {}, sent: {}, timers: {}, pullTimers: {}, chains: {}, rev: {}, dirty: {}, channel: null, errToast: 0, failed: {}, rtStatus: '-', lastError: '' };
 
   function cloudClean(spec, r) {
     const o = {};
@@ -2183,7 +2183,12 @@
   function cloudSave(key, items) {
     const spec = CLOUD_SPECS[key];
     if (items && Array.isArray(items)) spec.set(items);
-    if (!cloud.ready) return;
+    if (!cloud.ready || cloud.failed[key]) {
+      const why = !cloud.ready ? 'Belum tersambung ke Supabase' : ('Tabel "' + spec.table + '" error: ' + cloud.failed[key]);
+      cloud.lastError = why;
+      if (Date.now() - cloud.errToast > 8000) { cloud.errToast = Date.now(); toast('⚠ Data BELUM tersimpan — ' + why + '. Cek menu Profile.'); }
+      return;
+    }
     cloud.rev[key] = (cloud.rev[key] || 0) + 1;
     cloud.dirty[key] = true;
     clearTimeout(cloud.timers[key]);
@@ -2217,6 +2222,7 @@
         cloud.known[key] = ids;
       } catch (e) {
         console.warn('[supabase] sync gagal:', spec.table, e && e.message || e);
+        cloud.lastError = spec.table + ': ' + (e && e.message || e);
         setSyncStatus('error');
         if (Date.now() - cloud.errToast > 8000) { cloud.errToast = Date.now(); toast('⚠ Gagal simpan ke Supabase: ' + (e && e.message || 'network error')); }
       } finally {
@@ -2269,9 +2275,9 @@
         if (!cloud.ready) return;
         try {
           const r = await cloudPull(k);
-          if (r === 'ok') cloudRender();
+          if (r === 'ok') { delete cloud.failed[k]; cloudRender(); }
           else if (r === 'busy') cloudSchedulePull([k], 800);
-        } catch (e) { console.warn('[supabase] pull gagal:', k, e && e.message || e); }
+        } catch (e) { console.warn('[supabase] pull gagal:', k, e && e.message || e); cloud.failed[k] = (e && e.message) || String(e); }
       }, delay);
     });
   }
@@ -2297,8 +2303,10 @@
     });
     ch.subscribe(function (status) {
       if (brandId !== cloud.brandId) return;
-      if (status === 'SUBSCRIBED') { setSyncStatus('live'); cloudSchedulePull(Object.keys(CLOUD_SPECS), 50); }  // catch-up setelah (re)connect
-      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setSyncStatus('error');
+      cloud.rtStatus = status;
+      if (status === 'SUBSCRIBED') { setSyncStatus(Object.keys(cloud.failed).length ? 'error' : 'live'); cloudSchedulePull(Object.keys(CLOUD_SPECS), 50); }  // catch-up setelah (re)connect
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { cloud.lastError = 'Realtime: ' + status + ' (cek Database > Replication, tabel harus ada di supabase_realtime)'; setSyncStatus('error'); }
+      else setSyncStatus(window.cloudStatus || 'connecting');
     });
     cloud.channel = ch;
   }
@@ -2306,7 +2314,7 @@
   function cloudReset() {
     Object.keys(cloud.timers).forEach(function (k) { clearTimeout(cloud.timers[k]); });
     Object.keys(cloud.pullTimers).forEach(function (k) { clearTimeout(cloud.pullTimers[k]); });
-    cloud.ready = false; cloud.known = {}; cloud.sent = {}; cloud.timers = {}; cloud.pullTimers = {}; cloud.chains = {}; cloud.rev = {}; cloud.dirty = {};
+    cloud.ready = false; cloud.known = {}; cloud.sent = {}; cloud.timers = {}; cloud.pullTimers = {}; cloud.chains = {}; cloud.rev = {}; cloud.dirty = {}; cloud.failed = {}; cloud.lastError = '';
     Object.keys(CLOUD_SPECS).forEach(function (k) { CLOUD_SPECS[k].set([]); });
   }
   window.cloudStop = function () {
@@ -2319,17 +2327,26 @@
     cloudUnsubscribe(); cloudReset();
     cloud.brandId = brand.id;
     setSyncStatus('connecting');
-    try {
-      await Promise.all(Object.keys(CLOUD_SPECS).map(function (k) { return cloudPull(k); }));
-      if (cloud.brandId !== brand.id) return;
-      cloud.ready = true;
-      try { renderAll(); } catch (re) { console.error('render error', re); }
-      cloudSubscribe();
-    } catch (e) {
-      console.warn('[supabase] load gagal:', e && e.message || e);
+    const keys = Object.keys(CLOUD_SPECS);
+    const results = await Promise.all(keys.map(function (k) { return cloudPull(k).then(function () { return null; }, function (e) { return (e && e.message) || String(e); }); }));
+    if (cloud.brandId !== brand.id) return;
+    cloud.failed = {};
+    results.forEach(function (msg, i) { if (msg) cloud.failed[keys[i]] = msg; });
+    const failedKeys = Object.keys(cloud.failed);
+    if (failedKeys.length === keys.length) {
+      cloud.lastError = cloud.failed[keys[0]];
       setSyncStatus('error');
-      toast('⚠ Gagal load data: ' + (e && e.message || 'network error'));
+      toast('⚠ Gagal load data dari Supabase: ' + cloud.lastError + ' — jalankan supabase-setup.sql');
+      return;
     }
+    cloud.ready = true;
+    if (failedKeys.length) {
+      cloud.lastError = failedKeys.map(function (k) { return CLOUD_SPECS[k].table + ': ' + cloud.failed[k]; }).join(' | ');
+      toast('⚠ Sebagian tabel gagal: ' + Array.from(new Set(failedKeys.map(function (k) { return CLOUD_SPECS[k].table; }))).join(', ') + ' — jalankan supabase-setup.sql');
+    }
+    try { renderAll(); } catch (re) { console.error('render error', re); }
+    cloudSubscribe();
+    setSyncStatus(failedKeys.length ? 'error' : (cloud.rtStatus === 'SUBSCRIBED' ? 'live' : 'connecting'));
   };
   // Balik ke tab / koneksi balik → catch-up (jaga-jaga kalau websocket sempat putus)
   document.addEventListener('visibilitychange', function () {
@@ -4533,6 +4550,7 @@
         role: m.role,
         owner: m.brands.owner_user_id === window.currentUser.id
       }));
+      window.userBrands.sort(function (a, b) { return (b.owner - a.owner) || String(a.id).localeCompare(String(b.id)); });
       var saved = null;
       try { saved = localStorage.getItem('leads-dashboard:last-brand'); } catch (e) {}
       window.currentBrand = window.userBrands.find(b => b.id === saved) || window.userBrands[0] || null;
@@ -4577,6 +4595,21 @@
 
   /* Profile view: info akun, ganti brand, sign out */
   function escHtml(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function diagHtml() {
+    var cur = window.currentBrand;
+    var rows = Object.keys(CLOUD_SPECS).map(function (k) {
+      var sp = CLOUD_SPECS[k], n = (sp.get() || []).length, f = cloud.failed[k];
+      return '<div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:2px 0;color:' + (f ? '#b91c1c' : '#374151') + '"><span>' + escHtml(sp.table + (sp.channel ? ' (' + sp.channel + ')' : '')) + '</span><span>' + (f ? 'ERROR' : n + ' row') + '</span></div>';
+    }).join('');
+    var errs = Object.keys(cloud.failed).map(function (k) { return escHtml(CLOUD_SPECS[k].table + ': ' + cloud.failed[k]); });
+    errs = Array.from(new Set(errs));
+    return '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Diagnosa sync</div>'
+      + '<div style="font-size:12px;color:#374151;line-height:1.7">Brand ID: <b>' + escHtml(cur ? cur.id : '-') + '</b><br>User ID: ' + escHtml(((window.currentUser && window.currentUser.id) || '-').slice(0, 8)) + '…<br>Realtime: <b>' + escHtml(cloud.rtStatus) + '</b></div>'
+      + '<div style="margin:8px 0;border-top:1px solid var(--border);padding-top:8px">' + rows + '</div>'
+      + (errs.length ? '<div style="font-size:12px;color:#b91c1c;background:#fef2f2;border-radius:6px;padding:8px;margin-bottom:8px;word-break:break-word">' + errs.join('<br>') + '</div>' : '')
+      + (cloud.lastError ? '<div style="font-size:12px;color:#b91c1c;margin-bottom:8px;word-break:break-word">Error terakhir: ' + escHtml(cloud.lastError) + '</div>' : '')
+      + '<button id="profile-resync" class="btn btn-outline" style="font-size:12px">Sync ulang sekarang</button></div>';
+  }
   function renderProfileView() {
     var host = document.getElementById('profile-host');
     if (!host) return;
@@ -4608,10 +4641,13 @@
       +   '<div style="display:flex;flex-direction:column;gap:8px">' + (brandRows || '<div style="font-size:13px;color:#6b7280">Belum ada brand.</div>') + '</div></div>'
       + '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Sinkronisasi</div>'
       +   '<div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#1f2937"><span style="width:8px;height:8px;border-radius:50%;background:' + stColor + '"></span>' + stLabel + '</div></div>'
+      + diagHtml()
       + '<div><button id="profile-signout" class="btn btn-outline" style="color:#b91c1c;border-color:#fecaca;font-weight:600">'
       +   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>'
       +   'Sign out</button></div>'
       + '</div>';
+    var rs = document.getElementById('profile-resync');
+    if (rs) rs.addEventListener('click', function () { toast('Menyinkronkan ulang…'); window.cloudStart(); });
     var so = document.getElementById('profile-signout');
     if (so) so.addEventListener('click', function () { window.signOut(); });
     host.querySelectorAll('[data-switch-brand]').forEach(function (el) {
