@@ -1725,6 +1725,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
+          <button id="btn-force-login" class="btn btn-primary" style="padding:4px 12px;font-size:12px;font-weight:600;margin-left:8px">Sign in</button>
         </div>
         <div class="topbar-actions">
           <div id="brand-switcher-wrap" style="display:none;position:relative">
@@ -4085,6 +4086,11 @@
    * Add Lead modal
    * ================================================================ */
   document.getElementById('btn-add').addEventListener('click', () => openAddModal());
+  // Manual "Sign in" trigger button in topbar (fallback if initAuth didn't auto-show)
+  document.getElementById('btn-force-login')?.addEventListener('click', () => {
+    if (typeof showAuthScreen === 'function') showAuthScreen('login');
+    else location.reload();
+  });
 
   function openAddModal() {
     const modal = document.getElementById('modal-host');
@@ -4312,18 +4318,25 @@
    * ================================================================ */
   window.initAuth = async function () {
     var authScreen = document.getElementById('auth-screen');
-    if (!authScreen || !sb) return;
-    // Check existing session
-    var session = null;
-    try { session = await sb.auth.getSession(); } catch (e) {}
-    if (session && session.data && session.data.session && session.data.session.user) {
-      window.currentUser = session.data.session.user;
-      authScreen.style.display = 'none';
-      await loadUserBrands();
+    if (!authScreen) return;
+    // Always show the auth screen first - safer UX.
+    // If user already has a valid session, hide it after we check.
+    showAuthScreen('login');
+    if (!sb) {
+      console.warn('[initAuth] Supabase client not initialized');
       return;
     }
-    // Show auth screen
-    showAuthScreen('login');
+    // Check existing session
+    try {
+      var session = await sb.auth.getSession();
+      if (session && session.data && session.data.session && session.data.session.user) {
+        window.currentUser = session.data.session.user;
+        authScreen.style.display = 'none';
+        await loadUserBrands();
+      }
+    } catch (e) {
+      console.warn('[initAuth] getSession failed:', e.message);
+    }
   };
 
   function showAuthScreen(mode) {
@@ -7738,6 +7751,32 @@
           timers[t] = setTimeout(function () { pushSpec(s, val); }, 400);
         });
       };
+    }
+
+    async function ensureLogin() {
+      var cur = await sb.auth.getSession();
+      if (cur.data && cur.data.session) return;
+      await new Promise(function (resolve) {
+        var st = 'width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:10px;font-size:14px;box-sizing:border-box';
+        var ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif';
+        ov.innerHTML = '<form style="background:#fff;padding:28px;border-radius:14px;border:1px solid #e2e8f0;width:min(360px,90vw)">'
+          + '<div style="font-weight:700;font-size:18px;margin-bottom:4px">Leads CRM</div>'
+          + '<div style="color:#64748b;font-size:13px;margin-bottom:16px">Masuk untuk melanjutkan</div>'
+          + '<input name="e" type="email" placeholder="Email" required autocomplete="username" style="' + st + '">'
+          + '<input name="p" type="password" placeholder="Password" required autocomplete="current-password" style="' + st + '">'
+          + '<div data-err style="color:#e11d48;font-size:13px;min-height:18px;margin-bottom:8px"></div>'
+          + '<button type="submit" style="width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;font-size:14px;cursor:pointer">Masuk</button></form>';
+        document.body.appendChild(ov);
+        var f = ov.querySelector('form');
+        f.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          var b = f.querySelector('button'); b.disabled = true;
+          var r = await sb.auth.signInWithPassword({ email: f.querySelector('[name=e]').value.trim(), password: f.querySelector('[name=p]').value });
+          if (r.error) { f.querySelector('[data-err]').textContent = 'Email atau password salah.'; b.disabled = false; return; }
+          ov.remove(); resolve();
+        });
+      });
     }
 
     async function ensureLogin() {
