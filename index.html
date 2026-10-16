@@ -781,6 +781,10 @@
     .email-block-controls .ebl-del:hover { background: #fef2f2; color: var(--danger); }
 
     /* Drag-and-drop states for email blocks */
+    .email-block.drop-above { box-shadow: 0 -3px 0 0 var(--accent); }
+    .email-block.drop-below { box-shadow: 0 3px 0 0 var(--accent); }
+    .email-card-body.drop-empty { outline: 2px dashed var(--accent); outline-offset: -4px; }
+    .email-block-controls button[data-blk-act="move"] { cursor: grab; }
     .email-block.dragging {
       opacity: 0.4;
       border: 2px dashed var(--accent);
@@ -7016,23 +7020,9 @@
       });
       zone.addEventListener('drop', (e) => {
         e.preventDefault();
-        const pendingHtml = window.__pendingDropHtml;
-        const dragging = document.querySelector('.email-block.dragging');
-        const body = zone.closest('.email-card-body') || document.querySelector('[data-blast-input="body"]');
-        if (dragging && body) {
-          zone.insertAdjacentElement('beforebegin', dragging);
-        } else if (pendingHtml && body) {
-          zone.insertAdjacentHTML('beforebegin', pendingHtml);
-          body.querySelectorAll('.email-block:not([data-attached])').forEach(b => {
-            attachBlockControls(b);
-            b.setAttribute('data-attached', '1');
-          });
-        }
         zone.style.borderColor = '';
         zone.style.background = '';
-        window.__pendingDropHtml = null;
-        refreshEmailDropzones();
-        syncBody();
+        if (window.__canvasDrop) window.__canvasDrop(e, true);
       });
     });
 
@@ -7083,7 +7073,16 @@
       const bodyEl = document.querySelector('[data-blast-input="body"]');
       if (!bodyEl) return;
       bodyEl.focus();
-      document.execCommand('insertHTML', false, html);
+      const sel = window.getSelection();
+      const inBody = sel && sel.rangeCount && bodyEl.contains(sel.anchorNode);
+      const inBlock = inBody && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement).closest('.email-block');
+      if (inBody && !inBlock) {
+        document.execCommand('insertHTML', false, html);
+      } else {
+        const tpl = document.createElement('template');
+        tpl.innerHTML = String(html).trim();
+        if (tpl.content.firstElementChild) bodyEl.appendChild(tpl.content.firstElementChild);
+      }
       // Attach control buttons + ensure draggable on all blocks
       bodyEl.querySelectorAll('.email-block').forEach(bl => {
         bl.setAttribute('draggable', 'true');
@@ -7101,7 +7100,7 @@
 
       const ctrls = document.createElement('div');
       ctrls.className = 'email-block-controls';
-      ctrls.innerHTML = '<button title="Move up" data-blk-act="up">↑</button><button title="Move down" data-blk-act="down">↓</button><button title="Duplicate" data-blk-act="dup">⧉</button><button title="Delete block" class="ebl-del" data-blk-act="del">×</button>';
+      ctrls.innerHTML = '<button title="Drag untuk pindah" data-blk-act="move">✥</button><button title="Move up" data-blk-act="up">↑</button><button title="Move down" data-blk-act="down">↓</button><button title="Duplicate" data-blk-act="dup">⧉</button><button title="Delete block" class="ebl-del" data-blk-act="del">×</button>';
       blockEl.appendChild(ctrls);
 
       ctrls.querySelector('[data-blk-act="up"]').addEventListener('mousedown', (e) => e.stopPropagation());
@@ -7130,93 +7129,92 @@
       if (!bodyEl || bodyEl.dataset.bdlDragWired === '1') return;
       bodyEl.dataset.bdlDragWired = '1';
 
+      // Blok hanya bisa di-drag lewat handle ✥ (supaya teks/input di dalam blok tetap bisa diedit)
+      bodyEl.addEventListener('mousedown', (e) => {
+        const handle = e.target.closest && e.target.closest('[data-blk-act="move"]');
+        bodyEl.querySelectorAll('.email-block[draggable="true"]').forEach(b => b.setAttribute('draggable', 'false'));
+        if (handle) { const bl = handle.closest('.email-block'); if (bl) bl.setAttribute('draggable', 'true'); }
+      }, true);
+
+      function topBlocks(exclude) {
+        return Array.from(bodyEl.querySelectorAll('.email-block')).filter(bl => bl !== exclude && !(bl.parentElement && bl.parentElement.closest('.email-block')));
+      }
+      function dropTarget(clientY, exclude) {
+        const blocks = topBlocks(exclude);
+        for (const bl of blocks) {
+          const r = bl.getBoundingClientRect();
+          if (clientY < r.top + r.height / 2) return { block: bl, pos: 'before' };
+        }
+        return blocks.length ? { block: blocks[blocks.length - 1], pos: 'after' } : { block: null, pos: 'end' };
+      }
+      function clearDropMarks() {
+        bodyEl.classList.remove('drop-empty');
+        bodyEl.querySelectorAll('.drop-above, .drop-below').forEach(bl => bl.classList.remove('drop-above', 'drop-below'));
+      }
+      function hasActiveDrag(e) {
+        if (bodyEl.querySelector('.email-block.dragging') || window.__pendingDropHtml) return true;
+        try { return Array.from((e.dataTransfer && e.dataTransfer.types) || []).indexOf('application/x-email-block') >= 0; } catch (_) { return false; }
+      }
+      function doCanvasDrop(e, forceEnd) {
+        const dragging = bodyEl.querySelector('.email-block.dragging');
+        let html = window.__pendingDropHtml;
+        if (!html && !dragging) { try { html = e.dataTransfer.getData('application/x-email-block'); } catch (_) {} }
+        if (!dragging && !html) return false;
+        let node = dragging;
+        if (!node) {
+          const tpl = document.createElement('template');
+          tpl.innerHTML = String(html).trim();
+          node = tpl.content.firstElementChild;
+          if (!node) return false;
+        }
+        const t = forceEnd ? { block: null, pos: 'end' } : dropTarget(e.clientY, dragging);
+        if (t.pos === 'end') bodyEl.appendChild(node);
+        else if (t.pos === 'before') t.block.parentNode.insertBefore(node, t.block);
+        else t.block.insertAdjacentElement('afterend', node);
+        if (!dragging) { attachBlockControls(node); node.setAttribute('data-attached', '1'); }
+        node.setAttribute('draggable', 'false');
+        window.__pendingDropHtml = null;
+        clearDropMarks();
+        bodyEl.querySelectorAll('.email-block.dragging').forEach(bl => bl.classList.remove('dragging'));
+        setupImageButtonLiveEditors();
+        syncBody();
+        refreshEmailDropzones();
+        return true;
+      }
+      window.__canvasDrop = doCanvasDrop;
+      window.__canvasHasDrag = hasActiveDrag;
+
       bodyEl.addEventListener('dragstart', (e) => {
-        // Find the closest .email-block from the drag target (works even if drag started on child)
-        const block = e.target.closest && e.target.closest('.email-block');
-        if (!block || !bodyEl.contains(block)) return;
-        block.classList.add('dragging');
+        const bl = e.target.closest && e.target.closest('.email-block');
+        if (!bl || !bodyEl.contains(bl)) return;
+        bl.classList.add('dragging');
         try { e.dataTransfer.setData('text/plain', 'block-reorder'); } catch (_) {}
         e.dataTransfer.effectAllowed = 'move';
       });
-
       bodyEl.addEventListener('dragend', () => {
-        bodyEl.querySelectorAll('.email-block.dragging').forEach(b => b.classList.remove('dragging'));
-        bodyEl.querySelectorAll('.email-block.drag-over, .email-dropgap.drag-over').forEach(b => b.classList.remove('drag-over'));
-        // Clear pending palette HTML after a brief delay (so drop handler reads it first)
+        clearDropMarks();
+        bodyEl.querySelectorAll('.email-block.dragging').forEach(bl => { bl.classList.remove('dragging'); bl.setAttribute('draggable', 'false'); });
         setTimeout(() => { window.__pendingDropHtml = null; }, 50);
       });
-
       bodyEl.addEventListener('dragover', (e) => {
-        // Find drop target (dropgap OR block)
-        const gap = e.target.closest && e.target.closest('.email-dropgap');
-        const block = e.target.closest && e.target.closest('.email-block');
-        if (!gap && !block) return;
+        if (!hasActiveDrag(e)) return;
         e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        if (gap) {
-          bodyEl.querySelectorAll('.email-dropgap.drag-over').forEach(g => g.classList.remove('drag-over'));
-          gap.classList.add('drag-over');
-        } else if (block) {
-          bodyEl.querySelectorAll('.email-block.drag-over').forEach(b => b.classList.remove('drag-over'));
-          const dragging = bodyEl.querySelector('.email-block.dragging');
-          if (block !== dragging) block.classList.add('drag-over');
-        }
-      });
-
-      bodyEl.addEventListener('dragleave', (e) => {
-        const gap = e.target.closest && e.target.closest('.email-dropgap');
-        const block = e.target.closest && e.target.closest('.email-block');
-        // Only clear if leaving body entirely (relatedTarget not inside body)
-        if (!bodyEl.contains(e.relatedTarget)) {
-          if (gap) gap.classList.remove('drag-over');
-          else if (block) block.classList.remove('drag-over');
-        }
-      });
-
-      bodyEl.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const gap = e.target.closest && e.target.closest('.email-dropgap');
-        const block = e.target.closest && e.target.closest('.email-block');
-        if (!gap && !block) return;
         const dragging = bodyEl.querySelector('.email-block.dragging');
-        const pendingHtml = window.__pendingDropHtml;
-
-        // Determine insertion point
-        let insertBefore = null;
-        if (gap) {
-          // Dropping on a gap → insert right after the gap (before the next block)
-          insertBefore = gap.nextSibling;
-        } else if (block) {
-          // Dropping on a block → insert above/below based on cursor Y
-          const rect = block.getBoundingClientRect();
-          const dropAbove = (e.clientY - rect.top) < rect.height / 2;
-          insertBefore = dropAbove ? block : block.nextSibling;
-        }
-
-        // Reorder existing block
-        if (dragging && dragging !== block && dragging !== gap && insertBefore) {
-          bodyEl.insertBefore(dragging, insertBefore);
-        }
-        // Insert new block from palette
-        else if (pendingHtml && insertBefore) {
-          insertBefore.insertAdjacentHTML('beforebegin', pendingHtml);
-          // Attach controls + add dropgap hooks to newly inserted block
-          const newBlock = insertBefore.previousElementSibling;
-          if (newBlock && newBlock.classList.contains('email-block')) {
-            attachBlockControls(newBlock);
-            newBlock.setAttribute('data-attached', '1');
-          }
-        }
-
-        // Cleanup state
-        window.__pendingDropHtml = null;
-        bodyEl.querySelectorAll('.email-block.dragging, .email-block.drag-over, .email-dropgap.drag-over').forEach(b => {
-          b.classList.remove('dragging');
-          b.classList.remove('drag-over');
-        });
-
-        syncBody();
-        refreshEmailDropzones();
+        e.dataTransfer.dropEffect = dragging ? 'move' : 'copy';
+        clearDropMarks();
+        const t = dropTarget(e.clientY, dragging);
+        if (t.pos === 'before') t.block.classList.add('drop-above');
+        else if (t.pos === 'after') t.block.classList.add('drop-below');
+        else bodyEl.classList.add('drop-empty');
+      });
+      bodyEl.addEventListener('dragleave', (e) => {
+        if (!bodyEl.contains(e.relatedTarget)) clearDropMarks();
+      });
+      bodyEl.addEventListener('drop', (e) => {
+        if (!hasActiveDrag(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        doCanvasDrop(e, false);
       });
     }
     function moveBlock(blockEl, dir) {
