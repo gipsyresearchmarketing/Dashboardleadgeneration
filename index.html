@@ -785,6 +785,12 @@
     .email-block.drop-below { box-shadow: 0 3px 0 0 var(--accent); }
     .email-card-body.drop-empty { outline: 2px dashed var(--accent); outline-offset: -4px; }
     .email-block-controls button[data-blk-act="move"] { cursor: grab; }
+    .eb-img-wrap, .eb-btn-wrap { position: relative; max-width: 100%; }
+    .eb-resize-handle { position: absolute; width: 14px; height: 14px; background: var(--accent); border: 2px solid #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: ew-resize; opacity: 0; transition: opacity .15s; z-index: 6; }
+    .eb-img-wrap .eb-resize-handle { right: -7px; bottom: -7px; cursor: nwse-resize; }
+    .eb-btn-wrap .eb-resize-handle { right: -8px; top: 50%; margin-top: -7px; }
+    .eb-img-wrap:hover .eb-resize-handle, .eb-btn-wrap:hover .eb-resize-handle, .eb-resize-handle.active { opacity: 1; }
+    .eb-resize-badge { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; z-index: 7; }
     .email-block.dragging {
       opacity: 0.4;
       border: 2px dashed var(--accent);
@@ -6376,12 +6382,18 @@
 
   function safeLink(u) { u = String(u || '').trim(); return /^(https?:\/\/|mailto:)/i.test(u) ? u : '#'; }
 
+  /** Konstanta tampilan email */
+  const EMAIL_ACCENT = '#2563eb';
+  const EMAIL_FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const EMAIL_CONTENT_W = 520; // lebar area isi (600 - padding 40px kiri/kanan)
+
   /** Ubah HTML editor (block + kontrol + input) jadi HTML email bersih. */
   function bodyToEmailHtml(bodyHtml) {
     const doc = new DOMParser().parseFromString('<div id="r">' + bodyHtml + '</div>', 'text/html');
     const root = doc.getElementById('r');
     if (!root) return bodyHtml;
     const val = (el, sel) => { const n = el.querySelector(sel); return n ? (n.getAttribute('value') || n.value || '') : ''; };
+    const px = (w, max) => Math.max(40, Math.min(EMAIL_CONTENT_W, Math.round((w / max) * EMAIL_CONTENT_W)));
     root.querySelectorAll('.email-block').forEach(b => {
       const type = b.getAttribute('data-block');
       let out = null;
@@ -6390,15 +6402,22 @@
         let src = val(b, '[data-eb-input="src"]').trim();
         if ((!src || src.indexOf('📷') === 0) && pimg) src = pimg.getAttribute('src') || '';
         const alt = val(b, '[data-eb-input="alt"]') || (pimg && pimg.getAttribute('alt')) || '';
-        let size = '100%';
-        const sel = b.querySelector('[data-eb-input="size"] option[selected]');
-        if (sel) size = sel.getAttribute('value') || sel.textContent || '100%';
+        let w = EMAIL_CONTENT_W;
+        const wAttr = parseInt(b.getAttribute('data-img-w'), 10) || 0;
+        const mAttr = parseInt(b.getAttribute('data-img-max'), 10) || 0;
+        if (wAttr && mAttr) w = px(wAttr, mAttr);
+        else {
+          const sel = b.querySelector('[data-eb-input="size"] option[selected]');
+          const m = sel && /^(\d+)%$/.exec(sel.getAttribute('value') || sel.textContent || '');
+          if (m) w = Math.round(EMAIL_CONTENT_W * parseInt(m[1], 10) / 100);
+        }
         if (src) {
           out = doc.createElement('div');
-          out.setAttribute('style', 'text-align:center;margin:8px 0');
+          out.setAttribute('style', 'text-align:center;margin:22px 0');
           const im = doc.createElement('img');
           im.setAttribute('src', src); im.setAttribute('alt', alt);
-          im.setAttribute('style', 'width:' + size + ';max-width:100%;height:auto;border-radius:4px');
+          im.setAttribute('width', String(w));
+          im.setAttribute('style', 'display:block;margin:0 auto;width:' + w + 'px;max-width:100%;height:auto;border:0;border-radius:10px');
           out.appendChild(im);
         }
       } else if (type === 'button') {
@@ -6407,28 +6426,46 @@
         let href = val(b, '[data-eb-input="href"]').trim();
         const a0 = b.querySelector('a[href]'); if (!href && a0) href = a0.getAttribute('href') || '';
         if (text && !/^click here/i.test(text)) {
+          const full = b.getAttribute('data-btn-full') === '1';
+          const wAttr = parseInt(b.getAttribute('data-btn-w'), 10) || 0;
+          const mAttr = parseInt(b.getAttribute('data-img-max'), 10) || 0;
+          const w = (!full && wAttr && mAttr) ? px(wAttr, mAttr) : 0;
           out = doc.createElement('div');
-          out.setAttribute('style', 'text-align:center;margin:14px 0');
-          const a = doc.createElement('a');
+          out.innerHTML = '<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0"'
+            + (full ? ' width="100%"' : (w ? ' width="' + w + '"' : ''))
+            + ' style="margin:26px auto;border-collapse:separate;' + (full ? 'width:100%;' : (w ? 'width:' + w + 'px;max-width:100%;' : '')) + '">'
+            + '<tr><td align="center" bgcolor="' + EMAIL_ACCENT + '" style="background:' + EMAIL_ACCENT + ';border-radius:10px">'
+            + '<a style="display:block;padding:15px 32px;font-family:' + EMAIL_FONT + ';font-size:15px;font-weight:700;line-height:1.3;color:#ffffff;text-decoration:none;border-radius:10px"></a>'
+            + '</td></tr></table>';
+          const a = out.querySelector('a');
           a.setAttribute('href', safeLink(href));
-          a.setAttribute('style', 'display:inline-block;background:#2563eb;color:#ffffff;padding:12px 28px;border-radius:6px;font-size:14px;font-weight:600;text-decoration:none');
           a.textContent = text;
-          out.appendChild(a);
         }
       } else if (type === 'divider') {
-        out = doc.createElement('hr'); out.setAttribute('style', 'border:0;border-top:1px solid #e5e7eb;margin:16px 0');
+        out = doc.createElement('hr'); out.setAttribute('style', 'border:0;border-top:1px solid #e2e8f0;margin:26px 0');
       } else if (type === 'spacer') {
-        out = doc.createElement('div'); out.setAttribute('style', 'height:24px');
+        out = doc.createElement('div'); out.setAttribute('style', 'height:24px;line-height:24px;font-size:0');
       } else {
         b.querySelectorAll('.email-block-controls, .email-block-label, .eb-controls').forEach(n => n.remove());
         b.removeAttribute('class');
+        b.setAttribute('style', 'margin:0 0 16px');
         return;
       }
       if (out) b.replaceWith(out); else b.remove();
     });
-    root.querySelectorAll('.email-block-controls, .email-block-label, .eb-controls, .email-dropgap').forEach(n => n.remove());
+    root.querySelectorAll('.email-block-controls, .email-block-label, .eb-controls, .eb-resize-handle, .eb-resize-badge, .email-dropgap').forEach(n => n.remove());
     root.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
     root.querySelectorAll('[draggable]').forEach(n => n.removeAttribute('draggable'));
+    // Rapikan tipografi (hanya properti yang belum di-set user)
+    const setIf = (el, prop, v) => { if (!el.style.getPropertyValue(prop)) el.style.setProperty(prop, v); };
+    root.querySelectorAll('h1').forEach(el => { setIf(el, 'font-size', '28px'); setIf(el, 'font-weight', '700'); setIf(el, 'line-height', '1.25'); setIf(el, 'color', '#0f172a'); setIf(el, 'margin', '0 0 14px'); });
+    root.querySelectorAll('h2').forEach(el => { setIf(el, 'font-size', '22px'); setIf(el, 'font-weight', '700'); setIf(el, 'line-height', '1.3'); setIf(el, 'color', '#0f172a'); setIf(el, 'margin', '0 0 12px'); });
+    root.querySelectorAll('h3').forEach(el => { setIf(el, 'font-size', '17px'); setIf(el, 'font-weight', '700'); setIf(el, 'line-height', '1.4'); setIf(el, 'color', '#1e293b'); setIf(el, 'margin', '0 0 10px'); });
+    root.querySelectorAll('p').forEach(el => { setIf(el, 'margin', '0 0 14px'); });
+    root.querySelectorAll('ul, ol').forEach(el => { setIf(el, 'margin', '0 0 14px'); setIf(el, 'padding-left', '22px'); });
+    root.querySelectorAll('li').forEach(el => { setIf(el, 'margin', '0 0 6px'); });
+    root.querySelectorAll('a[href]').forEach(el => { setIf(el, 'color', EMAIL_ACCENT); });
+    root.querySelectorAll('blockquote').forEach(el => { setIf(el, 'margin', '0 0 14px'); setIf(el, 'padding', '4px 0 4px 14px'); setIf(el, 'border-left', '3px solid #cbd5e1'); setIf(el, 'color', '#475569'); });
     return root.innerHTML;
   }
 
@@ -6449,10 +6486,15 @@
       }
       return '';
     }).join('');
-    return '<!doctype html><html><body style="margin:0;padding:0;background:#f3f4f6">'
-      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0"><tr><td align="center">'
-      + '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px"><tr>'
-      + '<td style="padding:28px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#111827">'
+    return '<!doctype html><html lang="id"><head><meta charset="utf-8">'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+      + '<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">'
+      + '<style>@media (max-width:620px){.em-pad{padding:26px 20px 24px !important}.em-outer{padding:16px 8px !important}}</style></head>'
+      + '<body style="margin:0;padding:0;background:#eef1f6;-webkit-text-size-adjust:100%">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef1f6" style="background:#eef1f6"><tr><td align="center" class="em-outer" style="padding:32px 12px">'
+      + '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #e3e8ef;border-radius:14px;border-collapse:separate;overflow:hidden">'
+      + '<tr><td height="5" style="height:5px;line-height:5px;font-size:0;background:' + EMAIL_ACCENT + '" bgcolor="' + EMAIL_ACCENT + '">&nbsp;</td></tr>'
+      + '<tr><td class="em-pad" style="padding:36px 40px 32px;font-family:' + EMAIL_FONT + ';font-size:15px;line-height:1.7;color:#334155">'
       + bodyToEmailHtml(compose.body || '') + blocks
       + '</td></tr></table></td></tr></table></body></html>';
   }
@@ -7273,6 +7315,64 @@
       const bodyHost = document.querySelector('[data-blast-input="body"]');
       if (bodyHost && bodyHost.dataset.ebUploadBound !== '1') {
         bodyHost.dataset.ebUploadBound = '1';
+        // Toggle tombol full width
+        bodyHost.addEventListener('click', (e) => {
+          const fb = e.target.closest && e.target.closest('[data-eb-btnfull]');
+          if (!fb) return;
+          e.preventDefault(); e.stopPropagation();
+          const block = fb.closest('.email-block');
+          if (!block) return;
+          if (block.getAttribute('data-btn-full') === '1') block.removeAttribute('data-btn-full');
+          else { block.setAttribute('data-btn-full', '1'); block.removeAttribute('data-btn-w'); }
+          applyBtnWidth(block);
+          syncBody();
+        });
+        // Tarik titik biru untuk ubah lebar gambar / tombol (simetris kiri-kanan)
+        bodyHost.addEventListener('mousedown', (e) => {
+          const h = e.target.closest && e.target.closest('[data-eb-handle]');
+          if (!h) return;
+          e.preventDefault(); e.stopPropagation();
+          const block = h.closest('.email-block');
+          const wrap = h.parentElement;
+          if (!block || !wrap) return;
+          const isImg = block.dataset.block === 'image';
+          const maxW = Math.max(60, wrap.parentElement.clientWidth || 520);
+          const minW = isImg ? 40 : 80;
+          const startX = e.clientX;
+          const startW = wrap.getBoundingClientRect().width;
+          const badge = document.createElement('div');
+          badge.className = 'eb-resize-badge';
+          wrap.appendChild(badge);
+          h.classList.add('active');
+          const onMove = (ev) => {
+            let w = Math.round(startW + 2 * (ev.clientX - startX));
+            w = Math.max(minW, Math.min(maxW, w));
+            if (maxW - w < 10) w = maxW; // snap ke lebar penuh
+            if (isImg) {
+              wrap.style.width = w + 'px';
+              block.setAttribute('data-img-w', w);
+              block.setAttribute('data-img-max', maxW);
+              const wi = block.querySelector('[data-eb-input="width"]');
+              if (wi) { wi.value = w >= maxW ? '' : w; }
+              if (w >= maxW) { block.removeAttribute('data-img-w'); block.removeAttribute('data-img-max'); }
+            } else {
+              block.removeAttribute('data-btn-full');
+              if (w >= maxW) { block.setAttribute('data-btn-full', '1'); block.removeAttribute('data-btn-w'); }
+              else { block.setAttribute('data-btn-w', w); block.setAttribute('data-img-max', maxW); }
+              applyBtnWidth(block);
+            }
+            badge.textContent = (w >= maxW ? 'Penuh' : w + ' px');
+          };
+          const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            h.classList.remove('active');
+            badge.remove();
+            syncBody();
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
         bodyHost.addEventListener('click', (e) => {
           const btn = e.target.closest && e.target.closest('[data-eb-upload]');
           if (!btn) return;
@@ -7309,6 +7409,19 @@
           syncBody();
         });
       });
+    }
+
+    // Terapkan lebar tombol (full / px / auto) ke preview editor
+    function applyBtnWidth(block) {
+      const wrap = block.querySelector('.eb-btn-wrap');
+      if (!wrap) return;
+      const full = block.getAttribute('data-btn-full') === '1';
+      const w = parseInt(block.getAttribute('data-btn-w'), 10) || 0;
+      wrap.style.display = (full || w) ? 'block' : 'inline-block';
+      wrap.style.width = full ? '100%' : (w ? w + 'px' : '');
+      wrap.style.margin = (w && !full) ? '0 auto' : '';
+      const fb = block.querySelector('[data-eb-btnfull]');
+      if (fb) { fb.style.background = full ? '#4338ca' : '#eef2ff'; fb.style.color = full ? '#ffffff' : '#4338ca'; }
     }
 
     // Simpan nilai input ke attribute supaya ikut ke innerHTML (value property tidak ter-serialize)
@@ -7348,24 +7461,43 @@
       if (block.dataset.block === 'image') {
         const srcEl = block.querySelector('[data-eb-input="src"]');
         const altEl = block.querySelector('[data-eb-input="alt"]');
-        const sizeEl = block.querySelector('[data-eb-input="size"]');
+        const widthEl = block.querySelector('[data-eb-input="width"]');
+        const sizeEl = block.querySelector('[data-eb-input="size"]'); // blok lama (persen)
         const preview = block.querySelector('.eb-image-preview');
         let src = srcEl ? srcEl.value.trim() : '';
         const prevImg = preview && preview.querySelector('img');
         if (block._pendingSrc) { src = block._pendingSrc; block._pendingSrc = null; }
         else if (src.indexOf('📷') === 0 && prevImg) { src = prevImg.getAttribute('src') || ''; }
         const alt = altEl ? altEl.value.trim() : '';
-        const size = sizeEl ? sizeEl.value : '100%';
+        const maxW = (preview && preview.clientWidth) || 520;
+        let wpx = 0;
+        if (widthEl) wpx = parseInt(widthEl.value, 10) || 0;
+        else if (sizeEl) { const m = /^(\d+)%$/.exec(sizeEl.value); wpx = (m && m[1] !== '100') ? Math.round(maxW * parseInt(m[1], 10) / 100) : 0; }
+        if (wpx) {
+          wpx = Math.max(40, Math.min(wpx, maxW));
+          block.setAttribute('data-img-w', wpx);
+          block.setAttribute('data-img-max', maxW);
+        } else { block.removeAttribute('data-img-w'); block.removeAttribute('data-img-max'); }
         persistBlockInputs(block);
         if (preview) {
           if (src) {
             preview.style.cssText = 'min-height:0;background:transparent;border:0;display:block;text-align:center';
             preview.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.className = 'eb-img-wrap';
+            wrap.style.cssText = 'display:inline-block;line-height:0;width:' + (wpx ? wpx + 'px' : '100%');
             const im = document.createElement('img');
             im.setAttribute('src', src);
             im.setAttribute('alt', alt);
-            im.style.cssText = 'width:' + size + ';max-width:100%;height:auto;display:block;margin:0 auto;border-radius:4px';
-            preview.appendChild(im);
+            im.style.cssText = 'width:100%;height:auto;display:block;border-radius:8px';
+            const hd = document.createElement('span');
+            hd.className = 'eb-resize-handle';
+            hd.setAttribute('data-eb-handle', '1');
+            hd.setAttribute('contenteditable', 'false');
+            hd.title = 'Tarik untuk ubah ukuran gambar';
+            wrap.appendChild(im);
+            wrap.appendChild(hd);
+            preview.appendChild(wrap);
           } else {
             preview.style.cssText = 'min-height:120px;background:#f1f5f9;border:2px dashed #cbd5e1;border-radius:6px;color:#64748b;font-size:13px;display:flex;align-items:center;justify-content:center';
             preview.innerHTML = '<span style="background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:4px;font-size:13px;color:#64748b">🖼️ Upload gambar atau isi URL</span>';
@@ -7384,7 +7516,7 @@
             const a = document.createElement('a');
             a.href = href;
             a.target = '_blank';
-            a.style.cssText = 'display:inline-block;background:#eef2ff;border:2px dashed #cbd5e1;border-radius:6px;padding:12px 28px;color:#4338ca;font-size:14px;font-weight:600;cursor:text;min-width:120px;text-decoration:none';
+            a.style.cssText = 'display:block;text-align:center;background:#eef2ff;border:2px dashed #cbd5e1;border-radius:6px;padding:12px 28px;color:#4338ca;font-size:14px;font-weight:600;cursor:text;min-width:120px;text-decoration:none';
             a.textContent = text || 'Click here, type button label';
             preview.parentNode.replaceChild(a, preview);
             // Re-attach contentEditable since we replaced the node
@@ -7394,6 +7526,7 @@
             setupImageButtonLiveEditors();
           }
         }
+        applyBtnWidth(block);
       }
     }
 
@@ -7412,9 +7545,7 @@
             '<button type="button" data-eb-upload="1" style="font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600">⬆ Upload</button>' +
             '<input data-eb-input="src" data-eb-placeholder="https://..." style="width:40%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Image URL..." />' +
             '<input data-eb-input="alt" style="width:25%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Alt text" />' +
-            '<select data-eb-input="size" style="font-size:11px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px">' +
-              '<option value="25%">25%</option><option value="50%">50%</option><option value="75%">75%</option><option value="100%" selected>100%</option>' +
-            '</select>' +
+            '<input data-eb-input="width" type="number" min="40" step="1" title="Lebar gambar (px). Kosongkan = penuh. Atau tarik titik biru di pojok gambar." style="width:84px;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Lebar px" />' +
           '</div>' +
         '</div>';
       } else if (type === 'library') {
@@ -7424,12 +7555,16 @@
       } else if (type === 'button') {
         // Inline editor for button — user fills label + link, button updates live
         return '<div class="email-block" data-block="button" contenteditable="false" style="text-align:center;padding:8px 0">' +
-          '<div class="eb-button-preview" contenteditable="true" data-eb-input="text" data-eb-placeholder="Click here, type button label" ' +
-            'style="display:inline-block;background:#eef2ff;border:2px dashed #cbd5e1;border-radius:6px;padding:12px 28px;color:#4338ca;font-size:14px;font-weight:600;cursor:text;min-width:120px">' +
-            'Click here, type button label' +
+          '<div class="eb-btn-wrap" style="display:inline-block">' +
+            '<div class="eb-button-preview" contenteditable="true" data-eb-input="text" data-eb-placeholder="Click here, type button label" ' +
+              'style="display:block;text-align:center;background:#eef2ff;border:2px dashed #cbd5e1;border-radius:6px;padding:12px 28px;color:#4338ca;font-size:14px;font-weight:600;cursor:text;min-width:120px">' +
+              'Click here, type button label' +
+            '</div>' +
+            '<span class="eb-resize-handle" data-eb-handle="1" contenteditable="false" title="Tarik untuk ubah lebar tombol"></span>' +
           '</div>' +
-          '<div class="eb-controls" style="margin-top:6px">' +
-            '<input data-eb-input="href" style="width:80%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Button link URL (https://...)" />' +
+          '<div class="eb-controls" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center">' +
+            '<input data-eb-input="href" style="width:62%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Button link URL (https://...)" />' +
+            '<button type="button" data-eb-btnfull="1" style="font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600">↔ Full width</button>' +
           '</div>' +
         '</div>';
       } else if (type === 'divider') {
