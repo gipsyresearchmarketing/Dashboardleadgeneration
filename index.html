@@ -771,7 +771,7 @@
       padding: 2px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.06);
     }
-    .email-block:hover .email-block-controls { display: inline-flex; }
+    .email-block:hover .email-block-controls, .email-block:focus-within .email-block-controls { display: inline-flex; z-index: 5; }
     .email-block-controls button {
       width: 22px; height: 22px; padding: 0; border: none; background: transparent;
       border-radius: 3px; cursor: pointer; color: var(--muted);
@@ -7218,11 +7218,16 @@
       });
     }
     function moveBlock(blockEl, dir) {
-      const next = dir < 0 ? blockEl.previousElementSibling : blockEl.nextElementSibling;
-      if (!next) return;
-      if (dir < 0) blockEl.parentNode.insertBefore(blockEl, next);
-      else blockEl.parentNode.insertBefore(next, blockEl);
+      const bodyEl = document.querySelector('[data-blast-input="body"]');
+      if (!bodyEl) return;
+      const blocks = Array.from(bodyEl.querySelectorAll('.email-block')).filter(bl => !(bl.parentElement && bl.parentElement.closest('.email-block')));
+      const idx = blocks.indexOf(blockEl);
+      const target = blocks[idx + dir];
+      if (idx < 0 || !target) return;
+      if (dir < 0) target.parentNode.insertBefore(blockEl, target);
+      else target.insertAdjacentElement('afterend', blockEl);
       syncBody();
+      blockEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
     function syncBody() {
       const bodyEl = document.querySelector('[data-blast-input="body"]');
@@ -7237,6 +7242,9 @@
       // Click → prompt + insert at cursor (existing behavior)
       btn.addEventListener('click', (e) => {
         e.preventDefault();
+        const nowTs = Date.now();
+        if (nowTs - (window.__lastBlockInsertAt || 0) < 500) return; // cegah insert dobel
+        window.__lastBlockInsertAt = nowTs;
         const html = buildBlockHtml(btn.getAttribute('data-block-insert'));
         if (html) insertBlockAtCursor(html);
         setupImageButtonLiveEditors();
