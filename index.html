@@ -5856,7 +5856,7 @@
       '<div class="palette-files-list">' +
         ((compose.files || []).map((f, i) =>
           '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:12px">' +
-            '<span>📎</span>' +
+            ((f.dataUrl && /^data:image\//i.test(f.dataUrl)) ? '<img src="' + f.dataUrl + '" alt="" style="width:28px;height:28px;object-fit:cover;border-radius:4px;flex:none">' : '<span>📎</span>') +
             '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHTML(f.name) + '</span>' +
             (!readOnly ? '<button type="button" data-blast-action="remove-att" data-idx="' + i + '" data-channel="' + channel + '" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 2px" title="Remove">×</button>' : '') +
           '</div>'
@@ -6371,6 +6371,62 @@
 
   function safeLink(u) { u = String(u || '').trim(); return /^(https?:\/\/|mailto:)/i.test(u) ? u : '#'; }
 
+  /** Ubah HTML editor (block + kontrol + input) jadi HTML email bersih. */
+  function bodyToEmailHtml(bodyHtml) {
+    const doc = new DOMParser().parseFromString('<div id="r">' + bodyHtml + '</div>', 'text/html');
+    const root = doc.getElementById('r');
+    if (!root) return bodyHtml;
+    const val = (el, sel) => { const n = el.querySelector(sel); return n ? (n.getAttribute('value') || n.value || '') : ''; };
+    root.querySelectorAll('.email-block').forEach(b => {
+      const type = b.getAttribute('data-block');
+      let out = null;
+      if (type === 'image') {
+        const pimg = b.querySelector('.eb-image-preview img, img');
+        let src = val(b, '[data-eb-input="src"]').trim();
+        if ((!src || src.indexOf('📷') === 0) && pimg) src = pimg.getAttribute('src') || '';
+        const alt = val(b, '[data-eb-input="alt"]') || (pimg && pimg.getAttribute('alt')) || '';
+        let size = '100%';
+        const sel = b.querySelector('[data-eb-input="size"] option[selected]');
+        if (sel) size = sel.getAttribute('value') || sel.textContent || '100%';
+        if (src) {
+          out = doc.createElement('div');
+          out.setAttribute('style', 'text-align:center;margin:8px 0');
+          const im = doc.createElement('img');
+          im.setAttribute('src', src); im.setAttribute('alt', alt);
+          im.setAttribute('style', 'width:' + size + ';max-width:100%;height:auto;border-radius:4px');
+          out.appendChild(im);
+        }
+      } else if (type === 'button') {
+        const te = b.querySelector('[data-eb-input="text"]');
+        const text = (te ? te.textContent : '').trim();
+        let href = val(b, '[data-eb-input="href"]').trim();
+        const a0 = b.querySelector('a[href]'); if (!href && a0) href = a0.getAttribute('href') || '';
+        if (text && !/^click here/i.test(text)) {
+          out = doc.createElement('div');
+          out.setAttribute('style', 'text-align:center;margin:14px 0');
+          const a = doc.createElement('a');
+          a.setAttribute('href', safeLink(href));
+          a.setAttribute('style', 'display:inline-block;background:#2563eb;color:#ffffff;padding:12px 28px;border-radius:6px;font-size:14px;font-weight:600;text-decoration:none');
+          a.textContent = text;
+          out.appendChild(a);
+        }
+      } else if (type === 'divider') {
+        out = doc.createElement('hr'); out.setAttribute('style', 'border:0;border-top:1px solid #e5e7eb;margin:16px 0');
+      } else if (type === 'spacer') {
+        out = doc.createElement('div'); out.setAttribute('style', 'height:24px');
+      } else {
+        b.querySelectorAll('.email-block-controls, .email-block-label, .eb-controls').forEach(n => n.remove());
+        b.removeAttribute('class');
+        return;
+      }
+      if (out) b.replaceWith(out); else b.remove();
+    });
+    root.querySelectorAll('.email-block-controls, .email-block-label, .eb-controls, .email-dropgap').forEach(n => n.remove());
+    root.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
+    root.querySelectorAll('[draggable]').forEach(n => n.removeAttribute('draggable'));
+    return root.innerHTML;
+  }
+
   function buildEmailHtml(compose) {
     const blocks = (compose.blocks || []).map(b => {
       const d = b.data || {};
@@ -6392,7 +6448,7 @@
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0"><tr><td align="center">'
       + '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px"><tr>'
       + '<td style="padding:28px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#111827">'
-      + (compose.body || '') + blocks
+      + bodyToEmailHtml(compose.body || '') + blocks
       + '</td></tr></table></td></tr></table></body></html>';
   }
 
@@ -6410,9 +6466,6 @@
     });
     if (!targets.length) { toast('Tidak ada recipient dengan email yang valid'); return null; }
     if (!window.currentBrand) { toast('Brand belum ke-load, coba refresh'); return null; }
-    if ((compose.blocks || []).some(b => b.type === 'image' && /^data:/i.test((b.data && b.data.url) || ''))) {
-      if (!confirm('Ada gambar yang disimpan sebagai data: URL — gambar ini TIDAK akan tampil di sebagian besar email.\n\nPakai URL gambar publik (https://...). Tetap kirim?')) return null;
-    }
     const msg = 'Kirim email "' + compose.subject.trim() + '" ke ' + targets.length + ' penerima?' + (skipped.length ? '\n\n' + skipped.length + ' lead dilewati karena email kosong/tidak valid.' : '') + '\n\nEmail yang sudah terkirim tidak bisa ditarik kembali.';
     if (!confirm(msg)) return null;
 
@@ -6422,6 +6475,10 @@
 
     toast('Mengirim ' + targets.length + ' email…');
     const html = buildEmailHtml(compose);
+    const files = (compose.files || []).filter(f => f && f.dataUrl && String(f.dataUrl).indexOf(',') > 0)
+      .map(f => ({ name: f.name, type: f.type || '', data: String(f.dataUrl).split(',')[1] }));
+    const payloadSize = html.length + files.reduce((n, f) => n + f.data.length, 0);
+    if (payloadSize > 4000000) { alert('Total ukuran isi email + gambar + lampiran terlalu besar (' + (payloadSize / 1048576).toFixed(1) + ' MB, batas ~3 MB).\n\nKecilkan gambar atau kurangi lampiran.'); return null; }
     const cc = compose.cc || '', bcc = compose.bcc || '';
     const okIds = {}, failed = [];
     for (let i = 0; i < targets.length; i += 25) {
@@ -6430,7 +6487,7 @@
         const resp = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ brand_id: window.currentBrand.id, subject: compose.subject.trim(), html: html, recipients: batch, cc: i === 0 ? cc : '', bcc: i === 0 ? bcc : '' }),
+          body: JSON.stringify({ brand_id: window.currentBrand.id, subject: compose.subject.trim(), html: html, recipients: batch, files: files, cc: i === 0 ? cc : '', bcc: i === 0 ? bcc : '' }),
         });
         let data = null; try { data = await resp.json(); } catch (e) {}
         if (!resp.ok || !data || !Array.isArray(data.results)) {
@@ -7044,13 +7101,24 @@
 
       const ctrls = document.createElement('div');
       ctrls.className = 'email-block-controls';
-      ctrls.innerHTML = '<button title="Move up" data-blk-act="up">↑</button><button title="Move down" data-blk-act="down">↓</button><button title="Delete block" class="ebl-del" data-blk-act="del">×</button>';
+      ctrls.innerHTML = '<button title="Move up" data-blk-act="up">↑</button><button title="Move down" data-blk-act="down">↓</button><button title="Duplicate" data-blk-act="dup">⧉</button><button title="Delete block" class="ebl-del" data-blk-act="del">×</button>';
       blockEl.appendChild(ctrls);
 
       ctrls.querySelector('[data-blk-act="up"]').addEventListener('mousedown', (e) => e.stopPropagation());
       ctrls.querySelector('[data-blk-act="up"]').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); moveBlock(blockEl, -1); });
       ctrls.querySelector('[data-blk-act="down"]').addEventListener('mousedown', (e) => e.stopPropagation());
       ctrls.querySelector('[data-blk-act="down"]').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); moveBlock(blockEl, +1); });
+      ctrls.querySelector('[data-blk-act="dup"]').addEventListener('mousedown', (e) => e.stopPropagation());
+      ctrls.querySelector('[data-blk-act="dup"]').addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        persistBlockInputs(blockEl);
+        const clone = blockEl.cloneNode(true);
+        const oldC = clone.querySelector('.email-block-controls'); if (oldC) oldC.remove();
+        blockEl.insertAdjacentElement('afterend', clone);
+        attachBlockControls(clone);
+        setupImageButtonLiveEditors();
+        syncBody();
+      });
       ctrls.querySelector('[data-blk-act="del"]').addEventListener('mousedown', (e) => e.stopPropagation());
       ctrls.querySelector('[data-blk-act="del"]').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); blockEl.remove(); syncBody(); refreshEmailDropzones(); });
     }
@@ -7161,6 +7229,7 @@
     function syncBody() {
       const bodyEl = document.querySelector('[data-blast-input="body"]');
       if (!bodyEl) return;
+      persistBlockInputs(bodyEl);
       if (channel === 'email') emailBlast.compose.body = bodyEl.innerHTML;
       else waBlast.compose.body = bodyEl.innerHTML;
       refreshEmailDropzones();
@@ -7194,6 +7263,35 @@
     // Live-updating editors for image & button blocks.
     // Watches inputs inside .email-block[data-block="image"|"button"] and updates preview.
     function setupImageButtonLiveEditors() {
+      const bodyHost = document.querySelector('[data-blast-input="body"]');
+      if (bodyHost && bodyHost.dataset.ebUploadBound !== '1') {
+        bodyHost.dataset.ebUploadBound = '1';
+        bodyHost.addEventListener('click', (e) => {
+          const btn = e.target.closest && e.target.closest('[data-eb-upload]');
+          if (!btn) return;
+          e.preventDefault(); e.stopPropagation();
+          const block = btn.closest('.email-block');
+          const fi = document.createElement('input');
+          fi.type = 'file'; fi.accept = 'image/*'; fi.style.display = 'none';
+          document.body.appendChild(fi);
+          fi.addEventListener('change', async () => {
+            const f = fi.files && fi.files[0];
+            document.body.removeChild(fi);
+            if (!f || !block) return;
+            try {
+              const dataUrl = await compressImageFile(f);
+              const srcEl = block.querySelector('[data-eb-input="src"]');
+              const altEl = block.querySelector('[data-eb-input="alt"]');
+              if (srcEl) srcEl.value = '📷 ' + f.name;
+              if (altEl && !altEl.value) altEl.value = f.name.replace(/\.[^.]+$/, '');
+              block._pendingSrc = dataUrl;
+              syncBlockPreview(block);
+              syncBody();
+            } catch (err) { alert('Upload gagal: ' + err.message); }
+          });
+          fi.click();
+        });
+      }
       document.querySelectorAll('[data-blast-input="body"] [data-eb-input]').forEach(inp => {
         if (inp.dataset.ebLiveBound === '1') return;
         inp.dataset.ebLiveBound = '1';
@@ -7206,29 +7304,64 @@
       });
     }
 
+    // Simpan nilai input ke attribute supaya ikut ke innerHTML (value property tidak ter-serialize)
+    function persistBlockInputs(root) {
+      (root || document).querySelectorAll('[data-blast-input="body"] [data-eb-input], [data-eb-input]').forEach(el => {
+        if (el.tagName === 'INPUT') el.setAttribute('value', el.value);
+        else if (el.tagName === 'SELECT') Array.from(el.options).forEach(o => { if (o.value === el.value) o.setAttribute('selected', 'selected'); else o.removeAttribute('selected'); });
+      });
+    }
+
+    // Kompres gambar (maks 1000px lebar, JPEG) supaya ringan dikirim
+    function compressImageFile(file) {
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onerror = () => reject(new Error('Gagal membaca file'));
+        fr.onload = () => {
+          if (/gif$/i.test(file.type) && file.size < 500000) return resolve(fr.result);
+          const im = new Image();
+          im.onerror = () => reject(new Error('File bukan gambar yang valid'));
+          im.onload = () => {
+            const maxW = 1000;
+            const sc = Math.min(1, maxW / im.width);
+            const c = document.createElement('canvas');
+            c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc);
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+            ctx.drawImage(im, 0, 0, c.width, c.height);
+            resolve(c.toDataURL('image/jpeg', 0.85));
+          };
+          im.src = fr.result;
+        };
+        fr.readAsDataURL(file);
+      });
+    }
+
     function syncBlockPreview(block) {
       if (block.dataset.block === 'image') {
         const srcEl = block.querySelector('[data-eb-input="src"]');
         const altEl = block.querySelector('[data-eb-input="alt"]');
         const sizeEl = block.querySelector('[data-eb-input="size"]');
         const preview = block.querySelector('.eb-image-preview');
-        const src = srcEl ? srcEl.value.trim() : '';
+        let src = srcEl ? srcEl.value.trim() : '';
+        const prevImg = preview && preview.querySelector('img');
+        if (block._pendingSrc) { src = block._pendingSrc; block._pendingSrc = null; }
+        else if (src.indexOf('📷') === 0 && prevImg) { src = prevImg.getAttribute('src') || ''; }
         const alt = altEl ? altEl.value.trim() : '';
         const size = sizeEl ? sizeEl.value : '100%';
+        persistBlockInputs(block);
         if (preview) {
           if (src) {
-            preview.style.backgroundImage = 'url("' + src.replace(/"/g, '%22') + '")';
-            preview.style.backgroundSize = size + ' auto';
-            preview.style.backgroundColor = 'transparent';
-            preview.style.borderStyle = 'solid';
-            preview.style.minHeight = '80px';
-            preview.innerHTML = '<span style="background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:4px;font-size:11px">' + (alt || '🖼️ image') + '</span>';
+            preview.style.cssText = 'min-height:0;background:transparent;border:0;display:block;text-align:center';
+            preview.innerHTML = '';
+            const im = document.createElement('img');
+            im.setAttribute('src', src);
+            im.setAttribute('alt', alt);
+            im.style.cssText = 'width:' + size + ';max-width:100%;height:auto;display:block;margin:0 auto;border-radius:4px';
+            preview.appendChild(im);
           } else {
-            preview.style.backgroundImage = 'none';
-            preview.style.backgroundColor = '#f1f5f9';
-            preview.style.borderStyle = 'dashed';
-            preview.style.minHeight = '120px';
-            preview.innerHTML = '<span style="background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:4px;font-size:13px;color:#64748b">🖼️ Click fields below to add image</span>';
+            preview.style.cssText = 'min-height:120px;background:#f1f5f9;border:2px dashed #cbd5e1;border-radius:6px;color:#64748b;font-size:13px;display:flex;align-items:center;justify-content:center';
+            preview.innerHTML = '<span style="background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:4px;font-size:13px;color:#64748b">🖼️ Upload gambar atau isi URL</span>';
           }
         }
       } else if (block.dataset.block === 'button') {
@@ -7269,7 +7402,8 @@
             '<span style="background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:4px">🖼️ Click fields below to add image</span>' +
           '</div>' +
           '<div class="eb-controls" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center">' +
-            '<input data-eb-input="src" data-eb-placeholder="https://..." style="width:55%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Image URL..." />' +
+            '<button type="button" data-eb-upload="1" style="font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600">⬆ Upload</button>' +
+            '<input data-eb-input="src" data-eb-placeholder="https://..." style="width:40%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Image URL..." />' +
             '<input data-eb-input="alt" style="width:25%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Alt text" />' +
             '<select data-eb-input="size" style="font-size:11px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px">' +
               '<option value="25%">25%</option><option value="50%">50%</option><option value="75%">75%</option><option value="100%" selected>100%</option>' +
