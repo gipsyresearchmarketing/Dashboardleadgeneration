@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "imapflow": "2.2.1",
+    "mailparser": "3.9.33",
     "nodemailer": "^6.9.16"
   }
 }
