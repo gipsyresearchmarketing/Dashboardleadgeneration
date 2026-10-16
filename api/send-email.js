@@ -23,6 +23,38 @@ function htmlToText(html) {
     .replace(/\n{3,}/g, '\n\n').trim();
 }
 
+const MAX_FILES = 10;
+const MAX_TOTAL_B64 = 4000000; // batas aman body Vercel (~4.5MB)
+
+/** Ubah <img src="data:image/..."> jadi cid: supaya gambar tampil di Gmail/Outlook. */
+function extractInlineImages(html) {
+  const atts = [];
+  const seen = {};
+  const out = String(html || '').replace(/src=(["'])data:image\/(png|jpe?g|gif|webp);base64,([A-Za-z0-9+\/=\s]+?)\1/gi, (m, q, ext, b64) => {
+    const clean = b64.replace(/\s+/g, '');
+    let cid = seen[clean];
+    if (!cid) {
+      cid = `img${atts.length + 1}@leadscrm`;
+      seen[clean] = cid;
+      const e = ext.toLowerCase().replace('jpeg', 'jpg');
+      atts.push({ filename: `image${atts.length + 1}.${e}`, content: clean, contentType: `image/${e === 'jpg' ? 'jpeg' : e}`, cid });
+    }
+    return `src=${q}cid:${cid}${q}`;
+  });
+  return { html: out, inline: atts };
+}
+
+function parseFiles(v) {
+  const arr = Array.isArray(v) ? v.slice(0, MAX_FILES) : [];
+  return arr
+    .map((f) => ({
+      filename: String((f && f.name) || 'file').replace(/[\\/\r\n"]/g, '_').slice(0, 120),
+      content: String((f && f.data) || '').replace(/\s+/g, ''),
+      contentType: String((f && f.type) || 'application/octet-stream').slice(0, 100),
+    }))
+    .filter((f) => /^[A-Za-z0-9+\/=]+$/.test(f.content) && f.content.length > 0);
+}
+
 function parseEmails(v) {
   const arr = Array.isArray(v) ? v : String(v || '').split(',');
   return arr.map((s) => String(s).trim()).filter((s) => EMAIL_RE.test(s));
@@ -52,7 +84,7 @@ function getSender() {
       const r = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to: [m.to], subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, reply_to: replyTo }),
+        body: JSON.stringify({ from, to: [m.to], subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, reply_to: replyTo, attachments: (m.attachments || []).length ? m.attachments.map((a) => ({ filename: a.filename, content: a.content, content_type: a.contentType, ...(a.cid ? { content_id: a.cid } : {}) })) : undefined }),
       });
       if (!r.ok) {
         let msg = `Resend HTTP ${r.status}`;
@@ -72,7 +104,7 @@ function getSender() {
     });
     const from = process.env.EMAIL_FROM || `"${process.env.EMAIL_FROM_NAME || 'Leads CRM'}" <${process.env.SMTP_USER}>`;
     return async (m) => {
-      await transporter.sendMail({ from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo });
+      await transporter.sendMail({ from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo, attachments: (m.attachments || []).map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64', contentType: a.contentType, ...(a.cid ? { cid: a.cid, contentDisposition: 'inline' } : {}) })) });
     };
   }
   return null;
@@ -96,7 +128,12 @@ module.exports = async (req, res) => {
     if (!brandId || !(await isBrandMember(token, brandId, user.id))) return res.status(403).json({ error: 'Kamu bukan member brand ini' });
 
     const subject = String(body.subject || '').trim().slice(0, 200);
-    const html = String(body.html || '');
+    const extracted = extractInlineImages(String(body.html || ''));
+    const html = extracted.html;
+    const files = parseFiles(body.files);
+    const attachments = [...extracted.inline, ...files];
+    const totalB64 = attachments.reduce((n, a) => n + a.content.length, 0);
+    if (totalB64 > MAX_TOTAL_B64) return res.status(413).json({ error: 'Total ukuran gambar/lampiran terlalu besar (maks ~3 MB). Kecilkan atau kurangi file.' });
     if (!subject) return res.status(400).json({ error: 'Subject wajib diisi' });
     if (!html.trim()) return res.status(400).json({ error: 'Isi email kosong' });
     if (html.length > 500000) return res.status(400).json({ error: 'Isi email terlalu besar' });
@@ -120,7 +157,7 @@ module.exports = async (req, res) => {
         if (!EMAIL_RE.test(email)) return { lead_id: r && r.lead_id, email, ok: false, error: 'Email tidak valid' };
         try {
           const first = i === 0 && j === 0;
-          await send({ to: email, subject, html, text, cc: first && cc.length ? cc : undefined, bcc: first && bcc.length ? bcc : undefined });
+          await send({ to: email, subject, html, text, attachments, cc: first && cc.length ? cc : undefined, bcc: first && bcc.length ? bcc : undefined });
           return { lead_id: r.lead_id, email, ok: true };
         } catch (e) {
           return { lead_id: r.lead_id, email, ok: false, error: String((e && e.message) || e).slice(0, 300) };
