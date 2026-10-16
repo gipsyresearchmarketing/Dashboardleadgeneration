@@ -5118,6 +5118,103 @@
   /* =================================================================
    * INBOX (mock email receiving view)
    * ================================================================= */
+  /* ---------- Sync balasan dari Gmail (IMAP) ke Inbox ---------- */
+  const INBOX_SYNC_KEY = 'leads-dashboard:inbox-last-sync:v1:';
+  function inboxLastSync() {
+    try { return parseInt(localStorage.getItem(INBOX_SYNC_KEY + ((window.currentBrand && window.currentBrand.id) || '')) || '0', 10) || 0; } catch (e) { return 0; }
+  }
+  function inboxSyncLabel() {
+    const t = inboxLastSync();
+    if (!t) return ' · belum pernah sync';
+    const m = Math.round((Date.now() - t) / 60000);
+    return ' · sync ' + (m < 1 ? 'barusan' : m < 60 ? m + ' mnt lalu' : Math.round(m / 60) + ' jam lalu');
+  }
+  function hashId(str) {
+    let h1 = 5381, h2 = 0;
+    for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = ((h1 << 5) + h1 + c) | 0; h2 = (c + (h2 << 6) + (h2 << 16) - h2) | 0; }
+    return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+  }
+  function findBlastForReply(lead, subject) {
+    const hist = (emailBlast.history || []).filter(b => (b.recipients || []).some(r => r.lead_id === lead.id));
+    if (!hist.length) return null;
+    const subj = String(subject || '').replace(/^\s*((re|balas|fwd?|fw)\s*:\s*)+/i, '').trim().toLowerCase();
+    const exact = hist.find(b => String(b.subject || '').trim().toLowerCase() === subj);
+    if (exact) return exact.id;
+    hist.sort((a, b) => new Date(b.sent_at || b.created_at || 0) - new Date(a.sent_at || a.created_at || 0));
+    return hist[0].id;
+  }
+  function maybeAutoSyncInbox() {
+    if (window.__inboxAutoOff || !window.currentBrand) return;
+    if (Date.now() - (window.__lastInboxSyncAt || 0) > 60000) syncInbox({ manual: false });
+  }
+  async function syncInbox(opts) {
+    opts = opts || {};
+    if (window.__inboxSyncing) return;
+    if (!window.currentBrand || !window.sb) { if (opts.manual) toast('Belum login / brand belum ke-load'); return; }
+    window.__inboxSyncing = true;
+    window.__lastInboxSyncAt = Date.now();
+    const setBtn = (txt, dis) => document.querySelectorAll('[data-inbox-action="sync"]').forEach(b => { b.textContent = txt; b.disabled = dis; });
+    setBtn('⏳ Syncing…', true);
+    let added = 0;
+    try {
+      const leads = appLeads();
+      const emails = Array.from(new Set(leads.map(l => String(l.email || '').trim().toLowerCase()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))).slice(0, 1000);
+      if (!emails.length) { if (opts.manual) toast('Belum ada lead yang punya email untuk dicocokkan'); return; }
+      const sess = await window.sb.auth.getSession();
+      const token = sess && sess.data && sess.data.session && sess.data.session.access_token;
+      if (!token) { if (opts.manual) toast('Sesi login habis, login ulang dulu'); return; }
+      const last = inboxLastSync();
+      const days = last ? Math.min(30, Math.max(2, Math.ceil((Date.now() - last) / 86400000) + 1)) : 14;
+      const resp = await fetch('/api/sync-inbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ brand_id: window.currentBrand.id, emails: emails, since_days: days, max: 40 }),
+      });
+      let data = null; try { data = await resp.json(); } catch (e) {}
+      if (!resp.ok || !data || !Array.isArray(data.messages)) {
+        let why = (data && data.error) || ('HTTP ' + resp.status);
+        if (resp.status === 404) why = 'Endpoint /api/sync-inbox tidak ditemukan — pastikan file api/sync-inbox.js ikut ke-deploy';
+        throw new Error(why);
+      }
+      const have = {};
+      (state.inboxEmails || []).forEach(e => { have[e.id] = 1; });
+      const fresh = [], acts = [];
+      data.messages.forEach(m => {
+        const id = 'IN-' + hashId(m.message_id || (m.from_email + m.received_at));
+        if (have[id]) return;
+        have[id] = 1;
+        const lead = leads.find(l => String(l.email || '').trim().toLowerCase() === m.from_email) || null;
+        fresh.push({
+          id: id, from_email: m.from_email, from_name: m.from_name || (lead && lead.name) || m.from_email,
+          to_email: m.to_email, subject: m.subject || '(no subject)', body: m.body || '', snippet: m.snippet || '',
+          lead_id: lead ? lead.id : null, blast_id: lead ? findBlastForReply(lead, m.subject) : null,
+          status: 'unread', starred: false, has_attachments: !!m.has_attachments, attachments: m.attachments || [],
+          received_at: m.received_at, read_at: null, replied_at: null,
+        });
+        if (lead) acts.push({ id: generateActivityId(), lead_id: lead.id, type: 'email', title: 'Balasan email: ' + String(m.subject || '').slice(0, 70), notes: String(m.snippet || '').slice(0, 200), created_at: m.received_at });
+      });
+      if (fresh.length) {
+        state.inboxEmails = fresh.concat(state.inboxEmails || []);
+        saveInboundEmails(state.inboxEmails);
+        if (acts.length) { try { appPrependActivities(acts); } catch (e) {} }
+        added = fresh.length;
+      }
+      try { localStorage.setItem(INBOX_SYNC_KEY + window.currentBrand.id, String(Date.now())); } catch (e) {}
+      if (added) toast('📥 ' + added + ' balasan baru masuk');
+      else if (opts.manual) toast(data.partial ? 'Sync sebagian selesai, coba lagi sebentar lagi' : 'Tidak ada balasan baru');
+    } catch (e) {
+      if (opts.manual || Date.now() - (window.__inboxErrToast || 0) > 300000) { window.__inboxErrToast = Date.now(); toast('Sync inbox gagal: ' + e.message); }
+    } finally {
+      window.__inboxSyncing = false;
+      if (added) {
+        if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+        const visible = (state.view === 'inbox') || (state.view === 'email-blast' && emailBlast.activeTab === 'inbox');
+        if (visible) renderInboxView();
+      }
+      setBtn('🔄 Sync', false);
+    }
+  }
+
   function renderInboxView() {
     // If we're inside the email-blast view (inbox as sub-tab), re-render the whole blast view
     if (state.view === 'email-blast') {
@@ -5176,9 +5273,9 @@
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
               <div>
                 <h2 style="font-size:16px;font-weight:700;margin:0">📥 Inbox</h2>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px">${unreadCount} unread of ${totalCount} emails</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">${unreadCount} unread of ${totalCount} emails${inboxSyncLabel()}</div>
               </div>
-              <div style="font-size:11px;background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:6px;font-weight:600">MOCK</div>
+              <button type="button" data-inbox-action="sync" title="Ambil balasan terbaru dari Gmail" style="font-size:12px;padding:5px 10px;border:1px solid var(--border);background:white;border-radius:6px;cursor:pointer;font-weight:600;color:var(--fg)">🔄 Sync</button>
             </div>
             <input type="search" data-inbox-action="search" placeholder="🔍 Search emails..." value="${escapeHTML(state.inboxQuery || '')}" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none" />
             <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
@@ -5203,11 +5300,12 @@
       </div>
     `;
     wireInboxEvents();
+    maybeAutoSyncInbox();
   }
 
   function renderInboxListItem(e, isSelected) {
     const date = new Date(e.received_at);
-    const now = new Date('2026-09-30T14:00:00Z');
+    const now = new Date();
     const diff = (now - date) / 1000; // seconds
     let timeAgo;
     if (diff < 60) timeAgo = 'just now';
@@ -5314,6 +5412,7 @@
   }
 
   function wireInboxEvents() {
+    document.querySelectorAll('[data-inbox-action="sync"]').forEach(b => b.addEventListener('click', () => syncInbox({ manual: true })));
     // Open email
     document.querySelectorAll('[data-inbox-action="open"]').forEach(el => {
       el.addEventListener('click', () => {
@@ -5408,7 +5507,7 @@
         if (!e) return;
         // Pre-fill compose from this email
         emailBlast.compose.subject = 'Re: ' + (e.subject || '').replace(/^Re:\s*/i, '');
-        emailBlast.compose.body = '\n\n\n--- Original message ---\nFrom: ' + e.from_name + ' <' + e.from_email + '>\nDate: ' + new Date(e.received_at).toLocaleString() + '\nSubject: ' + e.subject + '\n\n' + e.body;
+        emailBlast.compose.body = '<p><br></p><p><br></p><div style="color:#64748b;font-size:12px">Pada ' + escapeHTML(new Date(e.received_at).toLocaleString('id-ID')) + ', ' + escapeHTML(e.from_name || e.from_email) + ' &lt;' + escapeHTML(e.from_email) + '&gt; menulis:</div><blockquote style="margin:6px 0 0;padding-left:12px;border-left:3px solid #cbd5e1;color:#64748b">' + escapeHTML(e.body || '').replace(/\n/g, '<br>') + '</blockquote>';
         emailBlast.compose.recipients = e.lead_id ? [{ lead_id: e.lead_id }] : [];
         emailBlast.compose.loadedAudienceName = '';
         emailBlast.activeTab = 'compose';
@@ -6500,6 +6599,152 @@
   }
 
   /** Return { okRecipients, failed[], skipped[] } atau null kalau dibatalkan / gagal total. */
+  /* ---------- WhatsApp Cloud API ---------- */
+  const WA_CFG_KEY = 'leads-dashboard:wa-cfg:v1';
+  function getWaCfg() {
+    let c = {};
+    try { c = JSON.parse(localStorage.getItem(WA_CFG_KEY) || '{}') || {}; } catch (e) {}
+    return Object.assign({ mode: 'template', template: '', lang: 'id', v1src: 'first', v1txt: '', v2src: '', v2txt: '', v3src: '', v3txt: '' }, c);
+  }
+  function setWaCfg(patch) {
+    const c = Object.assign(getWaCfg(), patch || {});
+    try { localStorage.setItem(WA_CFG_KEY, JSON.stringify(c)); } catch (e) {}
+    return c;
+  }
+  document.addEventListener('click', (e) => {
+    const m = e.target.closest && e.target.closest('[data-wa-mode]');
+    if (!m) return;
+    setWaCfg({ mode: m.getAttribute('data-wa-mode') });
+    renderWaBlastView();
+  });
+  const onWaCfgInput = (e) => {
+    const el = e.target.closest && e.target.closest('[data-wa-cfg]');
+    if (!el) return;
+    const patch = {}; patch[el.getAttribute('data-wa-cfg')] = el.value;
+    setWaCfg(patch);
+  };
+  document.addEventListener('input', onWaCfgInput);
+  document.addEventListener('change', onWaCfgInput);
+  function normWaPhone(raw) {
+    let d = String(raw || '').replace(/[^\d]/g, '');
+    if (!d) return '';
+    if (d.startsWith('00')) d = d.slice(2);
+    if (d.startsWith('0')) d = '62' + d.slice(1);
+    else if (d.startsWith('8')) d = '62' + d;
+    return /^\d{9,15}$/.test(d) ? d : '';
+  }
+  function waVarValue(src, txt, lead) {
+    const name = String((lead && lead.name) || '').trim();
+    if (src === 'name') return name;
+    if (src === 'first') return name.split(/\s+/)[0] || name;
+    if (src === 'company') return String((lead && lead.company) || name || '').trim();
+    if (src === 'custom') return String(txt || '').trim();
+    return '';
+  }
+  function waFillTokens(text, lead) {
+    const name = String((lead && lead.name) || '').trim();
+    return String(text || '')
+      .replace(/\{\{\s*first_?name\s*\}\}/gi, name.split(/\s+/)[0] || name)
+      .replace(/\{\{\s*name\s*\}\}/gi, name)
+      .replace(/\{\{\s*company\s*\}\}/gi, String((lead && lead.company) || name || ''));
+  }
+  function renderWaCfgCard() {
+    const c = getWaCfg();
+    const opt = (v, l, cur) => '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + l + '</option>';
+    const varRow = (n) => '<div style="display:flex;gap:8px;align-items:center;margin-top:6px">' +
+      '<span style="font-size:12px;color:var(--muted);width:42px;font-family:monospace">{{' + n + '}}</span>' +
+      '<select class="input" data-wa-cfg="v' + n + 'src" style="font-size:12px;padding:5px 8px;max-width:200px">' +
+        opt('', '— tidak dipakai —', c['v' + n + 'src']) + opt('first', 'Nama depan lead', c['v' + n + 'src']) + opt('name', 'Nama lengkap lead', c['v' + n + 'src']) +
+        opt('company', 'Perusahaan lead', c['v' + n + 'src']) + opt('custom', 'Teks tetap…', c['v' + n + 'src']) +
+      '</select>' +
+      '<input class="input" data-wa-cfg="v' + n + 'txt" placeholder="isi teks tetap" value="' + escapeHTML(c['v' + n + 'txt'] || '') + '" style="font-size:12px;padding:5px 8px;flex:1" />' +
+    '</div>';
+    return '<div class="hub-card">' +
+      '<div class="sec-head"><span class="sec-title">WhatsApp Cloud API</span><span class="sec-meta">— pengirim resmi Meta</span></div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
+        '<button type="button" class="filter-pill ' + (c.mode === 'template' ? 'active' : '') + '" data-wa-mode="template">Template (untuk kontak baru)</button>' +
+        '<button type="button" class="filter-pill ' + (c.mode === 'text' ? 'active' : '') + '" data-wa-mode="text">Teks bebas (kontak yang chat ≤ 24 jam)</button>' +
+      '</div>' +
+      (c.mode === 'template'
+        ? '<div style="display:flex;gap:8px"><input class="input" data-wa-cfg="template" placeholder="nama_template (contoh: promo_oktober)" value="' + escapeHTML(c.template) + '" style="font-size:13px;padding:6px 10px;flex:1" />' +
+          '<input class="input" data-wa-cfg="lang" placeholder="id" value="' + escapeHTML(c.lang) + '" style="font-size:13px;padding:6px 10px;width:90px" title="Kode bahasa template, contoh: id, en, en_US" /></div>' +
+          '<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:12px">Isi variabel template</div>' +
+          varRow(1) + varRow(2) + varRow(3) +
+          '<div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">Nama dan bahasa harus <b>persis sama</b> dengan template berstatus <b>Approved</b> di Meta. Variabel diisi urut {{1}}, {{2}}, {{3}}; kosongkan yang tidak dipakai. Kolom Message di bawah hanya untuk preview dan catatan.</div>'
+        : '<div style="font-size:12px;color:var(--muted);line-height:1.5">Teks bebas hanya terkirim ke kontak yang <b>membalas/chat ke nomor kamu dalam 24 jam terakhir</b>. Untuk kontak baru gunakan Template. Kamu bisa pakai <code>{{name}}</code>, <code>{{first_name}}</code>, <code>{{company}}</code> di pesan.</div>') +
+    '</div>';
+  }
+
+  async function sendWaViaApi(compose) {
+    const cfg = getWaCfg();
+    const leads = appLeads();
+    const targets = [], skipped = [], seen = {};
+    (compose.recipients || []).forEach(r => {
+      const l = leads.find(x => x.id === r.lead_id);
+      if (!l) return;
+      const ph = normWaPhone(l.phone);
+      if (!ph) { skipped.push(l.name || l.id); return; }
+      if (seen[ph]) return;
+      seen[ph] = 1;
+      targets.push({ lead_id: l.id, phone: ph, lead: l });
+    });
+    if (!targets.length) { alert('Tidak ada recipient dengan nomor WhatsApp yang valid.\n\nIsi kolom phone di lead (contoh 0812xxxx atau +62812xxxx).'); return null; }
+    if (cfg.mode === 'template') {
+      if (!/^[a-z0-9_]+$/.test(String(cfg.template || '').trim())) { alert('Isi nama template dulu (huruf kecil, angka, underscore) — harus sama persis dengan template Approved di Meta.'); return null; }
+    } else if (!String(compose.message || '').trim()) { toast('Message wajib diisi untuk mode teks bebas'); return null; }
+    if (!window.currentBrand || !window.sb) { toast('Belum login / brand belum ke-load'); return null; }
+    const sess = await window.sb.auth.getSession();
+    const token = sess && sess.data && sess.data.session && sess.data.session.access_token;
+    if (!token) { toast('Sesi login habis, login ulang dulu'); return null; }
+    const msg = 'Kirim WhatsApp (' + (cfg.mode === 'template' ? 'template "' + cfg.template + '"' : 'teks bebas') + ') ke ' + targets.length + ' nomor?' +
+      (skipped.length ? '\n\n' + skipped.length + ' kontak dilewati karena nomor tidak valid.' : '') +
+      '\n\nPesan WhatsApp tidak bisa ditarik, dan pesan template dikenai biaya per pesan oleh Meta.';
+    if (!confirm(msg)) return null;
+    showBlastOverlay('sending', 'Mengirim WhatsApp ke ' + targets.length + ' nomor…', 'Jangan klik Send lagi dan jangan tutup halaman ini sampai selesai.');
+    const okIds = {}, failed = [];
+    for (let i = 0; i < targets.length; i += 50) {
+      const batch = targets.slice(i, i + 50);
+      try {
+        const body = { brand_id: window.currentBrand.id, mode: cfg.mode, recipients: batch.map(t => {
+          const o = { lead_id: t.lead_id, phone: t.phone };
+          if (cfg.mode === 'template') {
+            const params = [];
+            for (let n = 1; n <= 3; n++) { const src = cfg['v' + n + 'src']; if (!src) break; params.push(waVarValue(src, cfg['v' + n + 'txt'], t.lead)); }
+            o.params = params;
+          } else { o.text = waFillTokens(compose.message, t.lead); }
+          return o;
+        }) };
+        if (cfg.mode === 'template') body.template = { name: String(cfg.template).trim(), language: String(cfg.lang || 'id').trim() };
+        else body.text = compose.message;
+        const resp = await fetch('/api/send-wa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify(body),
+        });
+        let data = null; try { data = await resp.json(); } catch (e) {}
+        if (!resp.ok || !data || !Array.isArray(data.results)) {
+          let why = (data && data.error) || ('HTTP ' + resp.status);
+          if (resp.status === 404) why = 'Endpoint /api/send-wa tidak ditemukan — pastikan file api/send-wa.js ikut ke-deploy di Vercel';
+          throw new Error(why);
+        }
+        data.results.forEach(r => {
+          const t = batch.find(x => x.lead_id === r.lead_id);
+          if (r.ok) okIds[r.lead_id] = 1;
+          else failed.push({ email: ((t && t.lead.name) || r.phone) + ' (' + r.phone + ')', error: r.error || 'gagal' });
+        });
+      } catch (e) {
+        batch.forEach(t => failed.push({ email: (t.lead.name || '') + ' (' + t.phone + ')', error: e.message }));
+      }
+    }
+    const okRecipients = targets.filter(t => okIds[t.lead_id]).map(t => ({ lead_id: t.lead_id }));
+    if (!okRecipients.length) {
+      alert('WhatsApp GAGAL terkirim.\n\n' + failed.slice(0, 5).map(f => '• ' + f.email + ' — ' + f.error).join('\n'));
+      return null;
+    }
+    if (!compose.message) compose.message = '[Template WhatsApp: ' + cfg.template + ']';
+    return { okRecipients: okRecipients, failed: failed, skipped: skipped };
+  }
+
   async function sendEmailsViaApi(compose) {
     const leads = appLeads();
     const targets = [], skipped = [], seen = {};
@@ -6515,6 +6760,7 @@
     if (!window.currentBrand) { toast('Brand belum ke-load, coba refresh'); return null; }
     const msg = 'Kirim email "' + compose.subject.trim() + '" ke ' + targets.length + ' penerima?' + (skipped.length ? '\n\n' + skipped.length + ' lead dilewati karena email kosong/tidak valid.' : '') + '\n\nEmail yang sudah terkirim tidak bisa ditarik kembali.';
     if (!confirm(msg)) return null;
+    showBlastOverlay('sending', 'Mengirim email ke ' + targets.length + ' penerima…', 'Jangan klik Send lagi dan jangan tutup halaman ini sampai selesai.');
 
     let token = null;
     try { const ss = await window.sb.auth.getSession(); token = ss && ss.data && ss.data.session && ss.data.session.access_token; } catch (e) {}
@@ -6555,7 +6801,52 @@
     return { okRecipients: okRecipients, failed: failed, skipped: skipped };
   }
 
+  /* ----- Overlay status kirim (mencegah klik Send dobel) ----- */
+  function showBlastOverlay(state, title, sub) {
+    let ov = document.getElementById('blast-overlay');
+    if (!ov) {
+      if (!document.getElementById('blast-overlay-style')) {
+        const st = document.createElement('style');
+        st.id = 'blast-overlay-style';
+        st.textContent = '@keyframes blastspin{to{transform:rotate(360deg)}}';
+        document.head.appendChild(st);
+      }
+      ov = document.createElement('div');
+      ov.id = 'blast-overlay';
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+      document.body.appendChild(ov);
+    }
+    ov.dataset.state = state;
+    const icon = state === 'sending'
+      ? '<div style="width:38px;height:38px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:blastspin .8s linear infinite;margin:0 auto 14px"></div>'
+      : '<div style="font-size:40px;line-height:1;margin-bottom:10px">✅</div>';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:28px 34px;max-width:360px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.3);font-family:inherit">'
+      + icon
+      + '<div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px">' + title + '</div>'
+      + '<div style="font-size:13px;color:#64748b;line-height:1.5">' + sub + '</div></div>';
+    ov.onclick = state === 'done' ? hideBlastOverlay : null;
+    if (state === 'done') { clearTimeout(window.__blastOvTimer); window.__blastOvTimer = setTimeout(hideBlastOverlay, 2600); }
+  }
+  function hideBlastOverlay() {
+    clearTimeout(window.__blastOvTimer);
+    const ov = document.getElementById('blast-overlay');
+    if (ov) ov.remove();
+  }
+
+  /** Wrapper: cuma satu proses kirim yang boleh jalan sekaligus. */
   async function sendBlast(channel) {
+    if (window.__blastSending) { toast('Masih mengirim, tunggu sampai selesai…'); return; }
+    window.__blastSending = true;
+    try {
+      await sendBlastImpl(channel);
+    } finally {
+      window.__blastSending = false;
+      const ov = document.getElementById('blast-overlay');
+      if (ov && ov.dataset.state === 'sending') hideBlastOverlay();
+    }
+  }
+
+  async function sendBlastImpl(channel) {
     // Auto-commit teks yang masih diketik di kolom To (belum Enter/koma)
     {
       const pending = document.querySelector('[data-ech-add]');
@@ -6566,7 +6857,7 @@
     const state = channel === 'email' ? emailBlast : waBlast;
     const compose = state.compose;
     if (channel === 'email' && !compose.subject.trim()) { toast('Subject wajib diisi'); return; }
-    if (!compose.body && !compose.message) { toast(`${channel==='email'?'Body':'Message'} wajib diisi`); return; }
+    if (!compose.body && !compose.message && !(channel === 'wa' && getWaCfg().mode === 'template')) { toast(`${channel==='email'?'Body':'Message'} wajib diisi`); return; }
     // Recipients are now optional. If none selected, show a proper modal
     // asking user to choose (a) send to all, (b) save as draft, or (c) pick.
     if (compose.recipients.length === 0) {
@@ -6618,7 +6909,11 @@
     // Email: kirim BENERAN lewat /api/send-email. Channel lain / scheduled tetap seperti sebelumnya.
     let sentRecipients = compose.recipients;
     let sendSummary = null;
-    if (channel === 'email' && !isScheduled) {
+    if (channel === 'wa' && !isScheduled) {
+      sendSummary = await sendWaViaApi(compose);
+      if (!sendSummary) return;           // dibatalkan / gagal total (pesan sudah ditampilkan)
+      sentRecipients = sendSummary.okRecipients;
+    } else if (channel === 'email' && !isScheduled) {
       sendSummary = await sendEmailsViaApi(compose);
       if (!sendSummary) return;           // dibatalkan / gagal total (pesan sudah ditampilkan)
       sentRecipients = sendSummary.okRecipients;
@@ -6673,8 +6968,11 @@
     renderAll();
     if (sendSummary) {
       const nFail = sendSummary.failed.length;
-      toast('✉ Email terkirim ke ' + sentRecipients.length + ' penerima' + (nFail ? ' · ' + nFail + ' gagal' : ''));
-      if (nFail) alert('Sebagian email gagal terkirim (' + nFail + '):\n\n' + sendSummary.failed.slice(0, 8).map(f => '• ' + f.email + ' — ' + f.error).join('\n') + (nFail > 8 ? '\n…dan ' + (nFail - 8) + ' lainnya' : ''));
+      const chLabel = channel === 'email' ? 'Email' : 'WhatsApp';
+      toast((channel === 'email' ? '✉ ' : '💬 ') + chLabel + ' terkirim ke ' + sentRecipients.length + ' penerima' + (nFail ? ' · ' + nFail + ' gagal' : ''));
+      if (nFail) hideBlastOverlay();
+      else showBlastOverlay('done', chLabel + ' terkirim!', 'Terkirim ke ' + sentRecipients.length + ' penerima. Lihat di tab ' + (channel === 'email' ? 'Sent' : 'History') + '.');
+      if (nFail) alert('Sebagian ' + (channel === 'email' ? 'email' : 'WhatsApp') + ' gagal terkirim (' + nFail + '):\n\n' + sendSummary.failed.slice(0, 8).map(f => '• ' + f.email + ' — ' + f.error).join('\n') + (nFail > 8 ? '\n…dan ' + (nFail - 8) + ' lainnya' : ''));
     } else {
       toast(isScheduled ? `⏰ ${channel==='email'?'Email':'WA'} Blast dijadwalkan (belum ada pengirim otomatis — belum akan terkirim sendiri)` : `✉ ${channel==='email'?'Email':'WA'} Blast sent ke ${compose.recipients.length} recipient`);
     }
@@ -6760,6 +7058,8 @@
               ${audiences.filter(a => a.type === 'person').map(a => '<option value="' + a.id + '">[' + (a.type === 'company' ? 'B' : 'M') + '] ' + escapeHTML(a.name) + ' (' + (a.lead_ids || []).length + ')</option>').join('')}
             </select>
           </div>
+
+          ${renderWaCfgCard()}
 
           <div class="hub-card">
             <div class="sec-head">
