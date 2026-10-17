@@ -10,7 +10,7 @@
  *             field kosong pada smtp_pass / wa_token = pertahankan yang lama
  *   verify -> { what: "email" | "wa" | "both" } cek koneksi dengan kredensial yang tersimpan
  */
-const { authBrand, encrypt, loadSettings, saveSettings, getMailConfig, getWaConfig } = require('./_lib/brand');
+const { authBrand, encrypt, loadSettings, saveSettings, getMailConfig, createMailer, getWaConfig, GMAIL_READ_SCOPE } = require('./_lib/brand');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -18,7 +18,12 @@ function publicView(cfg) {
   const c = cfg || {};
   return {
     email: {
-      configured: !!(c.smtp_user && c.smtp_pass_enc),
+      configured: !!((c.smtp_user && c.smtp_pass_enc) || (c.gmail_email && c.gmail_refresh_token_enc)),
+      gmail_connected: !!(c.gmail_email && c.gmail_refresh_token_enc),
+      gmail_email: c.gmail_email || '',
+      gmail_can_read: String(c.gmail_scopes || '').indexOf(GMAIL_READ_SCOPE) >= 0,
+      gmail_connected_at: c.gmail_connected_at || null,
+      smtp_configured: !!(c.smtp_user && c.smtp_pass_enc),
       smtp_user: c.smtp_user || '', has_password: !!c.smtp_pass_enc,
       smtp_host: c.smtp_host || '', smtp_port: c.smtp_port || '',
       from_name: c.from_name || '', reply_to: c.reply_to || '',
@@ -34,18 +39,17 @@ function publicView(cfg) {
 function bad(res, msg) { return res.status(400).json({ error: msg }); }
 
 async function verifyEmail(a) {
-  const mc = await getMailConfig(a.token, a.brandId);
-  if (!mc) return { ok: false, message: 'Email belum diatur untuk brand ini.' };
-  let nodemailer;
-  try { nodemailer = require('nodemailer'); } catch (e) { return { ok: false, message: 'Paket nodemailer belum terinstall.' }; }
-  const t = nodemailer.createTransport({ host: mc.host, port: mc.port, secure: mc.port === 465, auth: { user: mc.user, pass: mc.pass }, connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 8000 });
+  let mc;
+  try { mc = await getMailConfig(a.token, a.brandId); } catch (e) { return { ok: false, message: e.message }; }
+  if (!mc) return { ok: false, message: 'Gmail belum dihubungkan untuk brand ini.' };
   try {
-    await t.verify();
-    return { ok: true, message: 'Login berhasil sebagai ' + mc.user + '.' };
+    const m = await createMailer(mc);
+    await m.verify();
+    return { ok: true, message: (mc.type === 'gmail' ? 'Gmail terhubung: ' : 'Login SMTP berhasil sebagai ') + mc.user + '.' };
   } catch (e) {
     const msg = String((e && e.message) || e);
-    if (/535|Invalid login|BadCredentials|EAUTH/i.test(msg + (e && e.code))) return { ok: false, message: 'Login ditolak Gmail. Pastikan yang dipakai App Password 16 karakter (bukan password biasa), email-nya benar, dan 2-Step Verification aktif.' };
-    return { ok: false, message: 'Gagal terhubung ke server email: ' + msg.slice(0, 160) };
+    if (mc.type === 'smtp' && /535|Invalid login|BadCredentials|EAUTH/i.test(msg + (e && e.code))) return { ok: false, message: 'Login ditolak. Pastikan App Password 16 karakter benar dan 2-Step Verification aktif — atau pakai tombol "Hubungkan Gmail" saja.' };
+    return { ok: false, message: msg.slice(0, 200) };
   }
 }
 
