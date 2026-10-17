@@ -1622,7 +1622,115 @@
     body.workspace-mode .topbar { display: none; }
     body.workspace-mode .view-container:not(#view-board):not(#view-board-calendar) { display: none; }
     body.workspace-mode #workspace-shell { display: block; }
-  </style>
+  
+    /* =================================================================
+     * WHATSAPP (gaya WhatsApp Web): inbox, balas, broadcast, riwayat
+     * ================================================================= */
+    #view-wa-blast { max-width: none; padding: 16px 20px; }
+    .wa-shell { display:grid; grid-template-columns:340px 1fr; height:calc(100vh - 110px); min-height:520px; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface); }
+    .wa-list { border-right:1px solid var(--border); display:flex; flex-direction:column; min-width:0; }
+    .wa-topbar { background:#f0f2f5; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); gap:8px; }
+    .wa-topbar .wa-me { display:flex; align-items:center; gap:10px; min-width:0; }
+    .wa-topbar .wa-me b { font-size:13.5px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .wa-topbar .wa-me span { font-size:11px; color:var(--muted); }
+    .wa-icons { display:flex; gap:2px; flex:none; }
+    .wa-ic { width:36px; height:36px; border-radius:50%; border:0; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#54656f; font-size:17px; position:relative; }
+    .wa-ic:hover { background:#e2e5e8; }
+    .wa-ic.on { background:#d9fdd3; color:#128c7e; }
+    .wa-ic[data-tip]:hover::after { content:attr(data-tip); position:absolute; top:40px; right:0; background:#111; color:#fff; font-size:11px; padding:4px 8px; border-radius:6px; white-space:nowrap; z-index:5; }
+    .wa-list-top { padding:10px 14px; border-bottom:1px solid var(--border); }
+    .wa-search { width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font:13px Inter, sans-serif; outline:none; background:#f6f6f6; }
+    .wa-search:focus { border-color:#25d366; background:#fff; }
+    .wa-pills { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+    .wa-pill { padding:4px 10px; border-radius:999px; border:1px solid var(--border); background:#fff; font-size:11px; font-weight:600; color:var(--fg); cursor:pointer; }
+    .wa-pill.active { background:#e7fce3; border-color:#a7f3d0; color:#047857; }
+    .wa-items { flex:1; overflow-y:auto; }
+    .wa-item { display:flex; gap:10px; padding:11px 14px; cursor:pointer; border-bottom:1px solid #f3f3f3; align-items:center; }
+    .wa-item:hover { background:#f8f8f8; }
+    .wa-item.sel { background:#eefcf0; }
+    .wa-av { width:42px; height:42px; border-radius:50%; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex:none; }
+    .wa-item-main { flex:1; min-width:0; }
+    .wa-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .wa-name { font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .wa-time { font-size:11px; color:var(--muted); flex:none; }
+    .wa-time.unread { color:#128c7e; font-weight:600; }
+    .wa-snip { font-size:12.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+    .wa-badge { background:#25d366; color:#fff; border-radius:999px; min-width:20px; height:20px; padding:0 6px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+    .wa-tag { display:inline-block; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; margin-top:4px; margin-right:4px; }
+    .wa-tag-lead { background:#e0e7ff; color:#3730a3; }
+    .wa-tag-new { background:#fef3c7; color:#92400e; }
+    .wa-tag-late { background:#f3f4f6; color:#6b7280; }
+    .wa-chat { display:flex; flex-direction:column; min-width:0; min-height:0; background:#efeae2; }
+    .wa-chat-head { background:#fff; border-bottom:1px solid var(--border); padding:10px 16px; display:flex; align-items:center; gap:12px; }
+    .wa-chat-head .wa-av { width:38px; height:38px; font-size:13px; }
+    .wa-chat-who { flex:1; min-width:0; }
+    .wa-chat-who b { font-size:14px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .wa-chat-who span { font-size:12px; color:var(--muted); }
+    .wa-btn-green { background:#25d366 !important; border-color:#25d366 !important; color:#fff !important; }
+    .wa-btn-green:hover { background:#1fb957 !important; }
+    .wa-window { font-size:11.5px; padding:6px 16px; display:flex; align-items:center; gap:6px; }
+    .wa-win-open { background:#ecfdf5; color:#047857; border-bottom:1px solid #d1fae5; }
+    .wa-win-closed { background:#fffbeb; color:#92400e; border-bottom:1px solid #fde68a; }
+    .wa-msgs { flex:1; overflow-y:auto; padding:16px 7%; display:flex; flex-direction:column; gap:3px; }
+    .wa-day { align-self:center; background:#fff; color:#54656f; font-size:11.5px; padding:4px 10px; border-radius:7px; margin:10px 0 6px; box-shadow:0 1px 1px rgba(0,0,0,.06); }
+    .wa-b { max-width:68%; padding:6px 9px 4px; border-radius:8px; font-size:13.5px; line-height:1.45; box-shadow:0 1px 1px rgba(0,0,0,.08); white-space:pre-wrap; word-wrap:break-word; }
+    .wa-b.in { align-self:flex-start; background:#fff; border-top-left-radius:2px; }
+    .wa-b.out { align-self:flex-end; background:#d9fdd3; border-top-right-radius:2px; }
+    .wa-meta { font-size:10.5px; color:#667781; text-align:right; margin-top:2px; display:flex; gap:4px; justify-content:flex-end; align-items:center; }
+    .wa-tpl-label { font-size:10px; font-weight:700; color:#128c7e; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px; }
+    .wa-btns { display:flex; flex-direction:column; margin:6px -9px -4px; border-top:1px solid rgba(0,0,0,.08); }
+    .wa-btns span { text-align:center; color:#027eb5; font-size:13px; font-weight:500; padding:8px; border-top:1px solid rgba(0,0,0,.06); }
+    .wa-btns span:first-child { border-top:0; }
+    .wa-media { display:flex; align-items:center; gap:8px; background:rgba(0,0,0,.05); border-radius:6px; padding:10px; margin-bottom:4px; font-size:12.5px; }
+    .wa-fail { color:#dc2626; font-weight:700; }
+    .wa-comp { background:#f0f2f5; padding:10px 14px; display:flex; gap:10px; align-items:flex-end; border-top:1px solid var(--border); }
+    .wa-comp textarea { flex:1; resize:none; border:0; border-radius:10px; padding:10px 12px; font:14px Inter, sans-serif; outline:none; max-height:120px; min-height:42px; background:#fff; }
+    .wa-send { width:42px; height:42px; border-radius:50%; border:0; background:#25d366; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; flex:none; }
+    .wa-send:disabled { background:#b6c2c9; cursor:not-allowed; }
+    .wa-locked { flex:1; display:flex; align-items:center; justify-content:space-between; gap:10px; background:#fff; border-radius:10px; padding:10px 12px; font-size:12.5px; color:#92400e; flex-wrap:wrap; }
+    .wa-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--muted); font-size:13px; gap:8px; text-align:center; padding:20px; }
+    .wa-alert { margin:10px 14px 0; padding:10px 12px; border-radius:8px; font-size:12px; line-height:1.5; }
+    .wa-alert-warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
+    .wa-alert-err { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
+    .wa-back { display:none !important; }
+    .wa-bc { flex:1; display:grid; grid-template-columns:minmax(0,1fr) 340px; min-height:0; background:#fff; }
+    .wa-bc-form { overflow-y:auto; padding:18px 22px; border-right:1px solid var(--border); }
+    .wa-bc-step { margin-bottom:20px; }
+    .wa-bc-step h4 { margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); display:flex; align-items:center; gap:8px; }
+    .wa-bc-step h4 .n { width:20px; height:20px; border-radius:50%; background:#25d366; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:11px; }
+    .wa-inp { width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:8px; font:13px Inter, sans-serif; background:#fff; outline:none; }
+    .wa-inp:focus { border-color:#25d366; }
+    .wa-seg { display:inline-flex; background:#f0f2f5; border-radius:8px; padding:3px; gap:3px; margin-bottom:10px; }
+    .wa-seg button { border:0; background:transparent; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; color:var(--muted); cursor:pointer; }
+    .wa-seg button.on { background:#fff; color:var(--fg); box-shadow:0 1px 2px rgba(0,0,0,.08); }
+    .wa-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .wa-chip { background:#e7fce3; color:#047857; border-radius:999px; padding:3px 10px; font-size:12px; font-weight:600; }
+    .wa-chip.gray { background:#f3f4f6; color:#374151; }
+    .wa-hint { font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.5; }
+    .wa-vars { display:grid; grid-template-columns:44px 1fr 1fr; gap:6px 8px; align-items:center; margin-top:10px; font-size:12px; }
+    .wa-vars code { color:#128c7e; font-weight:700; }
+    .wa-bc-prev { background:#efeae2; display:flex; flex-direction:column; min-height:0; }
+    .wa-bc-prev-head { background:#fff; padding:10px 14px; font-size:12px; color:var(--muted); border-bottom:1px solid var(--border); }
+    .wa-bc-prev-body { flex:1; overflow-y:auto; padding:16px 14px; display:flex; flex-direction:column; }
+    .wa-bc-prev .wa-b { max-width:95%; }
+    .wa-bc-foot { padding:12px 14px; background:#fff; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:8px; }
+    .wa-bc-foot .btn { justify-content:center; padding:10px; }
+    .wa-cost { font-size:11.5px; color:var(--muted); text-align:center; line-height:1.5; }
+    .wa-hist-item { display:flex; gap:12px; padding:12px 18px; border-bottom:1px solid #f1f1f1; align-items:center; }
+    .wa-hist-item b { font-size:13px; }
+    .wa-hist-stats { display:flex; gap:12px; font-size:11.5px; color:var(--muted); margin-top:3px; flex-wrap:wrap; }
+    @media (max-width: 1000px) { .wa-bc { grid-template-columns:1fr; } .wa-bc-prev { display:none; } }
+    @media (max-width: 760px) {
+      #view-wa-blast { padding: 8px; }
+      .wa-shell { grid-template-columns:1fr; height:calc(100vh - 80px); }
+      .wa-shell.chat-open .wa-list { display:none; }
+      .wa-shell:not(.chat-open) .wa-chat { display:none; }
+      .wa-back { display:inline-flex !important; }
+      .wa-b { max-width:85%; }
+      .wa-msgs { padding:12px 10px; }
+      .wa-vars { grid-template-columns:44px 1fr; }
+    }
+</style>
 </head>
 <body class="min-h-screen">
   <div class="app-shell">
@@ -1703,8 +1811,8 @@
         </div>
         <div class="nav-item" data-view="wa-blast">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.97.57 3.81 1.55 5.36L2 22l4.74-1.53C8.27 21.36 10.08 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm5.45 14.5c-.23.64-1.18 1.21-1.7 1.28-.43.06-.97.09-1.57-.1-.36-.11-.83-.26-1.43-.51-2.51-1.09-4.15-3.62-4.28-3.79-.13-.17-1.02-1.36-1.02-2.6 0-1.23.65-1.84.88-2.09.23-.25.5-.31.67-.31.17 0 .33.01.48.01.15 0 .36-.06.56.43.2.49.7 1.69.76 1.81.06.12.1.27.02.43-.08.17-..12.27-.25.42-..12.15-..26.33-..37.12.13.25.27.11.53-.14.26-.62 1.02-1.33 1.65-.91.81-1.68 1.06-1.94 1.18-.25.12-.4.1-.55-.06-.15-.17-.65-.76-.82-1.02-.17-.26-.34-.22-.58-.13-.23.09-1.49.7-1.74.83-.26.13-.43.19-.49.3-.06.11-.06.65.17 1.28z"/></svg>
-          WhatsApp Blast
-          <span class="badge-pill badge-marketing" title="Marketing" style="margin-left:auto">M</span>
+          WhatsApp
+          <span class="nav-badge" id="nav-wa-count" style="margin-left:auto;background:#25d366;color:#fff;display:none">0</span>
         </div>
         <div class="nav-item" data-view="assets">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -3210,7 +3318,7 @@
     document.body.classList.toggle('workspace-mode', inWorkspace);
     document.querySelectorAll('.view-container').forEach(c => c.classList.toggle('active', c.id === `view-${view}`));
     document.querySelectorAll('[data-view]').forEach(n => n.classList.toggle('active', n.getAttribute('data-view') === view));
-    const titles = { profile:'Profile', dashboard:'Dashboard', contacts:'Contacts', board:'Companies', tasks:'Lead Tasks', activities:'Activity Log', 'board-calendar':'Calendar', 'email-blast':'Email', 'wa-blast':'WhatsApp Blast', audiences:'Audiences', inbox:'Email · Inbox' };
+    const titles = { profile:'Profile', dashboard:'Dashboard', contacts:'Contacts', board:'Companies', tasks:'Lead Tasks', activities:'Activity Log', 'board-calendar':'Calendar', 'email-blast':'Email', 'wa-blast':'WhatsApp', audiences:'Audiences', inbox:'Email · Inbox' };
     document.getElementById('topbar-title').textContent = titles[view] || view;
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebar-backdrop').classList.remove('open');
@@ -4618,6 +4726,7 @@
       // Tarik data dari Supabase + nyalain realtime
       await window.cloudStart();
       finishGmailOAuth();
+      try { waEnsureLoaded(); } catch (e) {}
     } catch (e) {
       console.warn('loadUserBrands error:', e.message);
       cloud.lastError = 'Gagal load brand — ' + e.message;
@@ -4634,6 +4743,7 @@
     document.title = 'Leads Dashboard — ' + b.name;
     renderProfileView();
     await window.cloudStart();
+    try { waEnsureLoaded(); } catch (e) {}
     toast('✓ Brand: ' + b.name);
   }
 
@@ -4642,6 +4752,7 @@
     window.currentBrand = null;
     window.userBrands = [];
     window.cloudStop();
+    try { if (waUI) { waResetForBrand(null); waBadge(); } } catch (e) {}
     // bersihin sisa cache lama (versi sebelumnya nyimpen data di localStorage)
     try { Object.keys(localStorage).filter(k => k.indexOf('leads-dashboard:') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {}
     state.drawerLeadId = null;
@@ -4802,7 +4913,8 @@
       + '<details style="margin-top:10px"' + ((!wa.embedded_signup_ready && !wa.connected_via_meta) || (wa.configured && !wa.connected_via_meta) ? ' open' : '') + '><summary style="font-size:12px;color:#6b7280;cursor:pointer">Cara manual: Phone Number ID + Access Token</summary>'
       +   '<label style="' + lbl + '">Phone Number ID</label><input id="ss-wa-id" inputmode="numeric" autocomplete="off" style="' + inp + '" placeholder="contoh: 109876543210987" value="' + escHtml(wa.wa_phone_number_id || '') + '"' + dis + ' />'
       +   '<label style="' + lbl + '">Access Token (permanen)</label><input id="ss-wa-token" type="password" autocomplete="new-password" style="' + inp + '" placeholder="' + (wa.has_token ? '•••••••• tersimpan (kosongkan jika tidak diubah)' : 'token dari System User di Meta') + '"' + dis + ' />'
-      +   '<div style="font-size:11px;color:#6b7280;margin-top:4px;line-height:1.5">Phone Number ID ada di Meta for Developers → app → WhatsApp → API Setup. Token permanen dibuat lewat System User di Business Settings.</div>'
+      +   '<label style="' + lbl + '">WhatsApp Business Account ID (WABA ID)</label><input id="ss-wa-waba" inputmode="numeric" autocomplete="off" style="' + inp + '" placeholder="untuk menarik daftar template otomatis" value="' + escHtml(wa.wa_waba_id || '') + '"' + dis + ' />'
+      +   '<div style="font-size:11px;color:#6b7280;margin-top:4px;line-height:1.5">Phone Number ID dan WABA ID ada di Meta for Developers → app → WhatsApp → Step 1. Try it out (di bawah nomor pengirim). Token permanen dibuat lewat System User di Business Settings.</div>'
       +   '<button class="btn btn-outline" id="ss-save-wa" style="font-size:12px;margin-top:10px"' + dis + '>Simpan &amp; tes manual</button>'
       + '</details>'
       + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
@@ -4860,7 +4972,7 @@
     bind('ss-save-wa', async function () {
       var b = this; busy(b, 'Menyimpan…');
       try {
-        var waObj = { wa_phone_number_id: v('ss-wa-id') };
+        var waObj = { wa_phone_number_id: v('ss-wa-id'), wa_waba_id: v('ss-wa-waba') };
         var tk = document.getElementById('ss-wa-token').value; if (tk) waObj.wa_token = tk;
         var saved = await brandApi('save', { wa: waObj });
         toast('Pengaturan WhatsApp disimpan');
@@ -6181,8 +6293,8 @@
       emailBlast.compose.loadedAudienceName = a.name;
       renderEmailBlastView();
     } else {
-      waBlast.compose.recipients = leadIds.map(id => ({ lead_id: id }));
-      waBlast.compose.loadedAudienceName = a.name;
+      waUI.view = 'broadcast'; waUI.bc.single = null; waUI.bc.audience = a.id; waUI.bc.mode = 'template';
+      waLoadTemplates();
       renderWaBlastView();
     }
     // Update last_used
@@ -7356,96 +7468,512 @@
   /* ====================================================
    * WHATSAPP BLAST VIEW
    * ==================================================== */
-  function renderWaBlastView() {
+  /* =================================================================
+   * WHATSAPP — gaya WhatsApp Web: inbox, balas, broadcast, riwayat
+   * Data: tabel wa_messages (diisi webhook untuk pesan masuk, dashboard untuk pesan keluar)
+   * ================================================================= */
+  var waUI = {
+    brandId: null, msgs: [], loaded: false, loading: false, error: '', channel: null,
+    selected: null, view: 'chat', query: '', filter: 'all', drafts: {}, sendingReply: false,
+    settings: null, settingsLoading: false, settingsError: '',
+    templates: null, tplLoading: false, tplError: '',
+    bc: { audience: '', single: null, mode: 'template', template: '', vars: {}, text: '' }, bcSending: false,
+    lastScrollKey: '',
+  };
+  var WA_COLORS = ['#25d366', '#6366f1', '#f59e0b', '#06b6d4', '#ec4899', '#8b5cf6', '#10b981'];
+  function waColor(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return WA_COLORS[h % WA_COLORS.length]; }
+  function waInitials(n) { return String(n || '?').replace(/^\+/, '').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?'; }
+  function waFmtPhone(p) { p = String(p || ''); return p.startsWith('62') && p.length > 9 ? '+62 ' + p.slice(2, 5) + '-' + p.slice(5, 9) + '-' + p.slice(9) : '+' + p; }
+  function waTime(iso, now) { const d = new Date(iso); if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); const y = new Date(now); y.setDate(y.getDate() - 1); if (d.toDateString() === y.toDateString()) return 'Kemarin'; return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }); }
+  function waDayLabel(iso, now) { const d = new Date(iso); if (d.toDateString() === now.toDateString()) return 'Hari ini'; const y = new Date(now); y.setDate(y.getDate() - 1); if (d.toDateString() === y.toDateString()) return 'Kemarin'; return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' }); }
+  function waTicks(m) { if (m.direction !== 'out') return ''; if (m.status === 'sending') return '<span>🕓</span>'; if (m.status === 'failed') return '<span class="wa-fail" title="' + escapeHTML(m.error || 'Gagal terkirim') + '">⚠ Gagal</span>'; if (m.status === 'read') return '<span style="color:#53bdeb">✓✓</span>'; if (m.status === 'delivered') return '<span>✓✓</span>'; return '<span>✓</span>'; }
+  function waLeadIdx() { const m = {}; appLeads().forEach(l => { const p = normWaPhone(l.phone); if (p && !m[p]) m[p] = l; }); return m; }
+
+  function waConversations(msgs, leadIdx, now) {
+    const by = {};
+    msgs.forEach(m => { (by[m.contact_phone] = by[m.contact_phone] || []).push(m); });
+    return Object.keys(by).map(phone => {
+      const list = by[phone].slice().sort((a, b) => new Date(a.sent_at) - new Date(b.sent_at));
+      const last = list[list.length - 1];
+      const lastIn = list.slice().reverse().find(x => x.direction === 'in');
+      const lead = leadIdx[phone] || null;
+      const name = (lead && lead.name) || (list.slice().reverse().find(x => x.contact_name) || {}).contact_name || waFmtPhone(phone);
+      const windowUntil = lastIn ? new Date(new Date(lastIn.sent_at).getTime() + 24 * 3600e3) : null;
+      return { phone, name, lead, msgs: list, last, unread: list.filter(x => x.direction === 'in' && !x.read_by_agent).length,
+        windowUntil, windowOpen: !!(windowUntil && windowUntil > now), needsReply: last.direction === 'in' };
+    }).sort((a, b) => new Date(b.last.sent_at) - new Date(a.last.sent_at));
+  }
+
+  /* ---------- data ---------- */
+  async function waToken() {
+    const sess = await window.sb.auth.getSession();
+    const t = sess && sess.data && sess.data.session && sess.data.session.access_token;
+    if (!t) throw new Error('Sesi login habis, login ulang dulu');
+    return t;
+  }
+  async function waPost(path, body) {
+    const resp = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (await waToken()) }, body: JSON.stringify(body) });
+    let data = null; try { data = await resp.json(); } catch (e) {}
+    if (!resp.ok || !data) {
+      let why = (data && data.error) || ('HTTP ' + resp.status);
+      if (resp.status === 404) why = 'Endpoint ' + path + ' tidak ditemukan — pastikan file api/ ikut ke-deploy';
+      throw new Error(why);
+    }
+    return data;
+  }
+  function waResetForBrand(id) {
+    if (waUI.channel && window.sb) { try { window.sb.removeChannel(waUI.channel); } catch (e) {} }
+    Object.assign(waUI, { brandId: id, msgs: [], loaded: false, error: '', channel: null, selected: null, view: 'chat', drafts: {},
+      settings: null, settingsError: '', templates: null, tplError: '', bc: { audience: '', single: null, mode: 'template', template: '', vars: {}, text: '' } });
+  }
+  async function waEnsureLoaded() {
+    const b = window.currentBrand;
+    if (!b || !window.sb) return;
+    if (waUI.brandId !== b.id) { waResetForBrand(b.id); waSubscribe(); }
+    if (!waUI.loaded && !waUI.loading) waLoad();
+    if (!waUI.settings && !waUI.settingsLoading) waLoadSettings();
+  }
+  async function waLoad() {
+    const id = waUI.brandId;
+    if (!id || !window.sb) return;
+    waUI.loading = true;
+    try {
+      const since = new Date(Date.now() - 90 * 86400e3).toISOString();
+      const r = await window.sb.from('wa_messages').select('*').eq('brand_id', id).gte('sent_at', since).order('sent_at', { ascending: true }).limit(5000);
+      if (r.error) throw r.error;
+      if (id !== waUI.brandId) return;
+      const pending = waUI.msgs.filter(m => m.status === 'sending');
+      waUI.msgs = (r.data || []).concat(pending.filter(p => !(r.data || []).some(x => x.id === p.id)));
+      waUI.loaded = true; waUI.error = '';
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      waUI.error = /wa_messages|relation|does not exist|schema cache/i.test(msg) ? 'Tabel wa_messages belum dibuat — jalankan supabase-wa-inbox.sql di Supabase SQL Editor.' : msg;
+    }
+    waUI.loading = false;
+    waBadge();
+    if (state.view === 'wa-blast') waRender();
+  }
+  function waSubscribe() {
+    if (!window.sb || !waUI.brandId) return;
+    const id = waUI.brandId; let t;
+    waUI.channel = window.sb.channel('wa-msgs-' + id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wa_messages', filter: 'brand_id=eq.' + id }, function () {
+        clearTimeout(t); t = setTimeout(waLoad, 300);
+      }).subscribe();
+  }
+  async function waLoadSettings() {
+    if (!window.currentBrand) return;
+    waUI.settingsLoading = true;
+    try { waUI.settings = await brandApi('get'); waUI.settingsError = ''; }
+    catch (e) { waUI.settingsError = e.message; }
+    waUI.settingsLoading = false;
+    if (state.view === 'wa-blast') waRender();
+  }
+  async function waLoadTemplates(force) {
+    if (waUI.tplLoading || (waUI.templates && !force)) return;
+    waUI.tplLoading = true; waUI.tplError = '';
+    if (state.view === 'wa-blast') waRender();
+    try {
+      const out = await waPost('/api/wa-templates', { brand_id: window.currentBrand.id });
+      waUI.templates = out.templates || [];
+      const firstOk = waUI.templates.find(t => t.supported);
+      if (!waUI.bc.template && firstOk) waUI.bc.template = firstOk.name;
+    } catch (e) { waUI.tplError = e.message; waUI.templates = null; }
+    waUI.tplLoading = false;
+    if (state.view === 'wa-blast') waRender();
+  }
+  function waBadge() {
+    const el = document.getElementById('nav-wa-count');
+    if (!el) return;
+    const n = waUI.msgs.filter(m => m.direction === 'in' && !m.read_by_agent).length;
+    el.textContent = n; el.style.display = n ? '' : 'none';
+  }
+  async function waLogOutgoing(rows) {
+    if (!rows.length) return;
+    rows.forEach(r => { if (!waUI.msgs.some(x => x.id === r.id)) waUI.msgs.push(r); });
+    try {
+      for (let i = 0; i < rows.length; i += 200) {
+        const res = await window.sb.from('wa_messages').upsert(rows.slice(i, i + 200), { onConflict: 'id', ignoreDuplicates: true });
+        if (res.error) throw res.error;
+      }
+    } catch (e) { console.warn('[wa] gagal simpan pesan keluar:', e.message || e); }
+  }
+
+  /* ---------- variabel template ---------- */
+  var WA_VAR_SRC = [['first', 'Nama depan lead'], ['name', 'Nama lengkap lead'], ['company', 'Institusi / perusahaan'], ['custom', 'Teks tetap…']];
+  function waTplVars(tpl) { const v = waUI.bc.vars[tpl.name] || (waUI.bc.vars[tpl.name] = {}); for (let n = 1; n <= tpl.params; n++) if (!v[n]) v[n] = { src: n === 1 ? 'first' : 'custom', txt: '' }; return v; }
+  function waParamsFor(tpl, lead, fallbackName) {
+    const v = waTplVars(tpl); const out = [];
+    for (let n = 1; n <= tpl.params; n++) {
+      const cfg = v[n]; let val = cfg.src === 'custom' ? cfg.txt : waVarValue(cfg.src, '', lead || { name: fallbackName || '' });
+      out.push(String(val || '').trim() || (cfg.src === 'first' || cfg.src === 'name' ? 'Kak' : '-'));
+    }
+    return out;
+  }
+  function waRenderTpl(tpl, params) { return String(tpl.body || '').replace(/\{\{(\d+)\}\}/g, (m, n) => params[n - 1] != null ? params[n - 1] : m); }
+  function waBtnLabels(tpl) { return (tpl.buttons || []).map(b => (b.type === 'URL' ? '🔗 ' : b.type === 'PHONE_NUMBER' ? '📞 ' : '💬 ') + b.text); }
+
+  /* ---------- render ---------- */
+  function waConvListHtml(convs, sel, now) {
+    if (!convs.length) return '<div class="wa-empty" style="padding:40px 10px">' + (waUI.loading ? 'Memuat chat…' : (waUI.query || waUI.filter !== 'all' ? 'Tidak ada percakapan di filter ini.' : 'Belum ada chat. Chat dari customer akan muncul di sini otomatis.')) + '</div>';
+    return convs.map(c => {
+      const lastTxt = (c.last.direction === 'out' ? '<span style="color:#667781">' + waTicks(c.last) + '</span> ' : '') + escapeHTML((c.last.body || '').replace(/\s+/g, ' '));
+      const tag = c.lead ? '<span class="wa-tag wa-tag-lead">Lead · ' + escapeHTML(c.lead.status || '') + '</span>' : '<span class="wa-tag wa-tag-new">Kontak baru</span>';
+      const late = !c.windowOpen ? '<span class="wa-tag wa-tag-late">Lewat 24 jam</span>' : '';
+      return '<div class="wa-item' + (sel && sel.phone === c.phone ? ' sel' : '') + '" data-wa-act="open" data-phone="' + escapeHTML(c.phone) + '">'
+        + '<div class="wa-av" style="background:' + waColor(c.phone) + '">' + escapeHTML(waInitials(c.name)) + '</div>'
+        + '<div class="wa-item-main"><div class="wa-row"><span class="wa-name">' + escapeHTML(c.name) + '</span><span class="wa-time' + (c.unread ? ' unread' : '') + '">' + waTime(c.last.sent_at, now) + '</span></div>'
+        + '<div class="wa-row"><span class="wa-snip">' + lastTxt + '</span>' + (c.unread ? '<span class="wa-badge">' + c.unread + '</span>' : '') + '</div>'
+        + tag + late + '</div></div>';
+    }).join('');
+  }
+  function waChatHtml(sel, now) {
+    if (!sel) return '<div class="wa-empty"><div style="font-size:44px">💬</div><div>Pilih percakapan di kiri untuk mulai membalas,<br>atau klik <b>📣</b> untuk broadcast ke banyak kontak.</div></div>';
+    let lastDay = '';
+    const bubbles = sel.msgs.map(m => {
+      const day = waDayLabel(m.sent_at, now); let sep = '';
+      if (day !== lastDay) { sep = '<div class="wa-day">' + escapeHTML(day) + '</div>'; lastDay = day; }
+      const t = new Date(m.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const md = m.media || {};
+      const isMedia = md.type && ['image', 'video', 'audio', 'document', 'sticker'].indexOf(md.type) >= 0;
+      const parts = String(m.body || '').split(' · ');
+      const media = isMedia ? '<div class="wa-media">' + escapeHTML(parts[0]) + '</div>' : '';
+      const body = isMedia ? parts.slice(1).join(' · ') : (m.body || '');
+      const tpl = m.msg_type === 'template' ? '<div class="wa-tpl-label">Template' + (md.template ? ' · ' + escapeHTML(md.template) : '') + '</div>' : '';
+      const btns = (md.buttons && md.buttons.length) ? '<div class="wa-btns">' + md.buttons.map(b => '<span>' + escapeHTML(b) + '</span>').join('') + '</div>' : '';
+      const btnReply = (m.msg_type === 'button' || m.msg_type === 'interactive') ? '<div style="font-size:10px;color:#128c7e;font-weight:600;margin-bottom:2px">↩ Klik tombol</div>' : '';
+      const err = m.status === 'failed' && m.error ? '<div style="font-size:11px;color:#b91c1c;margin-top:2px">' + escapeHTML(m.error) + '</div>' : '';
+      return sep + '<div class="wa-b ' + (m.direction === 'in' ? 'in' : 'out') + '">' + tpl + btnReply + media + escapeHTML(body) + err
+        + '<div class="wa-meta">' + t + ' ' + waTicks(m) + '</div>' + btns + '</div>';
+    }).join('');
+    const hrs = sel.windowUntil ? Math.max(0, Math.floor((sel.windowUntil - now) / 3600e3)) : 0;
+    const win = sel.windowOpen
+      ? '<div class="wa-window wa-win-open">🟢 Bisa balas bebas sampai <b>' + sel.windowUntil.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + '</b> (' + (hrs >= 1 ? 'sisa ±' + hrs + ' jam' : 'kurang dari 1 jam') + ')</div>'
+      : '<div class="wa-window wa-win-closed">🟡 ' + (sel.windowUntil ? 'Lewat 24 jam sejak customer terakhir chat.' : 'Customer belum pernah membalas.') + ' Untuk menyapa wajib pakai <b>template</b>.</div>';
+    const draft = waUI.drafts[sel.phone] || '';
+    const comp = sel.windowOpen
+      ? '<div class="wa-comp"><textarea rows="1" id="wa-reply" data-wa-act="draft" placeholder="Ketik balasan… (Enter kirim, Shift+Enter baris baru)">' + escapeHTML(draft) + '</textarea>'
+        + '<button class="wa-send" data-wa-act="send" title="Kirim"' + (draft.trim() && !waUI.sendingReply ? '' : ' disabled') + '><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div>'
+      : '<div class="wa-comp"><div class="wa-locked"><span>🔒 Kolom balas dikunci (aturan WhatsApp)</span><button class="btn wa-btn-green" data-wa-act="tpl-single">Kirim template</button></div></div>';
+    return '<div class="wa-chat-head">'
+      + '<button class="btn btn-outline wa-back" data-wa-act="back">←</button>'
+      + '<div class="wa-av" style="background:' + waColor(sel.phone) + '">' + escapeHTML(waInitials(sel.name)) + '</div>'
+      + '<div class="wa-chat-who"><b>' + escapeHTML(sel.name) + '</b><span>' + waFmtPhone(sel.phone) + (sel.lead && sel.lead.company ? ' · ' + escapeHTML(sel.lead.company) : '') + '</span></div>'
+      + (sel.lead ? '<button class="btn btn-outline" data-wa-act="open-lead" data-lead="' + escapeHTML(sel.lead.id) + '">Buka lead →</button>' : '<button class="btn btn-outline" data-wa-act="add-lead">+ Jadikan lead</button>')
+      + '</div>' + win + '<div class="wa-msgs" id="wa-msgs">' + bubbles + '</div>' + comp;
+  }
+  function waBcTargets(convs) {
+    const b = waUI.bc, leadIdx = waLeadIdx(), byPhone = {};
+    convs.forEach(c => { byPhone[c.phone] = c; });
+    let list = [], noPhone = 0, label = '';
+    if (b.single) {
+      const c = byPhone[b.single];
+      list = [{ phone: b.single, lead: (c && c.lead) || leadIdx[b.single] || null, name: c ? c.name : waFmtPhone(b.single) }];
+      label = list[0].name;
+    } else if (b.audience) {
+      const a = audiences.find(x => x.id === b.audience);
+      const seen = {};
+      ((a && a.lead_ids) || []).forEach(id => {
+        const l = appLeads().find(x => x.id === id); if (!l) return;
+        const p = normWaPhone(l.phone); if (!p) { noPhone++; return; }
+        if (seen[p]) return; seen[p] = 1; list.push({ phone: p, lead: l, name: l.name });
+      });
+      label = a ? a.name : '';
+    }
+    let outside = 0;
+    if (b.mode === 'text') { const keep = list.filter(t => byPhone[t.phone] && byPhone[t.phone].windowOpen); outside = list.length - keep.length; list = keep; }
+    return { list, noPhone, outside, label };
+  }
+  function waBroadcastHtml(convs) {
+    const b = waUI.bc;
+    const tpls = (waUI.templates || []);
+    const tpl = tpls.find(t => t.name === b.template) || null;
+    const tg = waBcTargets(convs);
+    const sample = tg.list[0] || null;
+    const sampleName = sample ? sample.name : 'Andi Pratama';
+    let prevBody = '', prevBtns = [];
+    if (b.mode === 'text') prevBody = b.text ? waFillTokens(b.text, sample ? sample.lead : { name: sampleName }) : 'Tulis pesan di kiri…';
+    else if (tpl) { prevBody = waRenderTpl(tpl, waParamsFor(tpl, sample ? sample.lead : null, sampleName)); prevBtns = waBtnLabels(tpl); }
+    else prevBody = waUI.tplLoading ? 'Memuat template…' : 'Pilih template';
+
+    let recip;
+    if (b.single) recip = '<div class="wa-chips"><span class="wa-chip">👤 ' + escapeHTML(tg.label) + ' · ' + waFmtPhone(b.single) + '</span></div><div class="wa-hint">Kirim template ke 1 kontak ini saja.</div>';
+    else recip = '<select class="wa-inp" data-wa-act="bc-audience"><option value="">— Pilih audience tersimpan —</option>'
+      + audiences.map(a => '<option value="' + escapeHTML(a.id) + '"' + (b.audience === a.id ? ' selected' : '') + '>' + escapeHTML(a.name) + ' (' + ((a.lead_ids || []).length) + ' kontak)</option>').join('') + '</select>'
+      + (b.audience ? '<div class="wa-chips"><span class="wa-chip">👥 ' + tg.list.length + ' nomor siap kirim</span>' + (tg.noPhone ? '<span class="wa-chip gray">' + tg.noPhone + ' tanpa nomor valid (dilewati)</span>' : '') + (tg.outside ? '<span class="wa-chip gray">' + tg.outside + ' di luar 24 jam (dilewati)</span>' : '') + '</div>'
+        : '<div class="wa-hint">Belum punya audience? Buat dulu di menu <b>Audiences</b> (pilih kontak yang mau dikirimi).</div>');
+
+    let msg;
+    if (b.mode === 'text') {
+      msg = '<textarea class="wa-inp" rows="5" data-wa-act="bc-text" id="wa-bc-text" placeholder="Halo {{first_name}}, …">' + escapeHTML(b.text || '') + '</textarea>'
+        + '<div class="wa-hint">Bisa pakai <code>{{first_name}}</code>, <code>{{name}}</code>, <code>{{company}}</code>. ⚠ Teks bebas hanya terkirim ke kontak yang chat ke kamu dalam 24 jam terakhir — kontak lain otomatis dilewati.</div>';
+    } else if (waUI.tplError) {
+      msg = '<div class="wa-alert wa-alert-err" style="margin:0">' + escapeHTML(waUI.tplError) + '</div><button class="btn btn-outline" data-wa-act="tpl-reload" style="margin-top:8px;font-size:12px">Coba lagi</button>';
+    } else if (!waUI.templates) {
+      msg = '<div class="wa-hint">Memuat template dari Meta…</div>';
+    } else if (!tpls.length) {
+      msg = '<div class="wa-alert wa-alert-warn" style="margin:0">Belum ada template berstatus <b>Approved</b>. Buat di WhatsApp Manager → Message templates, lalu klik muat ulang.</div><button class="btn btn-outline" data-wa-act="tpl-reload" style="margin-top:8px;font-size:12px">Muat ulang</button>';
+    } else {
+      msg = '<select class="wa-inp" data-wa-act="bc-template">' + tpls.map(t => '<option value="' + escapeHTML(t.name) + '"' + (tpl && tpl.name === t.name ? ' selected' : '') + (t.supported ? '' : ' disabled') + '>' + escapeHTML(t.name) + ' · ' + escapeHTML(t.language) + ' · ' + escapeHTML((t.category || '').toLowerCase()) + (t.supported ? '' : ' (belum didukung)') + '</option>').join('') + '</select>'
+        + (tpl && tpl.params ? '<div class="wa-vars">' + (function () {
+            const v = waTplVars(tpl); let h = '';
+            for (let n = 1; n <= tpl.params; n++) {
+              h += '<code>{{' + n + '}}</code><select class="wa-inp" data-wa-act="bc-var-src" data-n="' + n + '">' + WA_VAR_SRC.map(o => '<option value="' + o[0] + '"' + (v[n].src === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>'
+                + (v[n].src === 'custom' ? '<input class="wa-inp" id="wa-var-' + n + '" data-wa-act="bc-var-txt" data-n="' + n + '" placeholder="isi teks" value="' + escapeHTML(v[n].txt || '') + '">' : '<span></span>');
+            }
+            return h;
+          })() + '</div>' : '')
+        + '<div class="wa-hint">Daftar diambil dari Meta (hanya yang <b>Approved</b>). <a href="#" data-wa-act="tpl-reload" style="color:#128c7e">Muat ulang</a></div>';
+    }
+    const canSend = !waUI.bcSending && tg.list.length > 0 && (b.mode === 'text' ? !!(b.text || '').trim() : !!(tpl && tpl.supported));
+    return '<div class="wa-chat-head"><button class="btn btn-outline wa-back" data-wa-act="back">←</button>'
+      + '<div class="wa-av" style="background:#128c7e">📣</div><div class="wa-chat-who"><b>' + (b.single ? 'Kirim template' : 'Broadcast baru') + '</b><span>' + (b.single ? 'ke ' + escapeHTML(tg.label) : 'Kirim ke banyak kontak sekaligus') + '</span></div>'
+      + '<button class="btn btn-outline" data-wa-act="close-panel">Tutup</button></div>'
+      + '<div class="wa-bc"><div class="wa-bc-form">'
+      + '<div class="wa-bc-step"><h4><span class="n">1</span>Penerima</h4>' + recip + '</div>'
+      + '<div class="wa-bc-step"><h4><span class="n">2</span>Pesan</h4>'
+      + (b.single ? '' : '<div class="wa-seg"><button class="' + (b.mode !== 'text' ? 'on' : '') + '" data-wa-act="bc-mode" data-mode="template">Template</button><button class="' + (b.mode === 'text' ? 'on' : '') + '" data-wa-act="bc-mode" data-mode="text">Teks bebas</button></div>')
+      + msg + '</div></div>'
+      + '<div class="wa-bc-prev"><div class="wa-bc-prev-head">Pratinjau di HP penerima (' + escapeHTML(sampleName) + ')</div>'
+      + '<div class="wa-bc-prev-body"><div class="wa-day">Hari ini</div><div class="wa-b out">'
+      + (b.mode !== 'text' && tpl ? '<div class="wa-tpl-label">Template · ' + escapeHTML(tpl.name) + '</div>' + (tpl.header ? '<b>' + escapeHTML(tpl.header) + '</b>\n' : '') : '')
+      + escapeHTML(prevBody) + (b.mode !== 'text' && tpl && tpl.footer ? '<div style="font-size:11.5px;color:#667781;margin-top:4px">' + escapeHTML(tpl.footer) + '</div>' : '')
+      + '<div class="wa-meta">' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' ✓✓</div>'
+      + (prevBtns.length ? '<div class="wa-btns">' + prevBtns.map(x => '<span>' + escapeHTML(x) + '</span>').join('') + '</div>' : '')
+      + '</div></div>'
+      + '<div class="wa-bc-foot"><div class="wa-cost">' + (tg.list.length ? 'Akan dikirim ke <b>' + tg.list.length + '</b> nomor' + (b.mode !== 'text' && tpl ? ' · template <b>' + escapeHTML((tpl.category || '').toLowerCase()) + '</b> dikenai biaya Meta per pesan' : '') : 'Pilih penerima dulu') + '</div>'
+      + '<button class="btn wa-btn-green" data-wa-act="bc-send"' + (canSend ? '' : ' disabled style="opacity:.5;cursor:not-allowed"') + '>' + (waUI.bcSending ? 'Mengirim…' : (b.single ? '📨 Kirim template' : '📣 Kirim broadcast')) + '</button></div>'
+      + '</div></div>';
+  }
+  function waHistoryHtml() {
+    const hist = (waBlast.history || []).slice().sort((a, b) => new Date(b.sent_at || b.created_at || 0) - new Date(a.sent_at || a.created_at || 0));
+    const rows = hist.map(h => {
+      const ms = waUI.msgs.filter(m => m.blast_id === h.id);
+      const sent = ms.length || (h.recipients || []).length;
+      const delivered = ms.filter(m => m.status === 'delivered' || m.status === 'read').length;
+      const read = ms.filter(m => m.status === 'read').length;
+      const failed = ms.filter(m => m.status === 'failed').length;
+      const t0 = new Date(h.sent_at || h.created_at || 0).getTime();
+      const phones = {}; ms.forEach(m => { phones[m.contact_phone] = 1; });
+      const replied = Object.keys(phones).filter(p => waUI.msgs.some(m => m.direction === 'in' && m.contact_phone === p && new Date(m.sent_at).getTime() > t0 && new Date(m.sent_at).getTime() < t0 + 72 * 3600e3)).length;
+      const title = h.audience_name || (h.message || '').slice(0, 60) || 'Broadcast';
+      return '<div class="wa-hist-item"><div class="wa-av" style="background:#e7fce3;color:#128c7e;width:38px;height:38px">📣</div>'
+        + '<div style="flex:1;min-width:0"><b>' + escapeHTML(title) + '</b><div class="wa-snip">' + escapeHTML((h.message || '').replace(/\s+/g, ' ').slice(0, 120)) + '</div>'
+        + '<div class="wa-hist-stats"><span>👥 ' + sent + ' terkirim</span>' + (ms.length ? '<span>✓✓ ' + delivered + ' sampai</span><span style="color:#027eb5">👁 ' + read + ' dibaca</span><span style="color:#128c7e">↩ ' + replied + ' membalas</span>' + (failed ? '<span style="color:#dc2626">⚠ ' + failed + ' gagal</span>' : '') : '') + '</div></div>'
+        + '<span class="wa-time">' + escapeHTML(formatDate(h.sent_at || h.created_at)) + '</span></div>';
+    }).join('');
+    return '<div class="wa-chat-head"><button class="btn btn-outline wa-back" data-wa-act="back">←</button>'
+      + '<div class="wa-av" style="background:#54656f">🕘</div><div class="wa-chat-who"><b>Riwayat broadcast</b><span>' + hist.length + ' broadcast</span></div>'
+      + '<button class="btn wa-btn-green" data-wa-act="broadcast">📣 Broadcast baru</button></div>'
+      + '<div style="flex:1;overflow-y:auto;background:#fff">' + (rows || '<div class="wa-empty" style="padding:40px">Belum ada broadcast.</div>') + '</div>';
+  }
+  function waPageHtml() {
+    const now = new Date();
+    const convsAll = waConversations(waUI.msgs, waLeadIdx(), now);
+    const q = (waUI.query || '').toLowerCase();
+    let convs = convsAll;
+    if (waUI.filter === 'unread') convs = convs.filter(c => c.unread > 0);
+    if (waUI.filter === 'reply') convs = convs.filter(c => c.needsReply);
+    if (q) convs = convs.filter(c => (c.name + ' ' + c.phone + ' ' + (c.last.body || '')).toLowerCase().includes(q));
+    const sel = waUI.view === 'chat' ? (convsAll.find(c => c.phone === waUI.selected) || null) : null;
+    const totalUnread = convsAll.reduce((n, c) => n + c.unread, 0);
+    const pill = (k, l) => '<button class="wa-pill' + (waUI.filter === k ? ' active' : '') + '" data-wa-act="filter" data-filter="' + k + '">' + l + '</button>';
+    const s = waUI.settings && waUI.settings.wa;
+    let alert = '';
+    if (waUI.error) alert = '<div class="wa-alert wa-alert-err">' + escapeHTML(waUI.error) + '</div>';
+    else if (waUI.settings && !(s && s.configured)) alert = '<div class="wa-alert wa-alert-warn">WhatsApp brand ini belum dihubungkan. Buka <a href="#" data-wa-act="go-profile" style="color:#92400e;font-weight:600">Profile → WhatsApp</a>.</div>';
+    const acct = s && s.display_phone ? s.display_phone : (s && s.wa_phone_number_id ? 'Phone ID ' + s.wa_phone_number_id : (window.currentBrand ? window.currentBrand.name : ''));
+    let right = waChatHtml(sel, now);
+    if (waUI.view === 'broadcast') right = waBroadcastHtml(convsAll);
+    if (waUI.view === 'history') right = waHistoryHtml();
+    const open = !!sel || waUI.view !== 'chat';
+    return '<div class="wa-shell' + (open ? ' chat-open' : '') + '">'
+      + '<div class="wa-list">'
+      + '<div class="wa-topbar"><div class="wa-me"><div class="wa-av" style="background:#128c7e;width:38px;height:38px;font-size:13px">' + escapeHTML(waInitials(window.currentBrand ? window.currentBrand.name : 'W')) + '</div>'
+      + '<div style="min-width:0"><b>' + escapeHTML(window.currentBrand ? window.currentBrand.name : 'WhatsApp') + '</b><span>' + escapeHTML(acct) + '</span></div></div>'
+      + '<div class="wa-icons">'
+      + '<button class="wa-ic' + (waUI.view === 'broadcast' && !waUI.bc.single ? ' on' : '') + '" data-wa-act="broadcast" data-tip="Broadcast baru">📣</button>'
+      + '<button class="wa-ic' + (waUI.view === 'history' ? ' on' : '') + '" data-wa-act="history" data-tip="Riwayat broadcast">🕘</button>'
+      + '<button class="wa-ic" data-wa-act="refresh" data-tip="Muat ulang">⟳</button>'
+      + '</div></div>' + alert
+      + '<div class="wa-list-top"><input class="wa-search" id="wa-search" data-wa-act="search" placeholder="🔍 Cari nama, nomor, atau isi chat" value="' + escapeHTML(waUI.query || '') + '">'
+      + '<div class="wa-pills">' + pill('all', 'Semua') + pill('unread', 'Belum dibaca' + (totalUnread ? ' (' + totalUnread + ')' : '')) + pill('reply', 'Perlu dibalas') + '</div></div>'
+      + '<div class="wa-items">' + waConvListHtml(convs, sel, now) + '</div></div>'
+      + '<div class="wa-chat">' + right + '</div></div>';
+  }
+  function waRender() {
     const host = document.getElementById('wa-blast-host');
     if (!host) return;
-    const compose = waBlast.compose;
-    const contacts = state.leads.filter(l => l.type === 'person');
-    const sample = contacts.find(c => compose.recipients.some(r => r.lead_id === c.id)) || contacts[0];
+    const a = document.activeElement;
+    const keepId = a && host.contains(a) && a.id ? a.id : null;
+    const selStart = keepId && a.selectionStart != null ? a.selectionStart : null;
+    const box0 = document.getElementById('wa-msgs');
+    const wasBottom = !box0 || (box0.scrollHeight - box0.scrollTop - box0.clientHeight < 60);
+    host.innerHTML = waPageHtml();
+    if (keepId) { const el = document.getElementById(keepId); if (el) { el.focus(); if (selStart != null && el.setSelectionRange) el.setSelectionRange(selStart, selStart); } }
+    const box = document.getElementById('wa-msgs');
+    if (box) {
+      const sel = waConversations(waUI.msgs, {}, new Date()).find(c => c.phone === waUI.selected);
+      const key = waUI.selected + ':' + (sel ? sel.msgs.length : 0);
+      if (key !== waUI.lastScrollKey || wasBottom) box.scrollTop = box.scrollHeight;
+      waUI.lastScrollKey = key;
+    }
+    const ta = document.getElementById('wa-reply');
+    if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; }
+    waBadge();
+  }
 
-    host.innerHTML = `
-      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-        <div>
-          <h2 class="text-lg font-semibold flex items-center gap-2">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.97.57 3.81 1.55 5.36L2 22l4.74-1.53C8.27 21.36 10.08 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm5.45 14.5c-.23.64-1.18 1.21-1.7 1.28-.43.06-.97.09-1.57-.1-.36-.11-.83-.26-1.43-.51-2.51-1.09-4.15-3.62-4.28-3.79-.13-.17-1.02-1.36-1.02-2.6 0-1.23.65-1.84.88-2.09.23-.25.5-.31.67-.31.17 0 .33.01.48.01.15 0 .36-.06.56.43.2.49.7 1.69.76 1.81.06.12.1.27.02.43-.08.17-.12.27-.25.42-.12.15-.26.33-.37.45-.12.13-.25.27-.11.53.14.26.62 1.02 1.33 1.65.91.81 1.68 1.06 1.94 1.18.25.12.4.1.55-.06.15-.17.65-.76.82-1.02.17-.26.34-.22.58-.13.23.09 1.49.7 1.74.83.26.13.43.19.49.3.06.11.06.65-.17 1.28z"/></svg>
-            WhatsApp Blast
-            <span class="badge-pill badge-marketing">M</span>
-            <span class="text-sm font-normal text-gray-500">— untuk Marketing (produk)</span>
-          </h2>
-          <p class="text-sm text-gray-500">Kirim WA ke banyak contacts. Message personal, no subject.</p>
-        </div>
-        <div class="blast-tabs">
-          <button class="blast-tab ${waBlast.activeTab==='compose'?'active':''}" data-blast-tab="compose" data-channel="wa">Compose</button>
-          <button class="blast-tab ${waBlast.activeTab==='drafts'?'active':''}" data-blast-tab="drafts" data-channel="wa">Drafts (${waBlast.drafts.length})</button>
-          <button class="blast-tab ${waBlast.activeTab==='history'?'active':''}" data-blast-tab="history" data-channel="wa">History (${waBlast.history.length})</button>
-        </div>
-      </div>
-      ${waBlast.activeTab === 'compose' ? `
-        <div>
-          ${renderBlastComposerShell('wa')}
+  /* ---------- aksi ---------- */
+  async function waMarkRead(phone) {
+    const unread = waUI.msgs.filter(m => m.contact_phone === phone && m.direction === 'in' && !m.read_by_agent);
+    if (!unread.length) return;
+    unread.forEach(m => { m.read_by_agent = true; });
+    waBadge();
+    try { await window.sb.from('wa_messages').update({ read_by_agent: true }).in('id', unread.map(m => m.id)); } catch (e) {}
+  }
+  async function waSendReply() {
+    const phone = waUI.selected; const text = (waUI.drafts[phone] || '').trim();
+    if (!phone || !text || waUI.sendingReply) return;
+    const conv = waConversations(waUI.msgs, waLeadIdx(), new Date()).find(c => c.phone === phone);
+    const tmpId = 'tmp-' + Date.now();
+    const row = { id: tmpId, brand_id: waUI.brandId, direction: 'out', contact_phone: phone, contact_name: conv ? conv.name : null, msg_type: 'text', body: text, status: 'sending', read_by_agent: true, sent_at: new Date().toISOString() };
+    waUI.msgs.push(row); waUI.drafts[phone] = ''; waUI.sendingReply = true; waRender();
+    try {
+      const out = await waPost('/api/send-wa', { brand_id: waUI.brandId, mode: 'text', text: text, recipients: [{ lead_id: conv && conv.lead ? conv.lead.id : '', phone: phone, text: text }] });
+      const r = (out.results || [])[0] || {};
+      waUI.msgs = waUI.msgs.filter(m => m.id !== tmpId);
+      if (r.ok && r.wa_message_id) {
+        await waLogOutgoing([Object.assign({}, row, { id: r.wa_message_id, status: 'sent' })]);
+        if (conv && conv.lead) { try { appPrependActivities([{ id: generateActivityId(), lead_id: conv.lead.id, type: 'whatsapp', title: 'Balas WA: ' + text.slice(0, 60), notes: text, created_at: new Date().toISOString() }]); } catch (e) {} }
+      } else {
+        waUI.msgs.push(Object.assign({}, row, { id: 'fail-' + Date.now(), status: 'failed', error: r.error || 'Gagal terkirim' }));
+        waUI.drafts[phone] = text;
+      }
+    } catch (e) {
+      waUI.msgs = waUI.msgs.filter(m => m.id !== tmpId);
+      waUI.msgs.push(Object.assign({}, row, { id: 'fail-' + Date.now(), status: 'failed', error: e.message }));
+      waUI.drafts[phone] = text;
+    }
+    waUI.sendingReply = false; waRender();
+  }
+  async function waSendBroadcast() {
+    const b = waUI.bc;
+    if (waUI.bcSending) return;
+    const convs = waConversations(waUI.msgs, waLeadIdx(), new Date());
+    const tg = waBcTargets(convs);
+    const tpl = (waUI.templates || []).find(t => t.name === b.template) || null;
+    if (!tg.list.length) { toast('Tidak ada penerima dengan nomor valid'); return; }
+    if (b.mode === 'text' && !(b.text || '').trim()) { toast('Isi pesan masih kosong'); return; }
+    if (b.mode !== 'text' && !(tpl && tpl.supported)) { toast('Pilih template dulu'); return; }
+    const what = b.mode === 'text' ? 'teks bebas' : 'template "' + tpl.name + '"';
+    if (!confirm('Kirim ' + what + ' ke ' + tg.list.length + ' nomor?' + (tg.noPhone ? '\n\n' + tg.noPhone + ' kontak dilewati karena nomor tidak valid.' : '') + (tg.outside ? '\n' + tg.outside + ' kontak dilewati karena di luar 24 jam.' : '') + '\n\nPesan WhatsApp tidak bisa ditarik kembali.')) return;
+    waUI.bcSending = true; waRender();
+    const blastId = b.single ? null : uid('WB');
+    const sentAt = new Date().toISOString();
+    const rows = [], failed = [], okLeads = [];
+    for (let i = 0; i < tg.list.length; i += 50) {
+      const batch = tg.list.slice(i, i + 50);
+      const bodyByPhone = {};
+      const payload = { brand_id: waUI.brandId, mode: b.mode === 'text' ? 'text' : 'template', recipients: batch.map(t => {
+        const o = { lead_id: t.lead ? t.lead.id : '', phone: t.phone };
+        if (b.mode === 'text') { o.text = waFillTokens(b.text, t.lead || { name: t.name }); bodyByPhone[t.phone] = o.text; }
+        else { o.params = waParamsFor(tpl, t.lead, t.name); bodyByPhone[t.phone] = waRenderTpl(tpl, o.params); }
+        return o;
+      }) };
+      if (b.mode === 'text') payload.text = b.text; else payload.template = { name: tpl.name, language: tpl.language };
+      try {
+        const out = await waPost('/api/send-wa', payload);
+        (out.results || []).forEach(r => {
+          const t = batch.find(x => x.phone === r.phone) || batch.find(x => x.lead && x.lead.id === r.lead_id) || {};
+          if (r.ok && r.wa_message_id) {
+            rows.push({ id: r.wa_message_id, brand_id: waUI.brandId, direction: 'out', contact_phone: r.phone, contact_name: t.name || null,
+              msg_type: b.mode === 'text' ? 'text' : 'template', body: bodyByPhone[r.phone] || '', media: b.mode === 'text' ? null : { template: tpl.name, buttons: waBtnLabels(tpl) },
+              status: 'sent', read_by_agent: true, blast_id: blastId, sent_at: sentAt });
+            if (t.lead) okLeads.push(t.lead.id);
+          } else failed.push((t.name || r.phone) + ' — ' + (r.error || 'gagal'));
+        });
+      } catch (e) { batch.forEach(t => failed.push((t.name || t.phone) + ' — ' + e.message)); }
+    }
+    await waLogOutgoing(rows);
+    if (rows.length) {
+      const summary = b.mode === 'text' ? b.text : '[Template: ' + tpl.name + ']';
+      if (blastId) {
+        waBlast.history = [{ id: blastId, channel: 'wa', subject: null, body: null, message: summary, recipients: okLeads.map(id => ({ lead_id: id })),
+          audience_id: b.audience || null, audience_name: tg.label || null, status: 'sent', sent_at: sentAt, created_at: sentAt }].concat(waBlast.history || []);
+        saveBlast(STORAGE_KEY_BLAST_WA, waBlast);
+      }
+      try { appPrependActivities(okLeads.map(id => ({ id: generateActivityId(), lead_id: id, type: 'whatsapp', title: (blastId ? 'WA Broadcast: ' : 'WA Template: ') + summary.slice(0, 60), notes: summary, created_at: sentAt }))); } catch (e) {}
+    }
+    waUI.bcSending = false;
+    if (failed.length) alert((rows.length ? 'Terkirim ke ' + rows.length + ' nomor, tapi ' : '') + failed.length + ' gagal:\n\n' + failed.slice(0, 8).join('\n') + (failed.length > 8 ? '\n…dan ' + (failed.length - 8) + ' lainnya' : ''));
+    else toast('📣 Terkirim ke ' + rows.length + ' nomor');
+    if (rows.length) {
+      if (b.single) { waUI.view = 'chat'; waUI.selected = b.single; waUI.bc.single = null; }
+      else waUI.view = 'history';
+    }
+    waRender();
+  }
+  function waAddLead() {
+    const phone = waUI.selected; if (!phone) return;
+    const conv = waConversations(waUI.msgs, {}, new Date()).find(c => c.phone === phone);
+    const name = prompt('Nama lead untuk ' + waFmtPhone(phone) + ':', (conv && conv.name && !/^\+/.test(conv.name)) ? conv.name : '');
+    if (name === null) return;
+    const lead = { id: generateId(), type: 'person', name: name.trim() || waFmtPhone(phone), company: '', email: '', phone: '+' + phone, status: 'Followed Up (WhatsApp)', sales_value: 0, notes: 'Dari chat WhatsApp', tags: [], last_contacted_at: new Date().toISOString() };
+    state.leads = [lead].concat(state.leads); saveLeads(state.leads);
+    toast('✓ ' + lead.name + ' jadi lead'); waRender(); renderSidebarCounts();
+  }
 
-          <div class="hub-card">
-            <div class="sec-head">
-              <svg class="sec-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11h-6"/><path d="m17 8 4 3-4 3"/></svg>
-              <span class="sec-title">Recipients</span>
-              <span class="sec-meta">— pilih dari saved audience</span>
-            </div>
-            <select data-blast-action="load-audience" data-channel="wa" class="input" style="font-size:13px;padding:6px 10px">
-              <option value="">— Load saved audience —</option>
-              ${audiences.filter(a => a.type === 'person').map(a => '<option value="' + a.id + '">[' + (a.type === 'company' ? 'B' : 'M') + '] ' + escapeHTML(a.name) + ' (' + (a.lead_ids || []).length + ')</option>').join('')}
-            </select>
-          </div>
+  document.addEventListener('click', function (e) {
+    const el = e.target.closest && e.target.closest('[data-wa-act]');
+    if (!el || !document.getElementById('wa-blast-host').contains(el)) return;
+    const a = el.getAttribute('data-wa-act');
+    if (['open', 'filter', 'back', 'close-panel', 'broadcast', 'history', 'refresh', 'send', 'tpl-single', 'tpl-reload', 'open-lead', 'add-lead', 'bc-mode', 'bc-send', 'go-profile'].indexOf(a) >= 0) e.preventDefault();
+    if (a === 'open') { waUI.view = 'chat'; waUI.selected = el.getAttribute('data-phone'); waMarkRead(waUI.selected); waRender(); }
+    else if (a === 'filter') { waUI.filter = el.getAttribute('data-filter'); waRender(); }
+    else if (a === 'back') { if (waUI.view !== 'chat') waUI.view = 'chat'; else waUI.selected = null; waUI.bc.single = null; waRender(); }
+    else if (a === 'close-panel') { waUI.view = 'chat'; waUI.bc.single = null; waRender(); }
+    else if (a === 'broadcast') { waUI.view = 'broadcast'; waUI.bc.single = null; waLoadTemplates(); waRender(); }
+    else if (a === 'history') { waUI.view = 'history'; waRender(); }
+    else if (a === 'refresh') { waLoad(); waLoadSettings(); toast('Memuat ulang chat…'); }
+    else if (a === 'send') waSendReply();
+    else if (a === 'tpl-single') { waUI.bc.single = waUI.selected; waUI.bc.mode = 'template'; waUI.view = 'broadcast'; waLoadTemplates(); waRender(); }
+    else if (a === 'tpl-reload') waLoadTemplates(true);
+    else if (a === 'open-lead') openDrawer(el.getAttribute('data-lead'));
+    else if (a === 'add-lead') waAddLead();
+    else if (a === 'bc-mode') { waUI.bc.mode = el.getAttribute('data-mode'); if (waUI.bc.mode === 'template') waLoadTemplates(); waRender(); }
+    else if (a === 'bc-send') waSendBroadcast();
+    else if (a === 'go-profile') setView('profile');
+  });
+  document.addEventListener('change', function (e) {
+    const el = e.target.closest && e.target.closest('[data-wa-act]');
+    if (!el) return;
+    const a = el.getAttribute('data-wa-act');
+    if (a === 'bc-audience') { waUI.bc.audience = el.value; waRender(); }
+    else if (a === 'bc-template') { waUI.bc.template = el.value; waRender(); }
+    else if (a === 'bc-var-src') { const tpl = (waUI.templates || []).find(t => t.name === waUI.bc.template); if (tpl) { waTplVars(tpl)[el.getAttribute('data-n')].src = el.value; waRender(); } }
+  });
+  document.addEventListener('input', function (e) {
+    const el = e.target.closest && e.target.closest('[data-wa-act]');
+    if (!el) return;
+    const a = el.getAttribute('data-wa-act');
+    if (a === 'search') { waUI.query = el.value; waRender(); }
+    else if (a === 'draft') {
+      waUI.drafts[waUI.selected] = el.value;
+      const btn = document.querySelector('[data-wa-act="send"]'); if (btn) btn.disabled = !el.value.trim() || waUI.sendingReply;
+      el.style.height = 'auto'; el.style.height = Math.min(120, el.scrollHeight) + 'px';
+    }
+    else if (a === 'bc-text') { waUI.bc.text = el.value; waRender(); }
+    else if (a === 'bc-var-txt') { const tpl = (waUI.templates || []).find(t => t.name === waUI.bc.template); if (tpl) { waTplVars(tpl)[el.getAttribute('data-n')].txt = el.value; } clearTimeout(waUI._vt); waUI._vt = setTimeout(waRender, 250); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.target && e.target.id === 'wa-reply' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); waSendReply(); }
+  });
 
-          ${renderWaCfgCard()}
-
-          <div class="hub-card">
-            <div class="sec-head">
-              <svg class="sec-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-              <span class="sec-title">Message</span>
-              <span class="sec-meta">— isi pesan WA</span>
-            </div>
-            <textarea data-blast-input="message" class="input" rows="8" placeholder="Halo 👋 Lagi ada promo spesial bulan ini...">${escapeHTML(compose.message)}</textarea>
-            <div style="margin-top:14px;display:flex;gap:8px;align-items:center">
-              <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">When</span>
-              <button type="button" class="filter-pill ${compose.sendMode==='now'?'active':''}" data-blast-action="send-mode" data-mode="now">Send Now</button>
-              <button type="button" class="filter-pill ${compose.sendMode==='scheduled'?'active':''}" data-blast-action="send-mode" data-mode="scheduled">Schedule</button>
-              ${compose.sendMode === 'scheduled' ? `
-                <input type="date" data-blast-action="schedule-date" class="input" value="${compose.scheduled_at ? compose.scheduled_at.slice(0,10) : ''}" style="max-width:160px;font-size:12px;padding:4px 8px" />
-                <input type="time" data-blast-action="schedule-time" class="input" value="${compose.scheduled_at ? compose.scheduled_at.slice(11,16) : '09:00'}" style="max-width:110px;font-size:12px;padding:4px 8px" />
-              ` : ''}
-            </div>
-          </div>
-
-          <div class="hub-card">
-            <div class="sec-head">
-              <svg class="sec-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-              <span class="sec-title">Media</span>
-              <span class="sec-meta">— file yang dikirim sebagai attachment</span>
-            </div>
-            <div class="flex flex-wrap gap-2 items-center">
-              ${(compose.media || []).map((m, i) => '<span class="chip">🖼️ ' + escapeHTML(m.name) + ' <span class="chip-remove" data-blast-action="remove-att" data-idx="' + i + '" data-channel="wa" style="cursor:pointer;margin-left:2px">×</span></span>').join('')}
-              <button data-blast-action="add-att" data-channel="wa" class="text-xs text-indigo-600 hover:underline" style="margin-left:4px">+ Add media</button>
-            </div>
-          </div>
-
-          <div class="card composer-section">
-            <div class="sec-head">
-              <svg class="sec-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <span class="sec-title">Preview</span>
-              <span class="sec-meta">— sample recipient</span>
-            </div>
-            ${renderBlastPreview(waBlast, sample, 'wa')}
-            <div class="flex flex-wrap justify-end gap-2 mt-4 pt-3" style="border-top:1px solid var(--border)">
-              <button class="btn btn-outline" data-blast-action="clear" data-channel="wa">Clear</button>
-              <button class="btn btn-outline" data-blast-action="save-draft" data-channel="wa">Save Draft</button>
-              <button class="btn btn-primary" data-blast-action="send" data-channel="wa">${compose.sendMode === 'scheduled' ? '⏰ Schedule WA Blast' : '📱 Send WA Blast'}</button>
-            </div>
-          </div>
-        </div>
-      ` : waBlast.activeTab === 'drafts' ? renderBlastDrafts(waBlast, 'wa') : renderBlastHistory(waBlast, 'wa')}
-    `;
-    wireBlastEvents('wa');
-    setupBlockInteractions();
+  function renderWaBlastView() {
+    const host = document.getElementById('wa-blast-host');
+    if (!host || !waUI) return;
+    waEnsureLoaded();
+    waRender();
   }
 
   /* ====================================================
