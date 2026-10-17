@@ -1695,6 +1695,24 @@
     .wa-cta { display:flex; gap:8px; margin-top:10px; }
     .wa-cta .btn { flex:1; justify-content:center; font-size:12.5px; padding:8px 10px; }
     .wa-nc { flex:1; display:flex; flex-direction:column; min-height:0; background:#fff; }
+    .wa-ic .wa-ic-dot { position:absolute; top:4px; right:4px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#f59e0b; color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+    .wa-tpl-row { display:flex; gap:12px; padding:12px 18px; border-bottom:1px solid #f1f1f1; align-items:flex-start; }
+    .wa-tpl-row b { font-size:13px; }
+    .wa-st { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+    .wa-st-APPROVED { background:#dcfce7; color:#166534; }
+    .wa-st-PENDING, .wa-st-IN_APPEAL { background:#fef3c7; color:#92400e; }
+    .wa-st-REJECTED, .wa-st-DISABLED { background:#fee2e2; color:#991b1b; }
+    .wa-st-PAUSED, .wa-st-other { background:#f3f4f6; color:#374151; }
+    .wa-tpl-meta { font-size:11px; color:var(--muted); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .wa-tpl-reject { margin-top:6px; font-size:11.5px; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:6px 8px; }
+    .wa-tpl-acts { display:flex; gap:6px; flex:none; align-items:center; }
+    .wa-tpl-acts .btn { padding:4px 10px; font-size:11.5px; }
+    .wa-tf-lbl { font-size:12px; font-weight:600; margin:12px 0 5px; display:flex; justify-content:space-between; align-items:center; }
+    .wa-tf-lbl small { font-weight:400; color:var(--muted); }
+    .wa-tf-btn { display:grid; grid-template-columns:150px 1fr 1fr 32px; gap:6px; margin-bottom:6px; align-items:center; }
+    .wa-tf-btn .x { border:0; background:transparent; color:#dc2626; cursor:pointer; font-size:16px; }
+    textarea.wa-inp { resize:vertical; min-height:110px; line-height:1.5; }
+    @media (max-width: 760px) { .wa-tf-btn { grid-template-columns:1fr 1fr; } .wa-tpl-row { flex-wrap:wrap; } }
     .wa-nc-top { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:10px; }
     .wa-nc-list { flex:1; overflow-y:auto; }
     .wa-back { display:none !important; }
@@ -1734,6 +1752,58 @@
       .wa-b { max-width:85%; }
       .wa-msgs { padding:12px 10px; }
       .wa-vars { grid-template-columns:44px 1fr; }
+    }
+
+    /* =================================================================
+     * MOBILE (HP) — rapikan topbar, composer email, kalender, audiences
+     * ================================================================= */
+    @media (max-width: 768px) {
+      .topbar { height: 56px; padding: 0 10px 0 6px; gap: 8px; }
+      .topbar > div:first-child { min-width: 0; flex: 1; gap: 4px !important; }
+      .topbar-title { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+      .topbar-actions { gap: 6px; flex-shrink: 0; }
+      .topbar-actions .btn { font-size: 0; gap: 0; width: 40px; height: 40px; padding: 0; justify-content: center; border-radius: 10px; }
+      .topbar-actions .btn svg { width: 18px; height: 18px; }
+      .sidebar-mobile-toggle { width: 40px; height: 40px; justify-content: center; }
+      .sidebar-mobile-toggle { padding: 0 !important; }
+      .sidebar-mobile-toggle svg { width: 24px; height: 24px; min-width: 24px; flex-shrink: 0; color: var(--fg); }
+      .wa-chat-head { padding: 8px 10px; gap: 8px; }
+      .wa-chat-who b { font-size: 14px; }
+      .wa-chat-who span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; }
+      .wa-chat-head .btn:not(.wa-back) { padding: 6px 9px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+      .wa-chat-head .wa-av { width: 34px; height: 34px; }
+      .wa-tpl-acts { width: 100%; justify-content: flex-end; }
+      .view-container { padding: 14px 12px; }
+
+      /* Email composer: modul di atas, kanvas email di bawah (full lebar) */
+      .composer-shell { flex-direction: column; min-height: 0; }
+      .palette-col { width: auto; max-height: none; border-right: 0; border-bottom: 1px solid var(--border); }
+      .palette-grid { grid-template-columns: repeat(4, 1fr); }
+      .canvas-col { max-height: none; padding: 0 8px 16px; overflow: visible; }
+      .canvas-col .canvas-toolbar { position: static; }
+      .canvas-col .email-card { width: 100% !important; max-width: 100% !important; }
+
+      /* Kalender: grid full lebar, ringkasan di bawah */
+      .cal-wrapper { flex-direction: column; padding: 4px 0 12px; }
+      .cal-sidebar { width: auto; flex-direction: row; flex-wrap: wrap; padding: 10px; }
+      .cal-sidebar > div:first-child { width: 100%; }
+      .cal-side-stat { flex: 1; min-width: 140px; }
+      .cal-head { padding: 6px 0; font-size: 9.5px; text-align: center; }
+      .cal-cell { min-height: 58px; padding: 2px; }
+      .cal-day-num { font-size: 10px; padding: 1px 4px; }
+      .cal-task-chip { font-size: 9px; padding: 1px 3px; border-left-width: 2px; }
+
+      /* Audiences: tiap audience jadi kartu bertumpuk */
+      #audiences-list .blast-history-row { grid-template-columns: 1fr !important; gap: 10px; padding: 14px; }
+      #audiences-list .blast-history-row > div:nth-child(2) { align-items: flex-start !important; flex-direction: row !important; flex-wrap: wrap; gap: 6px 10px; }
+      #audiences-list .blast-history-row > div:nth-child(2) > div { margin-top: 0 !important; }
+      #audiences-list .blast-history-row > div:nth-child(3) { justify-content: flex-start !important; flex-wrap: wrap; gap: 6px !important; }
+      #audiences-list .blast-history-row > div:nth-child(3) .btn { padding: 7px 12px !important; font-size: 12px !important; }
+
+      /* Modal & panel: hampir full layar, mudah discroll */
+      .modal-backdrop { padding: 10px !important; align-items: flex-end !important; }
+      .modal { max-height: 92vh; border-radius: 14px; }
+      .toast { left: 12px; right: 12px; bottom: 14px; text-align: center; }
     }
 </style>
 </head>
@@ -3312,13 +3382,21 @@
   /* ================================================================
    * Sidebar nav + view switching
    * ================================================================ */
-  function setView(view) {
+  function setView(view, opts) {
+    // Tombol "kembali" browser/HP: setiap pindah menu dicatat ke riwayat browser
+    if (!(opts && opts.fromPop)) {
+      try {
+        const cur = history.state && history.state.view;
+        if (!history.state) history.replaceState({ view: view }, '');
+        else if (cur !== view || history.state.overlay) history.pushState({ view: view }, '');
+      } catch (e) {}
+    }
     state.view = view;
     // Workspace mode = full-screen workspace (hides CRM topbar)
     // Both board and contacts use the same pipeline board UI but keep
     // the CRM topbar so they stay consistent with other CRM views.
     // Only board-calendar still uses full workspace mode.
-    const wsViews = ['board-calendar'];
+    const wsViews = []; // semua menu memakai topbar (ada tombol menu ☰ di HP)
     const inWorkspace = wsViews.includes(view);
     document.body.classList.toggle('workspace-mode', inWorkspace);
     document.querySelectorAll('.view-container').forEach(c => c.classList.toggle('active', c.id === `view-${view}`));
@@ -3340,6 +3418,42 @@
     if (view === 'assets')        { renderAssetsView(); }
     if (view === 'profile')       { renderProfileView(); }
   }
+  /* ---------- Navigasi "kembali" (tombol back HP / browser) ----------
+   * - Modal, sub-modal, dan panel detail lead: back = tutup panel itu dulu
+   * - Halaman WhatsApp di HP (chat/broadcast terbuka): back = kembali ke daftar chat
+   * - Selain itu: back = menu sebelumnya */
+  var navIgnorePop = false;
+  function navOverlayClosedByUi() {
+    if (history.state && history.state.overlay) { navIgnorePop = true; history.back(); }
+  }
+  ['modal-host', 'submodal-host', 'drawer-host'].forEach(function (id) {
+    const el = document.getElementById(id); if (!el) return;
+    let open = false;
+    new MutationObserver(function () {
+      const now = el.children.length > 0;
+      if (now && !open) { try { history.pushState({ view: state.view, overlay: id }, ''); } catch (e) {} }
+      if (!now && open && history.state && history.state.overlay === id) navOverlayClosedByUi();
+      open = now;
+    }).observe(el, { childList: true });
+  });
+  window.addEventListener('popstate', function (e) {
+    if (navIgnorePop) { navIgnorePop = false; return; }
+    const sub = document.getElementById('submodal-host');
+    const mod = document.getElementById('modal-host');
+    const drw = document.getElementById('drawer-host');
+    if (sub && sub.children.length) { sub.innerHTML = ''; return; }
+    if (mod && mod.children.length) { closeModal(); return; }
+    if (drw && drw.children.length) { closeDrawer(); return; }
+    const sb = document.getElementById('sidebar');
+    if (sb && sb.classList.contains('open')) { sb.classList.remove('open'); document.getElementById('sidebar-backdrop').classList.remove('open'); return; }
+    if (state.view === 'wa-blast' && waUI && waUI._navOpen) {
+      waUI.view = 'chat'; waUI.selected = null; waUI.bc.single = null; waUI._navOpen = false; waRender(); return;
+    }
+    const v = e.state && e.state.view;
+    if (v && v !== state.view) setView(v, { fromPop: true });
+  });
+  try { if (!history.state) history.replaceState({ view: state.view || 'dashboard' }, ''); } catch (e) {}
+
   function syncWsTabs() {
     document.querySelectorAll('[data-ws-tab]').forEach(x => x.classList.toggle('active', x.getAttribute('data-ws-tab') === wsState.wsView));
   }
@@ -7516,6 +7630,7 @@
     templates: null, tplLoading: false, tplError: '',
     bc: { audience: '', single: null, mode: 'template', template: '', vars: {}, text: '' }, bcSending: false,
     lastScrollKey: '', ncQuery: '', ncNum: '',
+    tm: { list: null, loading: false, error: '', saving: false, seen: {}, timer: null, at: 0 }, tf: null,
   };
   var WA_COLORS = ['#25d366', '#6366f1', '#f59e0b', '#06b6d4', '#ec4899', '#8b5cf6', '#10b981'];
   function waColor(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return WA_COLORS[h % WA_COLORS.length]; }
@@ -7561,7 +7676,7 @@
   function waResetForBrand(id) {
     if (waUI.channel && window.sb) { try { window.sb.removeChannel(waUI.channel); } catch (e) {} }
     Object.assign(waUI, { brandId: id, msgs: [], loaded: false, error: '', channel: null, selected: null, view: 'chat', drafts: {},
-      settings: null, settingsError: '', templates: null, tplError: '', bc: { audience: '', single: null, mode: 'template', template: '', vars: {}, text: '' } });
+      settings: null, settingsError: '', templates: null, tplError: '', tf: null, tm: (clearTimeout(waUI.tm && waUI.tm.timer), { list: null, loading: false, error: '', saving: false, seen: {}, timer: null, at: 0 }), bc: { audience: '', single: null, mode: 'template', template: '', vars: {}, text: '' } });
   }
   async function waEnsureLoaded() {
     const b = window.currentBrand;
@@ -7571,6 +7686,7 @@
     // Muat ulang setting kalau belum ada, belum terhubung, atau sudah > 30 detik (mis. baru dihubungkan di Profile)
     const stale = !waUI.settings || !(waUI.settings.wa && waUI.settings.wa.configured) || (Date.now() - (waUI.settingsAt || 0) > 30000);
     if (stale && !waUI.settingsLoading) waLoadSettings();
+    if (!waUI.tm.list && !waUI.tm.loading && !waUI.tm.error && waUI.settings && waUI.settings.wa && waUI.settings.wa.configured) waLoadTm(true);
   }
   async function waLoad() {
     const id = waUI.brandId;
@@ -7603,7 +7719,7 @@
   async function waLoadSettings() {
     if (!window.currentBrand) return;
     waUI.settingsLoading = true;
-    try { waUI.settings = await brandApi('get'); waUI.settingsError = ''; waUI.settingsAt = Date.now(); }
+    try { waUI.settings = await brandApi('get'); waUI.settingsError = ''; waUI.settingsAt = Date.now(); if (waUI.settings && waUI.settings.wa && waUI.settings.wa.configured && !waUI.tm.list && !waUI.tm.loading) waLoadTm(true); }
     catch (e) { waUI.settingsError = e.message; }
     waUI.settingsLoading = false;
     if (state.view === 'wa-blast') waRender();
@@ -7758,7 +7874,7 @@
     } else if (!waUI.templates) {
       msg = '<div class="wa-hint">Memuat template dari Meta…</div>';
     } else if (!tpls.length) {
-      msg = '<div class="wa-alert wa-alert-warn" style="margin:0">Belum ada template berstatus <b>Approved</b>. Buat di WhatsApp Manager → Message templates, lalu klik muat ulang.</div><button class="btn btn-outline" data-wa-act="tpl-reload" style="margin-top:8px;font-size:12px">Muat ulang</button>';
+      msg = '<div class="wa-alert wa-alert-warn" style="margin:0">Belum ada template berstatus <b>Approved</b>' + (waTplPending() ? ' (' + waTplPending() + ' masih direview Meta)' : '') + '.</div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn wa-btn-green" data-wa-act="tm-new" style="font-size:12px">+ Buat template</button><button class="btn btn-outline" data-wa-act="templates" style="font-size:12px">📋 Lihat status template</button><button class="btn btn-outline" data-wa-act="tpl-reload" style="font-size:12px">Muat ulang</button></div>';
     } else {
       msg = '<select class="wa-inp" data-wa-act="bc-template">' + tpls.map(t => '<option value="' + escapeHTML(t.name) + '"' + (tpl && tpl.name === t.name ? ' selected' : '') + (t.supported ? '' : ' disabled') + '>' + escapeHTML(t.name) + ' · ' + escapeHTML(t.language) + ' · ' + escapeHTML((t.category || '').toLowerCase()) + (t.supported ? '' : ' (belum didukung)') + '</option>').join('') + '</select>'
         + (tpl && tpl.params ? '<div class="wa-vars">' + (function () {
@@ -7769,7 +7885,7 @@
             }
             return h;
           })() + '</div>' : '')
-        + '<div class="wa-hint">Daftar diambil dari Meta (hanya yang <b>Approved</b>). <a href="#" data-wa-act="tpl-reload" style="color:#128c7e">Muat ulang</a></div>';
+        + '<div class="wa-hint">Daftar diambil dari Meta (hanya yang <b>Approved</b>). <a href="#" data-wa-act="tpl-reload" style="color:#128c7e">Muat ulang</a> · <a href="#" data-wa-act="templates" style="color:#128c7e">Kelola / buat template</a></div>';
     }
     const canSend = !waUI.bcSending && tg.list.length > 0 && (b.mode === 'text' ? !!(b.text || '').trim() : !!(tpl && tpl.supported));
     return '<div class="wa-chat-head"><button class="btn btn-outline wa-back" data-wa-act="back">←</button>'
@@ -7837,6 +7953,160 @@
       + '<div class="wa-hint" style="margin-top:0">Kalau kontak belum chat ke kamu dalam 24 jam, pesan pertama <b>wajib template</b> (aturan WhatsApp). Setelah dia membalas, kamu bisa chat bebas.' + (noPhone ? ' · ' + noPhone + ' lead tanpa nomor WA tidak ditampilkan.' : '') + '</div>'
       + '</div><div class="wa-nc-list">' + (rows || '<div class="wa-empty" style="padding:40px">Tidak ada lead dengan nomor WA' + (q ? ' yang cocok' : '') + '.</div>') + '</div></div>';
   }
+  /* ---------- Template manager (buat / pantau status / hapus) ---------- */
+  function waTfNew() {
+    return { name: '', category: 'MARKETING', language: 'id', header: '', body: '', footer: (window.currentBrand ? window.currentBrand.name : '').slice(0, 60), examples: [], buttons: [] };
+  }
+  function waTfVarCount(body) { const n = (String(body || '').match(/\{\{(\d+)\}\}/g) || []).map(x => parseInt(x.replace(/\D/g, ''), 10)); return n.length ? Math.max.apply(null, n) : 0; }
+  function waTplPending() { return (waUI.tm.list || []).filter(t => t.status === 'PENDING' || t.status === 'IN_APPEAL').length; }
+  async function waLoadTm(silent) {
+    if (waUI.tm.loading || !window.currentBrand) return;
+    waUI.tm.loading = true; if (!silent) waUI.tm.error = '';
+    if (!silent && state.view === 'wa-blast') waRender();
+    try {
+      const out = await waPost('/api/wa-templates', { brand_id: window.currentBrand.id, action: 'all' });
+      const list = out.templates || [];
+      const seen = waUI.tm.seen, first = !waUI.tm.list;
+      let changed = false;
+      list.forEach(t => {
+        const k = t.name + '|' + t.language, prev = seen[k];
+        if (!first && prev && prev !== t.status) {
+          changed = true;
+          if (t.status === 'APPROVED') toast('✅ Template "' + t.name + '" sudah Approved — siap dipakai broadcast');
+          else if (t.status === 'REJECTED') toast('❌ Template "' + t.name + '" ditolak Meta' + (t.rejected_label ? ': ' + t.rejected_label : ''));
+          else toast('Template "' + t.name + '": ' + t.status_label);
+        }
+        seen[k] = t.status;
+      });
+      if (changed) { if (waUI.view === 'broadcast') setTimeout(function () { waLoadTemplates(true); }, 0); else waUI.templates = null; } // daftar broadcast ikut diperbarui
+      waUI.tm.list = list; waUI.tm.error = ''; waUI.tm.at = Date.now();
+    } catch (e) { if (!silent) waUI.tm.error = e.message; }
+    waUI.tm.loading = false;
+    waTmSchedule();
+    if (state.view === 'wa-blast') waRender();
+  }
+  // Selama ada template "Sedang direview", cek status ke Meta tiap 30 detik (hanya saat halaman WhatsApp terbuka)
+  function waTmSchedule() {
+    clearTimeout(waUI.tm.timer);
+    if (!waTplPending()) return;
+    waUI.tm.timer = setTimeout(function () {
+      if (state.view === 'wa-blast' && !document.hidden) waLoadTm(true); else waTmSchedule();
+    }, 30000);
+  }
+  function waTfPreviewHtml(tf) {
+    let body = escapeHTML(tf.body || 'Tulis isi pesan di kiri…');
+    body = body.replace(/\{\{(\d+)\}\}/g, (m, n) => { const v = tf.examples[n - 1]; return v ? '<b style="background:#fff3c4">' + escapeHTML(v) + '</b>' : '<b style="color:#128c7e">' + m + '</b>'; });
+    body = body.replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/_([^_\n]+)_/g, '<i>$1</i>');
+    const btns = tf.buttons.filter(b => (b.text || '').trim());
+    return '<div class="wa-day">Hari ini</div><div class="wa-b in" style="max-width:95%">'
+      + (tf.header ? '<div style="font-weight:700;margin-bottom:3px">' + escapeHTML(tf.header) + '</div>' : '')
+      + '<div>' + body + '</div>'
+      + (tf.footer ? '<div style="font-size:11.5px;color:#8696a0;margin-top:4px">' + escapeHTML(tf.footer) + '</div>' : '')
+      + '<div class="wa-meta">' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + '</div>'
+      + (btns.length ? '<div class="wa-btns">' + btns.map(b => '<span>' + (b.type === 'URL' ? '🔗 ' : b.type === 'PHONE_NUMBER' ? '📞 ' : '↩ ') + escapeHTML(b.text) + '</span>').join('') + '</div>' : '')
+      + '</div>';
+  }
+  function waTemplatesHtml() {
+    const tm = waUI.tm;
+    const list = (tm.list || []).slice().sort((a, b) => {
+      const rank = s => s === 'PENDING' ? 0 : s === 'REJECTED' ? 1 : s === 'APPROVED' ? 2 : 3;
+      return rank(a.status) - rank(b.status) || a.name.localeCompare(b.name);
+    });
+    const rows = list.map(t => {
+      const stCls = ['APPROVED', 'PENDING', 'IN_APPEAL', 'REJECTED', 'DISABLED', 'PAUSED'].indexOf(t.status) >= 0 ? t.status : 'other';
+      const icon = t.status === 'APPROVED' ? '✓' : t.status === 'PENDING' ? '⏳' : t.status === 'REJECTED' ? '✕' : '•';
+      const cat = t.category === 'MARKETING' ? 'Marketing' : t.category === 'UTILITY' ? 'Utility' : t.category === 'AUTHENTICATION' ? 'Authentication' : t.category;
+      const acts = [];
+      if (t.status === 'APPROVED' && t.supported) acts.push('<button class="btn wa-btn-green" data-wa-act="tm-use" data-name="' + escapeHTML(t.name) + '">📣 Pakai</button>');
+      if (t.status === 'REJECTED') acts.push('<button class="btn btn-outline" data-wa-act="tm-copy" data-name="' + escapeHTML(t.name) + '" data-lang="' + escapeHTML(t.language) + '">✏️ Perbaiki</button>');
+      else if (!t.sample) acts.push('<button class="btn btn-outline" data-wa-act="tm-copy" data-name="' + escapeHTML(t.name) + '" data-lang="' + escapeHTML(t.language) + '" title="Buat template baru dari isi ini">⧉ Duplikat</button>');
+      if (!t.sample) acts.push('<button class="btn btn-ghost" style="color:var(--danger)" data-wa-act="tm-del" data-name="' + escapeHTML(t.name) + '">Hapus</button>');
+      return '<div class="wa-tpl-row"><div style="flex:1;min-width:0">'
+        + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>' + escapeHTML(t.name) + '</b><span class="wa-st wa-st-' + stCls + '">' + icon + ' ' + escapeHTML(t.status_label) + '</span></div>'
+        + '<div class="wa-tpl-meta"><span>' + escapeHTML(cat || '') + '</span><span>· ' + escapeHTML(t.language) + '</span>' + (t.params ? '<span>· ' + t.params + ' variabel</span>' : '') + (t.buttons.length ? '<span>· ' + t.buttons.length + ' tombol</span>' : '') + (t.quality && t.quality !== 'UNKNOWN' ? '<span>· kualitas ' + escapeHTML(t.quality) + '</span>' : '') + (t.sample ? '<span>· contoh Meta (tidak bisa dipakai di nomor asli)</span>' : '') + '</div>'
+        + '<div class="wa-snip" style="white-space:normal;max-height:38px;overflow:hidden;margin-top:4px">' + escapeHTML((t.header ? t.header + ' — ' : '') + t.body) + '</div>'
+        + (t.status === 'REJECTED' ? '<div class="wa-tpl-reject">❌ Ditolak: ' + escapeHTML(t.rejected_label || 'Meta tidak memberi alasan spesifik') + '. Klik <b>Perbaiki</b> untuk bikin versi baru (nama harus beda).</div>' : '')
+        + (t.status === 'APPROVED' && !t.supported && !t.sample ? '<div class="wa-hint">⚠ ' + escapeHTML(t.reason) + '</div>' : '')
+        + '</div><div class="wa-tpl-acts">' + acts.join('') + '</div></div>';
+    }).join('');
+    const pend = waTplPending();
+    const info = tm.error ? '<div class="wa-alert wa-alert-err" style="margin:12px 18px">' + escapeHTML(tm.error) + '</div>'
+      : pend ? '<div class="wa-alert wa-alert-warn" style="margin:12px 18px">⏳ ' + pend + ' template sedang direview Meta (biasanya menit–jam, maks 24 jam). Status dicek otomatis tiap 30 detik — kamu dapat notifikasi di sini saat Approved / Ditolak.</div>' : '';
+    return '<div class="wa-chat-head"><button class="btn btn-outline wa-back" data-wa-act="back">←</button>'
+      + '<div class="wa-av" style="background:#128c7e">📋</div><div class="wa-chat-who"><b>Template pesan</b><span>' + (tm.list ? list.length + ' template · status langsung dari Meta' + (tm.at ? ' · dicek ' + new Date(tm.at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '') : (tm.loading ? 'Memuat…' : '')) + '</span></div>'
+      + '<button class="btn btn-outline" data-wa-act="tm-refresh">' + (tm.loading ? 'Memuat…' : '⟳ Cek status') + '</button>'
+      + '<button class="btn wa-btn-green" data-wa-act="tm-new">+ Buat template</button></div>'
+      + '<div style="flex:1;overflow-y:auto;background:#fff">' + info
+      + (rows || (tm.loading ? '<div class="wa-empty" style="padding:40px">Memuat template dari Meta…</div>' : (tm.error ? '' : '<div class="wa-empty" style="padding:40px"><div style="font-size:40px">📋</div>Belum ada template. Klik <b>+ Buat template</b>.</div>')))
+      + '</div>';
+  }
+  function waTfHtml() {
+    const tf = waUI.tf || (waUI.tf = waTfNew());
+    const nv = waTfVarCount(tf.body);
+    const inp = (f, ph, max) => '<input class="wa-inp" id="wa-tf-' + f + '" data-wa-act="tf" data-f="' + f + '" placeholder="' + escapeHTML(ph) + '" value="' + escapeHTML(tf[f] || '') + '"' + (max ? ' maxlength="' + max + '"' : '') + '>';
+    let ex = '';
+    for (let i = 1; i <= nv; i++) ex += '<div class="wa-vars" style="grid-template-columns:44px 1fr;margin-top:6px"><code>{{' + i + '}}</code><input class="wa-inp" id="wa-tf-ex' + i + '" data-wa-act="tf-ex" data-n="' + i + '" placeholder="Contoh isi, mis. ' + (i === 1 ? 'Andi' : 'Gipsy AI PRO') + '" value="' + escapeHTML(tf.examples[i - 1] || '') + '"></div>';
+    const btns = tf.buttons.map((b, i) => '<div class="wa-tf-btn">'
+      + '<select class="wa-inp" data-wa-act="tf-btn" data-i="' + i + '" data-k="type"><option value="QUICK_REPLY"' + (b.type === 'QUICK_REPLY' ? ' selected' : '') + '>↩ Balas cepat</option><option value="URL"' + (b.type === 'URL' ? ' selected' : '') + '>🔗 Buka link</option><option value="PHONE_NUMBER"' + (b.type === 'PHONE_NUMBER' ? ' selected' : '') + '>📞 Telepon</option></select>'
+      + '<input class="wa-inp" id="wa-tf-b' + i + 't" data-wa-act="tf-btn" data-i="' + i + '" data-k="text" maxlength="25" placeholder="Teks tombol" value="' + escapeHTML(b.text || '') + '">'
+      + (b.type === 'URL' ? '<input class="wa-inp" id="wa-tf-b' + i + 'u" data-wa-act="tf-btn" data-i="' + i + '" data-k="url" placeholder="https://…" value="' + escapeHTML(b.url || '') + '">'
+        : b.type === 'PHONE_NUMBER' ? '<input class="wa-inp" id="wa-tf-b' + i + 'p" data-wa-act="tf-btn" data-i="' + i + '" data-k="phone" placeholder="0812xxxx" value="' + escapeHTML(b.phone || '') + '">' : '<span></span>')
+      + '<button class="x" data-wa-act="tf-btn-del" data-i="' + i + '" title="Hapus tombol">✕</button></div>').join('');
+    const seg = (k, v, l) => '<button class="' + (tf[k] === v ? 'on' : '') + '" data-wa-act="tf-set" data-k="' + k + '" data-v="' + v + '">' + l + '</button>';
+    return '<div class="wa-chat-head"><button class="btn btn-outline wa-back" data-wa-act="tm-back">←</button>'
+      + '<div class="wa-av" style="background:#128c7e">✏️</div><div class="wa-chat-who"><b>Buat template baru</b><span>Dikirim ke Meta untuk direview, statusnya muncul di daftar Template</span></div>'
+      + '<button class="btn btn-outline" data-wa-act="tm-back">Batal</button></div>'
+      + '<div class="wa-bc"><div class="wa-bc-form">'
+      + '<div class="wa-tf-lbl">Nama template <small>huruf kecil, angka, _</small></div>' + inp('name', 'mis. promo_gipsy_ai', 100)
+      + '<div class="wa-tf-lbl">Kategori</div><div class="wa-seg">' + seg('category', 'MARKETING', '📣 Marketing') + seg('category', 'UTILITY', '🧾 Utility') + '</div>'
+      + '<div class="wa-hint" style="margin-top:0">' + (tf.category === 'MARKETING' ? 'Promo, penawaran, follow-up checkout, info produk. Pilih ini kalau ragu — template promo yang diajukan sebagai Utility biasanya ditolak/diubah Meta.' : 'Hanya untuk info transaksi/akun yang sudah ada (konfirmasi order, pengingat pembayaran, status). Tidak boleh ada unsur promosi.') + '</div>'
+      + '<div class="wa-tf-lbl">Bahasa</div><select class="wa-inp" data-wa-act="tf" data-f="language"><option value="id"' + (tf.language === 'id' ? ' selected' : '') + '>Indonesia (id)</option><option value="en_US"' + (tf.language === 'en_US' ? ' selected' : '') + '>English US (en_US)</option><option value="en"' + (tf.language === 'en' ? ' selected' : '') + '>English (en)</option></select>'
+      + '<div class="wa-tf-lbl">Header <small>opsional · maks 60</small></div>' + inp('header', 'mis. Gipsy AI PRO', 60)
+      + '<div class="wa-tf-lbl">Isi pesan <span><button class="btn btn-outline" style="padding:2px 8px;font-size:11px" data-wa-act="tf-var">+ Variabel {{' + (nv + 1) + '}}</button></span></div>'
+      + '<textarea class="wa-inp" id="wa-tf-body" data-wa-act="tf" data-f="body" maxlength="1024" placeholder="Halo {{1}} 👋&#10;&#10;Kami lihat kamu sempat checkout Gipsy AI PRO tapi belum selesai. Ada yang bisa kami bantu?">' + escapeHTML(tf.body) + '</textarea>'
+      + '<div class="wa-hint"><span id="wa-tf-cnt">' + (tf.body || '').length + '</span>/1024 · *tebal* _miring_ · {{1}} = nama depan lead saat broadcast. Jangan awali/akhiri pesan dengan variabel.</div>'
+      + (nv ? '<div class="wa-tf-lbl">Contoh isi variabel <small>wajib, untuk review Meta</small></div>' + ex : '')
+      + '<div class="wa-tf-lbl">Footer <small>opsional · maks 60</small></div>' + inp('footer', 'mis. Gipsy Research', 60)
+      + '<div class="wa-tf-lbl">Tombol <small>opsional · maks 10 (link maks 2)</small></div>' + btns
+      + (tf.buttons.length < 10 ? '<button class="btn btn-outline" style="font-size:12px" data-wa-act="tf-btn-add">+ Tambah tombol</button>' : '')
+      + '<div style="height:20px"></div></div>'
+      + '<div class="wa-bc-prev"><div class="wa-bc-prev-head">Pratinjau di HP penerima</div><div class="wa-bc-prev-body" id="wa-tf-prev">' + waTfPreviewHtml(tf) + '</div>'
+      + '<div class="wa-bc-foot"><button class="btn wa-btn-green" data-wa-act="tf-submit"' + (waUI.tm.saving ? ' disabled' : '') + '>' + (waUI.tm.saving ? 'Mengirim ke Meta…' : '📤 Kirim untuk review') + '</button>'
+      + '<div class="wa-cost">Review Meta biasanya beberapa menit–jam (maks 24 jam). Statusnya otomatis diperbarui di daftar Template.</div></div></div></div>';
+  }
+  async function waTfSubmit() {
+    const tf = waUI.tf; if (!tf || waUI.tm.saving) return;
+    tf.name = String(tf.name || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    if (!/^[a-z0-9_]+$/.test(tf.name)) { toast('Nama template: huruf kecil, angka, dan _ saja'); return; }
+    if (!String(tf.body || '').trim()) { toast('Isi pesan masih kosong'); return; }
+    const nv = waTfVarCount(tf.body);
+    for (let i = 0; i < nv; i++) if (!String(tf.examples[i] || '').trim()) { toast('Isi contoh untuk {{' + (i + 1) + '}}'); return; }
+    if ((waUI.tm.list || []).some(t => t.name === tf.name && t.language === tf.language)) { toast('Nama "' + tf.name + '" sudah dipakai — ganti nama lain'); return; }
+    waUI.tm.saving = true; waRender();
+    try {
+      const out = await waPost('/api/wa-templates', { brand_id: window.currentBrand.id, action: 'create', template: Object.assign({}, tf, { examples: tf.examples.slice(0, nv) }) });
+      toast('📤 Template "' + out.name + '" dikirim ke Meta — status: ' + (out.status === 'APPROVED' ? 'Approved' : 'sedang direview'));
+      if (out.category && out.category !== tf.category) toast('ℹ Meta mengubah kategori jadi ' + out.category);
+      waUI.tf = null; waUI.view = 'templates';
+      waUI.tm.saving = false;
+      await waLoadTm();
+      return;
+    } catch (e) { alert('Gagal membuat template:\n\n' + e.message); }
+    waUI.tm.saving = false; waRender();
+  }
+  async function waTmDelete(name) {
+    if (!confirm('Hapus template "' + name + '" dari Meta?\n\nTemplate yang dihapus tidak bisa dipakai lagi, dan nama yang sama baru bisa dipakai ulang setelah 30 hari.')) return;
+    try { await waPost('/api/wa-templates', { brand_id: window.currentBrand.id, action: 'delete', name: name }); toast('Template "' + name + '" dihapus'); waUI.templates = null; }
+    catch (e) { alert('Gagal menghapus:\n\n' + e.message); }
+    waLoadTm();
+  }
+  function waTmCopy(name, lang) {
+    const t = (waUI.tm.list || []).find(x => x.name === name && x.language === lang); if (!t) return;
+    const nv = waTfVarCount(t.body);
+    waUI.tf = { name: name + '_v2', category: t.category === 'UTILITY' ? 'UTILITY' : 'MARKETING', language: t.language, header: t.header || '', body: t.body || '', footer: t.footer || '',
+      examples: Array.from({ length: nv }, (_, i) => i === 0 ? 'Andi' : ''), buttons: (t.buttons || []).filter(b => ['QUICK_REPLY', 'URL', 'PHONE_NUMBER'].indexOf(b.type) >= 0).map(b => ({ type: b.type, text: b.text || '', url: b.url || '', phone: b.phone || '' })) };
+    waUI.view = 'tplform'; waRender();
+  }
   function waStartChat(phone) {
     const conv = waConversations(waUI.msgs, {}, new Date()).find(c => c.phone === phone);
     if (conv && conv.windowOpen) { waUI.view = 'chat'; waUI.selected = phone; waMarkRead(phone); }
@@ -7864,6 +8134,8 @@
     if (waUI.view === 'broadcast') right = waBroadcastHtml(convsAll);
     if (waUI.view === 'history') right = waHistoryHtml();
     if (waUI.view === 'newchat') right = waNewChatHtml(convsAll);
+    if (waUI.view === 'templates') right = waTemplatesHtml();
+    if (waUI.view === 'tplform') right = waTfHtml();
     const open = !!sel || waUI.view !== 'chat';
     return '<div class="wa-shell' + (open ? ' chat-open' : '') + '">'
       + '<div class="wa-list">'
@@ -7871,6 +8143,7 @@
       + '<div style="min-width:0"><b>' + escapeHTML(window.currentBrand ? window.currentBrand.name : 'WhatsApp') + '</b><span>' + escapeHTML(acct) + '</span></div></div>'
       + '<div class="wa-icons">'
       + '<button class="wa-ic' + (waUI.view === 'broadcast' && !waUI.bc.single ? ' on' : '') + '" data-wa-act="broadcast" data-tip="Broadcast baru">📣</button>'
+      + '<button class="wa-ic' + (waUI.view === 'templates' || waUI.view === 'tplform' ? ' on' : '') + '" data-wa-act="templates" data-tip="Template pesan">📋' + (waTplPending() ? '<span class="wa-ic-dot">' + waTplPending() + '</span>' : '') + '</button>'
       + '<button class="wa-ic' + (waUI.view === 'history' ? ' on' : '') + '" data-wa-act="history" data-tip="Riwayat broadcast">🕘</button>'
       + '<button class="wa-ic" data-wa-act="refresh" data-tip="Muat ulang">⟳</button>'
       + '</div></div>' + alert
@@ -7900,6 +8173,12 @@
     const ta = document.getElementById('wa-reply');
     if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; }
     waBadge();
+    // Di HP: chat/broadcast terbuka = satu langkah "kembali"
+    const shell = host.querySelector('.wa-shell');
+    const isOpen = !!(shell && shell.classList.contains('chat-open') && window.matchMedia('(max-width: 760px)').matches);
+    if (isOpen && !waUI._navOpen) { try { history.pushState({ view: 'wa-blast', overlay: 'wa' }, ''); } catch (e) {} }
+    if (!isOpen && waUI._navOpen && history.state && history.state.overlay === 'wa') navOverlayClosedByUi();
+    waUI._navOpen = isOpen;
   }
 
   /* ---------- aksi ---------- */
@@ -8014,7 +8293,7 @@
     const el = e.target.closest && e.target.closest('[data-wa-act]');
     if (!el || !document.getElementById('wa-blast-host').contains(el)) return;
     const a = el.getAttribute('data-wa-act');
-    if (['open', 'filter', 'back', 'close-panel', 'broadcast', 'history', 'refresh', 'send', 'tpl-single', 'tpl-reload', 'open-lead', 'add-lead', 'bc-mode', 'bc-send', 'go-profile', 'newchat', 'nc-pick', 'nc-go'].indexOf(a) >= 0) e.preventDefault();
+    if (['open', 'filter', 'back', 'close-panel', 'broadcast', 'history', 'refresh', 'send', 'tpl-single', 'tpl-reload', 'open-lead', 'add-lead', 'bc-mode', 'bc-send', 'go-profile', 'newchat', 'nc-pick', 'nc-go', 'templates', 'tm-refresh', 'tm-new', 'tm-back', 'tm-use', 'tm-copy', 'tm-del', 'tf-set', 'tf-var', 'tf-btn-add', 'tf-btn-del', 'tf-submit'].indexOf(a) >= 0) e.preventDefault();
     if (a === 'open') { waUI.view = 'chat'; waUI.selected = el.getAttribute('data-phone'); waMarkRead(waUI.selected); waRender(); }
     else if (a === 'filter') { waUI.filter = el.getAttribute('data-filter'); waRender(); }
     else if (a === 'back') { if (waUI.view !== 'chat') waUI.view = 'chat'; else waUI.selected = null; waUI.bc.single = null; waRender(); }
@@ -8032,6 +8311,24 @@
     else if (a === 'go-profile') setView('profile');
     else if (a === 'newchat') { waUI.view = 'newchat'; waUI.bc.single = null; waRender(); const q = document.getElementById('wa-nc-q'); if (q) q.focus(); }
     else if (a === 'nc-pick') waStartChat(el.getAttribute('data-phone'));
+    else if (a === 'templates') { waUI.view = 'templates'; waLoadTm(); waRender(); }
+    else if (a === 'tm-refresh') waLoadTm();
+    else if (a === 'tm-new') { waUI.tf = waTfNew(); waUI.view = 'tplform'; waRender(); const n = document.getElementById('wa-tf-name'); if (n) n.focus(); }
+    else if (a === 'tm-back') { waUI.view = 'templates'; waRender(); }
+    else if (a === 'tm-use') { waUI.bc.single = null; waUI.bc.mode = 'template'; waUI.bc.template = el.getAttribute('data-name'); waUI.view = 'broadcast'; waLoadTemplates(true); waRender(); }
+    else if (a === 'tm-copy') waTmCopy(el.getAttribute('data-name'), el.getAttribute('data-lang'));
+    else if (a === 'tm-del') waTmDelete(el.getAttribute('data-name'));
+    else if (a === 'tf-set') { waUI.tf[el.getAttribute('data-k')] = el.getAttribute('data-v'); waRender(); }
+    else if (a === 'tf-var') {
+      const tf = waUI.tf, ta = document.getElementById('wa-tf-body'), tok = '{{' + (waTfVarCount(tf.body) + 1) + '}}';
+      const pos = ta && ta.selectionStart != null ? ta.selectionStart : tf.body.length;
+      tf.body = tf.body.slice(0, pos) + tok + tf.body.slice(pos);
+      if (!tf.examples[waTfVarCount(tf.body) - 1] && waTfVarCount(tf.body) === 1) tf.examples[0] = 'Andi';
+      waRender(); const t2 = document.getElementById('wa-tf-body'); if (t2) { t2.focus(); t2.setSelectionRange(pos + tok.length, pos + tok.length); }
+    }
+    else if (a === 'tf-btn-add') { waUI.tf.buttons.push({ type: 'QUICK_REPLY', text: '', url: '', phone: '' }); waRender(); }
+    else if (a === 'tf-btn-del') { waUI.tf.buttons.splice(parseInt(el.getAttribute('data-i'), 10), 1); waRender(); }
+    else if (a === 'tf-submit') waTfSubmit();
     else if (a === 'nc-go') { const p = normWaPhone(waUI.ncNum); if (!p) { toast('Nomor WA tidak valid (contoh: 0812xxxxxxx atau +62812xxxxxxx)'); return; } waStartChat(p); }
   });
   document.addEventListener('change', function (e) {
@@ -8040,6 +8337,8 @@
     const a = el.getAttribute('data-wa-act');
     if (a === 'bc-audience') { waUI.bc.audience = el.value; waRender(); }
     else if (a === 'bc-template') { waUI.bc.template = el.value; waRender(); }
+    else if (a === 'tf' && el.tagName === 'SELECT') { waUI.tf[el.getAttribute('data-f')] = el.value; waRender(); }
+    else if (a === 'tf-btn' && el.tagName === 'SELECT') { waUI.tf.buttons[parseInt(el.getAttribute('data-i'), 10)].type = el.value; waRender(); }
     else if (a === 'bc-var-src') { const tpl = (waUI.templates || []).find(t => t.name === waUI.bc.template); if (tpl) { waTplVars(tpl)[el.getAttribute('data-n')].src = el.value; waRender(); } }
   });
   document.addEventListener('input', function (e) {
@@ -8049,6 +8348,14 @@
     if (a === 'search') { waUI.query = el.value; waRender(); }
     else if (a === 'nc-q') { waUI.ncQuery = el.value; waRender(); }
     else if (a === 'nc-num') { waUI.ncNum = el.value; }
+    else if ((a === 'tf' || a === 'tf-ex' || a === 'tf-btn') && el.tagName !== 'SELECT' && waUI.tf) {
+      const tf = waUI.tf, before = waTfVarCount(tf.body);
+      if (a === 'tf') tf[el.getAttribute('data-f')] = el.value;
+      else if (a === 'tf-ex') tf.examples[parseInt(el.getAttribute('data-n'), 10) - 1] = el.value;
+      else tf.buttons[parseInt(el.getAttribute('data-i'), 10)][el.getAttribute('data-k')] = el.value;
+      if (waTfVarCount(tf.body) !== before) waRender();
+      else { const pv = document.getElementById('wa-tf-prev'); if (pv) pv.innerHTML = waTfPreviewHtml(tf); const c = document.getElementById('wa-tf-cnt'); if (c) c.textContent = (tf.body || '').length; }
+    }
     else if (a === 'draft') {
       waUI.drafts[waUI.selected] = el.value;
       const btn = document.querySelector('[data-wa-act="send"]'); if (btn) btn.disabled = !el.value.trim() || waUI.sendingReply;
