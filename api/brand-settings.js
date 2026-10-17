@@ -34,7 +34,7 @@ function publicView(cfg) {
       display_phone: c.wa_display_phone || '',
       coexistence: !!c.wa_coexistence,
       embedded_signup_ready: !!(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.WA_ES_CONFIG_ID),
-      wa_phone_number_id: c.wa_phone_number_id || '', has_token: !!c.wa_token_enc,
+      wa_phone_number_id: c.wa_phone_number_id || '', wa_waba_id: c.wa_waba_id || '', has_token: !!c.wa_token_enc,
       wa_api_version: c.wa_api_version || '',
     },
   };
@@ -128,6 +128,11 @@ module.exports = async (req, res) => {
           const id = String(w.wa_phone_number_id || '').trim();
           if (id && !/^\d{5,25}$/.test(id)) return bad(res, 'Phone number ID harus angka saja');
           patch.wa_phone_number_id = id || null;
+        }
+        if (w.wa_waba_id !== undefined) {
+          const wb = String(w.wa_waba_id || '').trim();
+          if (wb && !/^\d{5,25}$/.test(wb)) return bad(res, 'WABA ID harus angka saja');
+          patch.wa_waba_id = wb || null;
         }
         const tok = String(w.wa_token || '').replace(/\s+/g, '');
         if (tok) { if (tok.length < 30) return bad(res, 'Access token terlalu pendek, pastikan token permanen disalin utuh'); patch.wa_token_enc = encrypt(tok); }
