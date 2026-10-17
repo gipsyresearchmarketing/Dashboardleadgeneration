@@ -30,6 +30,10 @@ function publicView(cfg) {
     },
     wa: {
       configured: !!(c.wa_phone_number_id && c.wa_token_enc),
+      connected_via_meta: !!c.wa_waba_id,
+      display_phone: c.wa_display_phone || '',
+      coexistence: !!c.wa_coexistence,
+      embedded_signup_ready: !!(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.WA_ES_CONFIG_ID),
       wa_phone_number_id: c.wa_phone_number_id || '', has_token: !!c.wa_token_enc,
       wa_api_version: c.wa_api_version || '',
     },
@@ -90,7 +94,7 @@ module.exports = async (req, res) => {
       const patch = {};
       const clear = Array.isArray(body.clear) ? body.clear : [];
       if (clear.indexOf('email') >= 0) Object.assign(patch, { smtp_user: null, smtp_pass_enc: null, smtp_host: null, smtp_port: null, from_name: null, reply_to: null });
-      if (clear.indexOf('wa') >= 0) Object.assign(patch, { wa_phone_number_id: null, wa_token_enc: null, wa_api_version: null });
+      if (clear.indexOf('wa') >= 0) Object.assign(patch, { wa_phone_number_id: null, wa_token_enc: null, wa_api_version: null, wa_waba_id: null, wa_display_phone: null, wa_coexistence: null, wa_connected_at: null });
 
       const e = body.email;
       if (e && typeof e === 'object') {
