@@ -18,6 +18,8 @@ const STATUS_RANK = { sent: 1, delivered: 2, read: 3, failed: 4 };
 function svc() {
   const k = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!k) throw new Error('SUPABASE_SERVICE_ROLE_KEY belum diisi di Vercel');
+  // Kunci baru "sb_secret_..." bukan JWT: cukup di header apikey. Kunci legacy service_role (eyJ...) dipakai di dua header.
+  if (/^sb_secret_/.test(k)) return { apikey: k, 'Content-Type': 'application/json' };
   return { apikey: k, Authorization: `Bearer ${k}`, 'Content-Type': 'application/json' };
 }
 
