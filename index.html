@@ -4785,12 +4785,30 @@
       + '<div style="height:1px;background:#e5e7eb;margin:18px 0"></div>'
       // ---- WhatsApp ----
       + heading('💬 WhatsApp (Cloud API Meta)', wa.configured)
-      + '<label style="' + lbl + '">Phone Number ID</label><input id="ss-wa-id" inputmode="numeric" autocomplete="off" style="' + inp + '" placeholder="contoh: 109876543210987" value="' + escHtml(wa.wa_phone_number_id || '') + '"' + dis + ' />'
-      + '<label style="' + lbl + '">Access Token (permanen)</label><input id="ss-wa-token" type="password" autocomplete="new-password" style="' + inp + '" placeholder="' + (wa.has_token ? '•••••••• tersimpan (kosongkan jika tidak diubah)' : 'token dari System User di Meta') + '"' + dis + ' />'
-      + '<div style="font-size:11px;color:#6b7280;margin-top:4px;line-height:1.5">Phone Number ID ada di Meta for Developers → app → WhatsApp → API Setup. Token permanen dibuat lewat System User di Business Settings.</div>'
-      + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn btn-primary" id="ss-save-wa" style="font-size:12px"' + dis + '>Simpan &amp; tes WhatsApp</button>'
+      + (wa.configured && wa.connected_via_meta
+        ? '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;margin-top:8px;border:1px solid #a7f3d0;background:#ecfdf5;border-radius:10px">'
+          +   '<div style="width:34px;height:34px;border-radius:50%;background:#25d366;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none">W</div>'
+          +   '<div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:600;color:#065f46">' + escHtml(wa.display_phone || ('Phone ID ' + wa.wa_phone_number_id)) + '</div>'
+          +   '<div style="font-size:11px;color:#047857">WA blast brand ini dikirim dari nomor ini' + (wa.coexistence ? ' · tetap aktif di aplikasi WhatsApp Business di HP' : '') + '</div></div>'
+          + '</div>'
+        : (wa.embedded_signup_ready
+          ? '<div style="padding:14px;margin-top:8px;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc">'
+            +   '<div style="font-size:13px;color:#334155;line-height:1.5;margin-bottom:10px">Hubungkan nomor WhatsApp Business brand ini lewat login Facebook. Nomor yang sudah dipakai di aplikasi <b>WhatsApp Business di HP tetap bisa dipakai</b> di HP.</div>'
+            +   (isOwner
+                ? '<button class="btn btn-primary" id="ss-wa-connect" style="font-size:13px;background:#25d366;border-color:#25d366;font-weight:600">Hubungkan WhatsApp</button>'
+                : '<div style="font-size:12px;color:#b45309">Minta owner brand untuk menghubungkan WhatsApp.</div>')
+            + '</div>'
+          : ''))
+      + '<details style="margin-top:10px"' + ((!wa.embedded_signup_ready && !wa.connected_via_meta) || (wa.configured && !wa.connected_via_meta) ? ' open' : '') + '><summary style="font-size:12px;color:#6b7280;cursor:pointer">Cara manual: Phone Number ID + Access Token</summary>'
+      +   '<label style="' + lbl + '">Phone Number ID</label><input id="ss-wa-id" inputmode="numeric" autocomplete="off" style="' + inp + '" placeholder="contoh: 109876543210987" value="' + escHtml(wa.wa_phone_number_id || '') + '"' + dis + ' />'
+      +   '<label style="' + lbl + '">Access Token (permanen)</label><input id="ss-wa-token" type="password" autocomplete="new-password" style="' + inp + '" placeholder="' + (wa.has_token ? '•••••••• tersimpan (kosongkan jika tidak diubah)' : 'token dari System User di Meta') + '"' + dis + ' />'
+      +   '<div style="font-size:11px;color:#6b7280;margin-top:4px;line-height:1.5">Phone Number ID ada di Meta for Developers → app → WhatsApp → API Setup. Token permanen dibuat lewat System User di Business Settings.</div>'
+      +   '<button class="btn btn-outline" id="ss-save-wa" style="font-size:12px;margin-top:10px"' + dis + '>Simpan &amp; tes manual</button>'
+      + '</details>'
+      + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
       +   (wa.configured ? '<button class="btn btn-outline" id="ss-verify-wa" style="font-size:12px">Tes koneksi</button>' : '')
-      +   (wa.configured && isOwner ? '<button class="btn btn-outline" id="ss-clear-wa" style="font-size:12px;color:#b91c1c;border-color:#fecaca">Hapus</button>' : '') + '</div>'
+      +   (wa.configured && isOwner && wa.embedded_signup_ready ? '<button class="btn btn-outline" id="ss-wa-connect" style="font-size:12px">Ganti nomor</button>' : '')
+      +   (wa.configured && isOwner ? '<button class="btn btn-outline" id="ss-clear-wa" style="font-size:12px;color:#b91c1c;border-color:#fecaca">Putuskan WhatsApp</button>' : '') + '</div>'
       + '<div id="ss-wa-status" style="font-size:12px;margin-top:8px;word-break:break-word"></div>'
       + '</div>';
 
@@ -4856,8 +4874,112 @@
       idle(b);
     });
     bind('ss-clear-wa', async function () {
-      if (!confirm('Hapus pengaturan WhatsApp brand ini? Brand tidak bisa kirim WhatsApp sampai diisi lagi.')) return;
-      try { renderSendSettings(host, await brandApi('save', { clear: ['wa'] })); toast('Pengaturan WhatsApp dihapus'); } catch (e) { setStatus('ss-wa-status', false, e.message); }
+      if (!confirm('Putuskan WhatsApp dari brand ini? Brand tidak bisa kirim WA blast sampai dihubungkan lagi. (Nomor di aplikasi HP tidak terpengaruh.)')) return;
+      try {
+        if (wa.connected_via_meta) { await waConnectApi({ action: 'disconnect', brand_id: cur.id }); loadSendSettings(); }
+        else renderSendSettings(host, await brandApi('save', { clear: ['wa'] }));
+        toast('WhatsApp diputus');
+      } catch (e) { setStatus('ss-wa-status', false, e.message); }
+    });
+    document.querySelectorAll('#ss-wa-connect').forEach(function (btn) {
+      btn.addEventListener('click', function () { startWaConnect(cur.id, btn); });
+    });
+    if (wa.embedded_signup_ready && isOwner) prepareWaConnect(cur.id);
+  }
+
+  /* ---------- Hubungkan WhatsApp (Meta Embedded Signup, mendukung coexistence) ---------- */
+  async function waConnectApi(payload) {
+    if (!window.sb) throw new Error('Belum login');
+    var sess = await window.sb.auth.getSession();
+    var token = sess && sess.data && sess.data.session && sess.data.session.access_token;
+    if (!token) throw new Error('Sesi login habis, login ulang dulu');
+    var resp = await fetch('/api/wa-connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload),
+    });
+    var data = null; try { data = await resp.json(); } catch (e) {}
+    if (!resp.ok || !data) {
+      var why = (data && data.error) || ('HTTP ' + resp.status);
+      if (resp.status === 404) why = 'Endpoint /api/wa-connect tidak ditemukan — pastikan file api/wa-connect.js ikut ke-deploy';
+      throw new Error(why);
+    }
+    return data;
+  }
+  var waEs = { cfg: null, brandId: null, loading: null };
+  function loadFbSdk(appId, version) {
+    if (window.FB && window.__fbInitApp === appId) return Promise.resolve();
+    return new Promise(function (resolve, reject) {
+      var init = function () {
+        try { window.FB.init({ appId: appId, autoLogAppEvents: true, xfbml: false, version: version }); window.__fbInitApp = appId; resolve(); }
+        catch (e) { reject(e); }
+      };
+      if (window.FB) return init();
+      window.fbAsyncInit = init;
+      var sc = document.createElement('script');
+      sc.src = 'https://connect.facebook.net/en_US/sdk.js';
+      sc.async = true; sc.defer = true; sc.crossOrigin = 'anonymous';
+      sc.onerror = function () { reject(new Error('Gagal memuat Facebook SDK (cek koneksi / ad-blocker).')); };
+      document.head.appendChild(sc);
+    });
+  }
+  // Disiapkan duluan supaya popup Facebook dibuka langsung saat klik (tidak diblokir browser)
+  function prepareWaConnect(brandId) {
+    if (waEs.cfg && waEs.brandId === brandId) return waEs.loading;
+    waEs.brandId = brandId; waEs.cfg = null;
+    waEs.loading = waConnectApi({ action: 'config', brand_id: brandId })
+      .then(function (cfg) { return loadFbSdk(cfg.app_id, cfg.version).then(function () { if (waEs.brandId === brandId) waEs.cfg = cfg; }); })
+      .catch(function (e) { waEs.error = e.message; });
+    return waEs.loading;
+  }
+  function startWaConnect(brandId, btn) {
+    var statusEl = function (ok, msg) { var el = document.getElementById('ss-wa-status'); if (el) el.innerHTML = '<span style="color:' + (ok ? '#047857' : '#b91c1c') + '">' + (ok ? '✅ ' : '❌ ') + escHtml(msg) + '</span>'; };
+    if (!waEs.cfg || waEs.brandId !== brandId || !window.FB) {
+      statusEl(false, waEs.error || 'Masih menyiapkan login Facebook, coba klik lagi beberapa detik lagi.');
+      prepareWaConnect(brandId);
+      return;
+    }
+    var session = null, finished = false;
+    var onMsg = function (ev) {
+      if (!/(^|\.)facebook\.com$/.test(String(ev.origin).replace(/^https?:\/\//, ''))) return;
+      var d = ev.data;
+      try { if (typeof d === 'string') d = JSON.parse(d); } catch (e) { return; }
+      if (!d || d.type !== 'WA_EMBEDDED_SIGNUP') return;
+      session = d;
+    };
+    window.addEventListener('message', onMsg);
+    var cleanup = function () { window.removeEventListener('message', onMsg); };
+    btn.disabled = true; var oldTxt = btn.innerHTML; btn.textContent = 'Menunggu Facebook…';
+    var reset = function () { btn.disabled = false; btn.innerHTML = oldTxt; };
+    window.FB.login(function (resp) {
+      var code = resp && resp.authResponse && resp.authResponse.code;
+      if (!code) {
+        cleanup(); reset();
+        var ev = session && session.event;
+        statusEl(false, ev === 'ERROR' ? ('Facebook: ' + ((session.data && session.data.error_message) || 'terjadi error')) : 'Koneksi WhatsApp dibatalkan.');
+        return;
+      }
+      btn.textContent = 'Menyimpan…';
+      // tunggu info sesi (waba_id / phone_number_id) maks 2,5 detik — kode hanya berlaku 30 detik
+      var started = Date.now();
+      (function waitThenSend() {
+        if (!session && Date.now() - started < 2500) return setTimeout(waitThenSend, 200);
+        if (finished) return; finished = true; cleanup();
+        var d = (session && session.data) || {};
+        waConnectApi({
+          action: 'finish', brand_id: brandId, code: code,
+          waba_id: d.waba_id || '', phone_number_id: d.phone_number_id || '',
+          coexistence: !!(session && session.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'),
+        }).then(function (out) {
+          toast('✓ WhatsApp ' + (out.display || '') + ' terhubung');
+          loadSendSettings();
+        }).catch(function (e) { reset(); statusEl(false, e.message); });
+      })();
+    }, {
+      config_id: waEs.cfg.config_id,
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: waEs.cfg.extras || { setup: {} },
     });
   }
 
