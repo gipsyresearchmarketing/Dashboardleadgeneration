@@ -37,7 +37,8 @@ function simplify(t) {
   const params = nums.length ? Math.max.apply(null, nums) : 0;
   let supported = true, reason = '';
   if (/\{\{\s*[a-z_]/i.test(String(body.text || ''))) { supported = false; reason = 'Template memakai variabel bernama ({{nama}}), belum didukung — pakai {{1}}, {{2}}.'; }
-  if (header && header.format && header.format !== 'TEXT') { supported = false; reason = 'Header ' + header.format.toLowerCase() + ' belum didukung dashboard.'; }
+  const hf = header && header.format ? header.format : null;
+  if (hf === 'LOCATION') { supported = false; reason = 'Header lokasi belum didukung dashboard.'; }
   if (header && header.format === 'TEXT' && /\{\{\d+\}\}/.test(header.text || '')) { supported = false; reason = 'Header dengan variabel belum didukung.'; }
   if (buttons.some((b) => b.url && /\{\{\d+\}\}/.test(b.url))) { supported = false; reason = 'Tombol link dinamis belum didukung.'; }
   if (t.name === 'hello_world') { supported = false; reason = 'Template contoh Meta — hanya bisa dikirim dari nomor test.'; }
@@ -49,6 +50,8 @@ function simplify(t) {
     quality: t.quality_score && t.quality_score.score ? t.quality_score.score : null,
     sample: /^hello_world$/.test(t.name),
     body: body.text || '', header: header && header.format === 'TEXT' ? header.text : null, footer: footer ? footer.text : null,
+    header_format: hf && hf !== 'TEXT' ? hf.toLowerCase() : null,
+    header_sample: hf && hf !== 'TEXT' && header.example && header.example.header_handle ? header.example.header_handle[0] : null,
     buttons, params, supported, reason,
   };
 }
@@ -77,8 +80,12 @@ function buildTemplate(t) {
   for (let i = 0; i < max; i++) if (!examples[i]) return { error: 'Isi contoh untuk {{' + (i + 1) + '}} (wajib untuk review Meta).' };
 
   const components = [];
+  const hfmt = String(t.header_format || '').toUpperCase();
   const header = String(t.header || '').trim();
-  if (header) {
+  if (['IMAGE', 'DOCUMENT', 'VIDEO'].indexOf(hfmt) >= 0) {
+    if (!t.header_handle) return { error: 'Unggah contoh ' + (hfmt === 'IMAGE' ? 'gambar' : hfmt === 'VIDEO' ? 'video' : 'dokumen') + ' untuk header (wajib untuk review Meta).' };
+    components.push({ type: 'HEADER', format: hfmt, example: { header_handle: [String(t.header_handle)] } });
+  } else if (header) {
     if (header.length > 60) return { error: 'Header maksimal 60 karakter.' };
     if (/\{\{/.test(header)) return { error: 'Header tidak boleh berisi variabel.' };
     components.push({ type: 'HEADER', format: 'TEXT', text: header });
