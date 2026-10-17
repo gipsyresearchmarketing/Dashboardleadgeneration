@@ -7567,7 +7567,9 @@
     if (!b || !window.sb) return;
     if (waUI.brandId !== b.id) { waResetForBrand(b.id); waSubscribe(); }
     if (!waUI.loaded && !waUI.loading) waLoad();
-    if (!waUI.settings && !waUI.settingsLoading) waLoadSettings();
+    // Muat ulang setting kalau belum ada, belum terhubung, atau sudah > 30 detik (mis. baru dihubungkan di Profile)
+    const stale = !waUI.settings || !(waUI.settings.wa && waUI.settings.wa.configured) || (Date.now() - (waUI.settingsAt || 0) > 30000);
+    if (stale && !waUI.settingsLoading) waLoadSettings();
   }
   async function waLoad() {
     const id = waUI.brandId;
@@ -7600,7 +7602,7 @@
   async function waLoadSettings() {
     if (!window.currentBrand) return;
     waUI.settingsLoading = true;
-    try { waUI.settings = await brandApi('get'); waUI.settingsError = ''; }
+    try { waUI.settings = await brandApi('get'); waUI.settingsError = ''; waUI.settingsAt = Date.now(); }
     catch (e) { waUI.settingsError = e.message; }
     waUI.settingsLoading = false;
     if (state.view === 'wa-blast') waRender();
