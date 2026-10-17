@@ -62,6 +62,19 @@ function describe(m) {
     const label = { image: '🖼️ Gambar', video: '🎬 Video', audio: '🎤 Pesan suara', document: '📎 ' + (md.filename || 'Dokumen'), sticker: 'Stiker' }[t];
     return { body: md.caption ? label + ' · ' + md.caption : label, media: { type: t, id: md.id || null, mime: md.mime_type || null, filename: md.filename || null } };
   }
+  if (t === 'contacts') {
+    const c = (m.contacts || [])[0] || {};
+    const nm = (c.name && (c.name.formatted_name || c.name.first_name)) || 'Kontak';
+    const ph = (c.phones || [])[0];
+    return { body: '👤 Kontak: ' + nm + (ph ? ' · ' + (ph.phone || ph.wa_id || '') : ''), media: null };
+  }
+  if (t === 'system') return { body: 'ℹ️ ' + ((m.system && m.system.body) || 'Pesan sistem'), media: null };
+  if (t === 'order') return { body: '🛒 Pesanan dari katalog (' + (((m.order && m.order.product_items) || []).length) + ' produk)', media: null };
+  if (t === 'unsupported' || t === 'unknown') {
+    const e = (m.errors || [])[0] || {};
+    const det = (e.error_data && e.error_data.details) || e.title || '';
+    return { body: '⚠️ Pesan ini tidak bisa dibaca lewat WhatsApp API' + (det ? ' (' + det + ')' : '') + '. Biasanya: kode verifikasi/OTP, polling, pesan sekali lihat, atau pesan yang sudah dihapus. Minta pengirim memakai SMS/telepon atau kirim ulang sebagai teks biasa.', media: null };
+  }
   return { body: '[Pesan ' + t + ' belum didukung]', media: null };
 }
 
