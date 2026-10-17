@@ -2,14 +2,13 @@
  * Vercel Serverless Function — kirim WhatsApp blast lewat WhatsApp Cloud API (Meta, resmi).
  *
  * Auth   : header "Authorization: Bearer <Supabase access token>" (user harus login & member brand).
- * Env    : WA_ACCESS_TOKEN       (permanent token dari System User di Meta Business)
- *          WA_PHONE_NUMBER_ID    (Phone number ID dari WhatsApp > API Setup)
- *          WA_API_VERSION        (opsional, default v25.0)
+ * Pengirim: Phone Number ID + token WhatsApp MILIK BRAND (tabel brand_settings, token terenkripsi).
+ *           Diatur dari dashboard: Profile -> Pengaturan Pengiriman.
+ * Env    : SECRETS_KEY (membuka token yang tersimpan), WA_API_VERSION (opsional, default v25.0)
  * Mode   : "template" -> pesan template yang sudah di-approve Meta (wajib untuk kontak yang belum chat dalam 24 jam)
  *          "text"     -> teks bebas (HANYA bisa untuk kontak yang membalas/chat ke nomor kamu dalam 24 jam terakhir)
  */
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ugxrtiitmqrfrdpmcxka.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_JTxgxH__IgjcJhGkncaIkQ_erJNnZDG';
+const { authBrand, getWaConfig } = require('./_lib/brand');
 const MAX_RECIPIENTS = 100;
 
 /** 0812-345 / +62 812 / 62812 -> 62812345... (khusus Indonesia kalau diawali 0 atau 8). */
@@ -20,21 +19,6 @@ function normalizePhone(raw) {
   if (d.startsWith('0')) d = '62' + d.slice(1);
   else if (d.startsWith('8')) d = '62' + d;
   return /^\d{9,15}$/.test(d) ? d : '';
-}
-
-async function verifyUser(token) {
-  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
-  if (!r.ok) return null;
-  const u = await r.json();
-  return u && u.id ? u : null;
-}
-
-async function isBrandMember(token, brandId, userId) {
-  const url = `${SUPABASE_URL}/rest/v1/brand_members?select=brand_id&brand_id=eq.${encodeURIComponent(brandId)}&user_id=eq.${encodeURIComponent(userId)}`;
-  const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
-  if (!r.ok) return false;
-  const rows = await r.json();
-  return Array.isArray(rows) && rows.length > 0;
 }
 
 /** Terjemahkan error Meta ke pesan yang bisa dimengerti. */
@@ -93,26 +77,21 @@ async function sendOne(ctx, r) {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); }
 
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  if (!token) return res.status(401).json({ error: 'Belum login' });
-
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = null; } }
   if (!body || typeof body !== 'object') return res.status(400).json({ error: 'Body tidak valid' });
 
   try {
-    const user = await verifyUser(token);
-    if (!user) return res.status(401).json({ error: 'Session tidak valid, coba login ulang' });
-    const brandId = String(body.brand_id || '');
-    if (!brandId || !(await isBrandMember(token, brandId, user.id))) return res.status(403).json({ error: 'Kamu bukan member brand ini' });
+    const a = await authBrand(req, body.brand_id);
+    if (a.error) return res.status(a.status).json({ error: a.error });
 
-    const waToken = process.env.WA_ACCESS_TOKEN;
-    const phoneId = process.env.WA_PHONE_NUMBER_ID;
-    if (!waToken || !phoneId) return res.status(500).json({ error: 'WhatsApp belum dikonfigurasi di Vercel (isi WA_ACCESS_TOKEN dan WA_PHONE_NUMBER_ID)' });
+    const wc = await getWaConfig(a.token, a.brandId);
+    if (!wc) return res.status(400).json({ error: 'WhatsApp brand ini belum diatur. Buka Profile -> Pengaturan Pengiriman, isi Phone Number ID dan Access Token.' });
+    const waToken = wc.token;
+    const phoneId = wc.phoneId;
 
     const mode = body.mode === 'text' ? 'text' : 'template';
-    const ctx = { mode, token: waToken, phoneId, version: process.env.WA_API_VERSION || 'v25.0', template: null, text: '' };
+    const ctx = { mode, token: waToken, phoneId, version: wc.version, template: null, text: '' };
     if (mode === 'template') {
       const name = String((body.template && body.template.name) || '').trim();
       const language = String((body.template && body.template.language) || 'id').trim();
