@@ -1705,6 +1705,16 @@
     .wa-cta .btn { flex:1; justify-content:center; font-size:12.5px; padding:8px 10px; }
     .wa-nc { flex:1; display:flex; flex-direction:column; min-height:0; background:#fff; }
     .wa-ic .wa-ic-dot { position:absolute; top:4px; right:4px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#f59e0b; color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+    .wa-tool { width:38px; height:42px; border:0; background:transparent; font-size:19px; cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center; flex:none; color:#54656f; }
+    .wa-tool:hover, .wa-tool.on { background:#e2e5e8; }
+    .wa-qr { background:#fff; border-top:1px solid var(--border); max-height:240px; display:flex; flex-direction:column; }
+    .wa-qr-head { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid #f1f1f1; font-size:12.5px; flex-wrap:wrap; }
+    .wa-qr-list { overflow-y:auto; }
+    .wa-qr-item { display:flex; gap:8px; align-items:center; padding:8px 12px; cursor:pointer; border-bottom:1px solid #f6f6f6; font-size:13px; }
+    .wa-qr-item:hover { background:#f0fdf4; }
+    .wa-qr-del { border:0; background:transparent; color:#9ca3af; cursor:pointer; font-size:13px; padding:4px 6px; border-radius:6px; }
+    .wa-qr-del:hover { color:#dc2626; background:#fef2f2; }
+    .wa-media a { text-decoration:none; }
     .wa-tpl-row { display:flex; gap:12px; padding:12px 18px; border-bottom:1px solid #f1f1f1; align-items:flex-start; }
     .wa-tpl-row b { font-size:13px; }
     .wa-st { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
@@ -1751,7 +1761,7 @@
     .wa-hist-item { display:flex; gap:12px; padding:12px 18px; border-bottom:1px solid #f1f1f1; align-items:center; }
     .wa-hist-item b { font-size:13px; }
     .wa-hist-stats { display:flex; gap:12px; font-size:11.5px; color:var(--muted); margin-top:3px; flex-wrap:wrap; }
-    @media (max-width: 1000px) { .wa-bc { grid-template-columns:1fr; } .wa-bc-prev { display:none; } }
+    @media (max-width: 1000px) { .wa-bc { display:flex; flex-direction:column; } .wa-bc-form { flex:1; min-height:0; border-right:0; } .wa-bc-prev { flex:none; } .wa-bc-prev-head, .wa-bc-prev-body { display:none; } .wa-bc-foot { border-top:1px solid var(--border); } }
     @media (max-width: 760px) {
       #view-wa-blast { padding: 8px; }
       .wa-shell { grid-template-columns:1fr; height:calc(100vh - 80px); }
@@ -4861,6 +4871,8 @@
   window.loadUserBrands = async function () {
     try {
       var uidv = window.currentUser.id;
+      // Undangan tim untuk email ini otomatis diterima (fitur Tim di Profile)
+      try { var acc = await sb.rpc('accept_my_invites'); if (acc && !acc.error && acc.data > 0) toast('✓ Kamu bergabung ke ' + acc.data + ' brand dari undangan'); } catch (e) {}
       var m = await sb.from('brand_members').select('brand_id, role').eq('user_id', uidv);
       if (m.error) throw new Error('brand_members: ' + m.error.message);
       var memberships = m.data || [];
@@ -5295,6 +5307,7 @@
       + '</div>'
       + '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Brand</div>'
       +   '<div style="display:flex;flex-direction:column;gap:8px">' + (brandRows || '<div style="font-size:13px;color:#6b7280">Belum ada brand.</div>') + '</div></div>'
+      + '<div id="team-host"></div>'
       + '<div id="send-settings-host"></div>'
       + '<div class="card p-5"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin-bottom:10px">Sinkronisasi</div>'
       +   '<div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#1f2937"><span style="width:8px;height:8px;border-radius:50%;background:' + stColor + '"></span>' + stLabel + '</div>'
@@ -5305,6 +5318,7 @@
       +   'Sign out</button></div>'
       + '</div>';
     loadSendSettings();
+    loadTeam();
     var rs = document.getElementById('profile-resync');
     if (rs) rs.addEventListener('click', function () { toast('Menyinkronkan ulang…'); window.cloudStart(); });
     var so = document.getElementById('profile-signout');
@@ -5312,6 +5326,105 @@
     host.querySelectorAll('[data-switch-brand]').forEach(function (el) {
       el.addEventListener('click', function () { switchBrand(el.getAttribute('data-switch-brand')); });
     });
+  }
+
+  /* ---------- Tim: undang anggota (akun masing-masing) ---------- */
+  var teamUI = { brandId: null, members: null, invites: null, error: '', busy: false };
+  async function loadTeam() {
+    var host = document.getElementById('team-host');
+    var cur = window.currentBrand;
+    if (!host || !cur || !window.sb) return;
+    if (teamUI.brandId !== cur.id) Object.assign(teamUI, { brandId: cur.id, members: null, invites: null, error: '' });
+    renderTeam();
+    try {
+      var m = await window.sb.rpc('brand_member_list', { bid: cur.id });
+      if (m.error) throw m.error;
+      teamUI.members = m.data || [];
+      if (cur.role === 'owner') {
+        var iv = await window.sb.from('brand_invites').select('*').eq('brand_id', cur.id).is('accepted_at', null).order('created_at', { ascending: false });
+        if (iv.error) throw iv.error;
+        teamUI.invites = iv.data || [];
+      } else teamUI.invites = [];
+      teamUI.error = '';
+    } catch (e) {
+      var msg = (e && e.message) || String(e);
+      teamUI.error = /brand_member_list|brand_invites|does not exist|schema cache|function/i.test(msg) ? 'Fitur tim belum aktif — jalankan supabase-wa-fitur-lanjutan.sql di Supabase SQL Editor.' : msg;
+    }
+    renderTeam();
+  }
+  function teamInviteText(email) {
+    var b = window.currentBrand ? window.currentBrand.name : '';
+    return 'Halo! Kamu diundang ke dashboard Leads CRM "' + b + '".\n\n1. Buka ' + location.origin + '\n2. Klik Sign up (atau Sign in kalau sudah punya akun) pakai email: ' + email + '\n3. Setelah masuk, brand "' + b + '" otomatis muncul.\n\nKalau diminta konfirmasi email, cek inbox dulu ya.';
+  }
+  function renderTeam() {
+    var host = document.getElementById('team-host'); if (!host) return;
+    var cur = window.currentBrand; if (!cur) { host.innerHTML = ''; return; }
+    var isOwner = cur.role === 'owner';
+    var h = '<div class="card p-5"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#6b7280">Tim — ' + escHtml(cur.name) + '</div>'
+      + (teamUI.members ? '<span style="font-size:12px;color:#6b7280">' + teamUI.members.length + ' anggota</span>' : '') + '</div>';
+    if (teamUI.error) h += '<div style="font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px">' + escHtml(teamUI.error) + '</div>';
+    else if (!teamUI.members) h += '<div style="font-size:13px;color:#6b7280">Memuat anggota…</div>';
+    else {
+      h += '<div style="display:flex;flex-direction:column;gap:6px">' + teamUI.members.map(function (m) {
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px">'
+          + '<div style="width:32px;height:32px;border-radius:50%;background:' + (m.role === 'owner' ? '#4f46e5' : '#0ea5e9') + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none">' + escHtml((m.email || '?').charAt(0).toUpperCase()) + '</div>'
+          + '<div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(m.email || '') + (m.is_me ? ' <span style="font-weight:400;color:#6b7280">(kamu)</span>' : '') + '</div>'
+          + '<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">' + escHtml(m.role) + '</div></div>'
+          + (isOwner && !m.is_me ? '<button class="btn btn-ghost" style="color:var(--danger);font-size:12px;padding:4px 8px" data-team-remove="' + escHtml(m.user_id) + '" data-email="' + escHtml(m.email || '') + '">Keluarkan</button>' : '')
+          + '</div>';
+      }).join('') + '</div>';
+      if (isOwner) {
+        var inv = teamUI.invites || [];
+        if (inv.length) h += '<div style="font-size:12px;font-weight:600;color:#6b7280;margin:14px 0 6px">Menunggu bergabung</div><div style="display:flex;flex-direction:column;gap:6px">' + inv.map(function (i) {
+          return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">'
+            + '<div style="flex:1;min-width:150px;font-size:13px"><b>' + escHtml(i.email) + '</b> <span style="font-size:11px;color:#6b7280">· ' + escHtml(i.role) + ' · diundang ' + escHtml(formatDate(i.created_at)) + '</span></div>'
+            + '<button class="btn btn-outline" style="font-size:12px;padding:4px 8px" data-team-copy="' + escHtml(i.email) + '">Salin pesan</button>'
+            + '<a class="btn btn-outline" style="font-size:12px;padding:4px 8px" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(teamInviteText(i.email)) + '">Kirim via WA</a>'
+            + '<button class="btn btn-ghost" style="font-size:12px;padding:4px 8px;color:var(--danger)" data-team-cancel="' + escHtml(i.id) + '">Batal</button></div>';
+        }).join('') + '</div>';
+        h += '<div style="font-size:12px;font-weight:600;color:#6b7280;margin:14px 0 6px">Undang anggota baru</div>'
+          + '<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="team-email" class="input" type="email" placeholder="email@tim.com" style="flex:1;min-width:180px">'
+          + '<select id="team-role" class="input" style="width:auto"><option value="member">Member</option><option value="owner">Owner</option></select>'
+          + '<button class="btn btn-primary" id="team-invite"' + (teamUI.busy ? ' disabled' : '') + '>Undang</button></div>'
+          + '<div style="font-size:11.5px;color:#6b7280;margin-top:6px;line-height:1.5">Anggota login pakai akun & password masing-masing, lalu otomatis masuk ke brand ini. <b>Member</b> bisa pakai semua fitur (chat, broadcast, email); <b>Owner</b> juga bisa mengubah pengaturan pengiriman & mengatur tim.</div>';
+      } else {
+        h += '<div style="font-size:11.5px;color:#6b7280;margin-top:8px">Hanya owner yang bisa mengundang atau mengeluarkan anggota.</div>';
+      }
+    }
+    host.innerHTML = h + '</div>';
+    var btn = document.getElementById('team-invite');
+    if (btn) btn.addEventListener('click', teamInvite);
+    var em = document.getElementById('team-email');
+    if (em) em.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); teamInvite(); } });
+    host.querySelectorAll('[data-team-copy]').forEach(function (b) { b.addEventListener('click', function () { teamCopy(b.getAttribute('data-team-copy')); }); });
+    host.querySelectorAll('[data-team-cancel]').forEach(function (b) { b.addEventListener('click', async function () {
+      if (!confirm('Batalkan undangan ini?')) return;
+      var r = await window.sb.from('brand_invites').delete().eq('id', b.getAttribute('data-team-cancel'));
+      if (r.error) toast('Gagal: ' + r.error.message); else { toast('Undangan dibatalkan'); loadTeam(); }
+    }); });
+    host.querySelectorAll('[data-team-remove]').forEach(function (b) { b.addEventListener('click', async function () {
+      if (!confirm('Keluarkan ' + b.getAttribute('data-email') + ' dari brand ini? Dia tidak bisa membuka data brand ini lagi.')) return;
+      var r = await window.sb.rpc('remove_brand_member', { bid: window.currentBrand.id, uid: b.getAttribute('data-team-remove') });
+      if (r.error) toast('Gagal: ' + r.error.message); else { toast('Anggota dikeluarkan'); loadTeam(); }
+    }); });
+  }
+  function teamCopy(email) {
+    var txt = teamInviteText(email);
+    try { navigator.clipboard.writeText(txt).then(function () { toast('✓ Pesan undangan disalin — kirim ke ' + email); }, function () { prompt('Salin pesan ini:', txt); }); }
+    catch (e) { prompt('Salin pesan ini:', txt); }
+  }
+  async function teamInvite() {
+    var em = document.getElementById('team-email'), rl = document.getElementById('team-role');
+    var email = String(em && em.value || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Email tidak valid'); return; }
+    if ((teamUI.members || []).some(function (m) { return String(m.email || '').toLowerCase() === email; })) { toast('Email ini sudah jadi anggota'); return; }
+    teamUI.busy = true; renderTeam();
+    var r = await window.sb.from('brand_invites').insert({ brand_id: window.currentBrand.id, email: email, role: rl ? rl.value : 'member' });
+    teamUI.busy = false;
+    if (r.error) { toast(/duplicate|unique/i.test(r.error.message) ? 'Email ini sudah diundang' : 'Gagal mengundang: ' + r.error.message); renderTeam(); return; }
+    toast('✓ ' + email + ' diundang');
+    await loadTeam();
+    teamCopy(email);
   }
 
   function showFormError(msg) {
@@ -7656,9 +7769,10 @@
     selected: null, view: 'chat', query: '', filter: 'all', drafts: {}, sendingReply: false,
     settings: null, settingsLoading: false, settingsError: '',
     templates: null, tplLoading: false, tplError: '',
-    bc: { audience: '', single: null, mode: 'template', template: '', vars: {}, text: '' }, bcSending: false,
+    bc: { audience: '', single: null, mode: 'template', template: '', vars: {}, text: '', when: 'now', at: '', hdr: null }, bcSending: false,
     lastScrollKey: '', ncQuery: '', ncNum: '',
     tm: { list: null, loading: false, error: '', saving: false, seen: {}, timer: null, at: 0 }, tf: null,
+    qr: null, qrOpen: false, media: {}, uploading: false,
   };
   var WA_COLORS = ['#25d366', '#6366f1', '#f59e0b', '#06b6d4', '#ec4899', '#8b5cf6', '#10b981'];
   function waColor(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return WA_COLORS[h % WA_COLORS.length]; }
@@ -7704,13 +7818,15 @@
   function waResetForBrand(id) {
     if (waUI.channel && window.sb) { try { window.sb.removeChannel(waUI.channel); } catch (e) {} }
     Object.assign(waUI, { brandId: id, msgs: [], loaded: false, error: '', channel: null, selected: null, view: 'chat', drafts: {},
-      settings: null, settingsError: '', templates: null, tplError: '', tf: null, tm: (clearTimeout(waUI.tm && waUI.tm.timer), { list: null, loading: false, error: '', saving: false, seen: {}, timer: null, at: 0 }), bc: { audience: '', single: null, mode: 'template', template: '', vars: {}, text: '' } });
+      settings: null, settingsError: '', templates: null, tplError: '', tf: null, evChecked: false, qrLoading: false, tm: (clearTimeout(waUI.tm && waUI.tm.timer), { list: null, loading: false, error: '', saving: false, seen: {}, timer: null, at: 0 }), bc: { audience: '', single: null, mode: 'template', template: '', vars: {}, text: '', when: 'now', at: '', hdr: null }, qr: null, qrOpen: false, media: {} });
   }
   async function waEnsureLoaded() {
     const b = window.currentBrand;
     if (!b || !window.sb) return;
     if (waUI.brandId !== b.id) { waResetForBrand(b.id); waSubscribe(); }
     if (!waUI.loaded && !waUI.loading) waLoad();
+    if (waUI.qr === null && !waUI.qrLoading) { waUI.qrLoading = true; waLoadQr().finally(function () { waUI.qrLoading = false; }); }
+    if (!waUI.evChecked) { waUI.evChecked = true; waCheckTplEvents().catch(function () {}); }
     // Muat ulang setting kalau belum ada, belum terhubung, atau sudah > 30 detik (mis. baru dihubungkan di Profile)
     const stale = !waUI.settings || !(waUI.settings.wa && waUI.settings.wa.configured) || (Date.now() - (waUI.settingsAt || 0) > 30000);
     if (stale && !waUI.settingsLoading) waLoadSettings();
@@ -7742,6 +7858,9 @@
     waUI.channel = window.sb.channel('wa-msgs-' + id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wa_messages', filter: 'brand_id=eq.' + id }, function () {
         clearTimeout(t); t = setTimeout(waLoad, 300);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'wa_template_events', filter: 'brand_id=eq.' + id }, function () {
+        waCheckTplEvents().catch(function () {});
       }).subscribe();
   }
   async function waLoadSettings() {
@@ -7826,7 +7945,7 @@
       const md = m.media || {};
       const isMedia = md.type && ['image', 'video', 'audio', 'document', 'sticker'].indexOf(md.type) >= 0;
       const parts = String(m.body || '').split(' · ');
-      const media = isMedia ? '<div class="wa-media">' + escapeHTML(parts[0]) + '</div>' : '';
+      const media = isMedia ? waMediaHtml(md, parts[0]) : (md.header && (md.header.id || md.header.link) ? waMediaHtml(md.header, waMediaLabel(md.header.type)) : '');
       const body = isMedia ? parts.slice(1).join(' · ') : (m.body || '');
       const tpl = m.msg_type === 'template' ? '<div class="wa-tpl-label">Template' + (md.template ? ' · ' + escapeHTML(md.template) : '') + '</div>' : '';
       const btns = (md.buttons && md.buttons.length) ? '<div class="wa-btns">' + md.buttons.map(b => '<span>' + escapeHTML(b) + '</span>').join('') + '</div>' : '';
@@ -7841,7 +7960,10 @@
       : '<div class="wa-window wa-win-closed">🟡 ' + (sel.windowUntil ? 'Lewat 24 jam sejak customer terakhir chat.' : 'Customer belum pernah membalas.') + ' Untuk menyapa wajib pakai <b>template</b>.</div>';
     const draft = waUI.drafts[sel.phone] || '';
     const comp = sel.windowOpen
-      ? '<div class="wa-comp"><textarea rows="1" id="wa-reply" data-wa-act="draft" placeholder="Ketik balasan… (Enter kirim, Shift+Enter baris baru)">' + escapeHTML(draft) + '</textarea>'
+      ? waQrHtml(sel) + '<div class="wa-comp">'
+        + '<button class="wa-tool' + (waUI.qrOpen ? ' on' : '') + '" data-wa-act="qr-toggle" title="Balasan cepat (atau ketik /)">⚡</button>'
+        + '<label class="wa-tool" title="Kirim gambar / dokumen (maks 3 MB)">' + (waUI.uploading ? '⏳' : '📎') + '<input type="file" data-wa-act="chat-file" accept="image/jpeg,image/png,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,video/mp4,audio/mpeg,audio/ogg" style="display:none"' + (waUI.uploading ? ' disabled' : '') + '></label>'
+        + '<textarea rows="1" id="wa-reply" data-wa-act="draft" placeholder="Ketik balasan… ( / = balasan cepat)">' + escapeHTML(draft) + '</textarea>'
         + '<button class="wa-send" data-wa-act="send" title="Kirim"' + (draft.trim() && !waUI.sendingReply ? '' : ' disabled') + '><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div>'
       : '<div class="wa-comp"><div class="wa-locked"><span>🔒 Kolom balas dikunci (aturan WhatsApp)</span><button class="btn wa-btn-green" data-wa-act="tpl-single">Kirim template</button></div></div>';
     return '<div class="wa-chat-head">'
@@ -7915,7 +8037,32 @@
           })() + '</div>' : '')
         + '<div class="wa-hint">Daftar diambil dari Meta (hanya yang <b>Approved</b>). <a href="#" data-wa-act="tpl-reload" style="color:#128c7e">Muat ulang</a> · <a href="#" data-wa-act="templates" style="color:#128c7e">Kelola / buat template</a></div>';
     }
-    const canSend = !waUI.bcSending && tg.list.length > 0 && (b.mode === 'text' ? !!(b.text || '').trim() : !!(tpl && tpl.supported));
+    const hdrNeed = b.mode !== 'text' && tpl && tpl.header_format ? tpl.header_format : null;
+    let step = 3, hdrBlock = '';
+    if (hdrNeed) {
+      const hl = { image: 'Gambar', document: 'Dokumen', video: 'Video' }[hdrNeed] || 'Media';
+      const imgs = hdrNeed === 'image' ? (assets || []).filter(a => a.kind === 'image' && /^https:\/\//i.test(a.url || '')) : [];
+      const h = b.hdr && b.hdr.type === hdrNeed ? b.hdr : null;
+      hdrBlock = '<div class="wa-bc-step"><h4><span class="n">' + (step++) + '</span>' + hl + ' header</h4>'
+        + '<div class="wa-hint" style="margin:0 0 8px">Template ini punya header ' + hl.toLowerCase() + ' — wajib diisi untuk setiap kiriman.</div>'
+        + '<label class="btn btn-outline" style="font-size:12px;cursor:pointer">' + (waUI.uploading ? '⏳ Mengunggah…' : '📤 Unggah ' + hl.toLowerCase() + ' (maks 3 MB)')
+        + '<input type="file" data-wa-act="bc-hfile" accept="' + (hdrNeed === 'image' ? 'image/jpeg,image/png' : hdrNeed === 'video' ? 'video/mp4' : 'application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx') + '" style="display:none"></label>'
+        + (imgs.length ? '<select class="wa-inp" data-wa-act="bc-hasset" style="margin-top:8px"><option value="">— atau pilih dari Image Library —</option>' + imgs.map(a => '<option value="' + escapeHTML(a.url) + '"' + (h && h.link === a.url ? ' selected' : '') + '>' + escapeHTML(a.name || a.url) + '</option>').join('') + '</select>' : '')
+        + '<input class="wa-inp" id="wa-bc-hlink" data-wa-act="bc-hlink" style="margin-top:8px" placeholder="atau tempel link https://… (file publik)" value="' + escapeHTML(h && h.link ? h.link : '') + '">'
+        + (h && (h.id || h.link) ? '<div class="wa-chips"><span class="wa-chip">✓ ' + escapeHTML(h.filename || (h.id ? 'File terunggah' : 'Link')) + '</span><a href="#" data-wa-act="bc-hclear" style="font-size:12px;color:#dc2626;align-self:center">hapus</a></div>' : '')
+        + '</div>';
+    }
+    const minAt = new Date(Date.now() + 5 * 60000); minAt.setSeconds(0, 0);
+    const toLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const later = b.when === 'later';
+    const atOk = later && b.at && new Date(b.at).getTime() > Date.now() + 60000;
+    const whenBlock = '<div class="wa-bc-step"><h4><span class="n">' + (step++) + '</span>Waktu kirim</h4>'
+      + '<div class="wa-seg"><button class="' + (!later ? 'on' : '') + '" data-wa-act="bc-when" data-v="now">⚡ Sekarang</button><button class="' + (later ? 'on' : '') + '" data-wa-act="bc-when" data-v="later">⏰ Jadwalkan</button></div>'
+      + (later ? '<input type="datetime-local" class="wa-inp" data-wa-act="bc-at" id="wa-bc-at" min="' + toLocal(minAt) + '" value="' + escapeHTML(b.at || '') + '">'
+        + '<div class="wa-hint">Dikirim otomatis oleh server pada waktu itu — dashboard boleh ditutup. Bisa dibatalkan dari 🕘 Riwayat sebelum waktunya.' + (b.mode === 'text' ? ' ⚠ Teks bebas tetap butuh kontak chat dalam 24 jam terakhir <b>saat dikirim</b>.' : '') + '</div>' : '')
+      + '</div>';
+    const hdrOk = !hdrNeed || !!(b.hdr && b.hdr.type === hdrNeed && (b.hdr.id || b.hdr.link));
+    const canSend = !waUI.bcSending && !waUI.uploading && tg.list.length > 0 && (b.mode === 'text' ? !!(b.text || '').trim() : !!(tpl && tpl.supported)) && hdrOk && (!later || atOk);
     return '<div class="wa-chat-head"><button class="btn btn-outline wa-back" data-wa-act="back">←</button>'
       + '<div class="wa-av" style="background:#128c7e">📣</div><div class="wa-chat-who"><b>' + (b.single ? 'Kirim template' : 'Broadcast baru') + '</b><span>' + (b.single ? 'ke ' + escapeHTML(tg.label) : 'Kirim ke banyak kontak sekaligus') + '</span></div>'
       + '<button class="btn btn-outline" data-wa-act="close-panel">Tutup</button></div>'
@@ -7923,16 +8070,17 @@
       + '<div class="wa-bc-step"><h4><span class="n">1</span>Penerima</h4>' + recip + '</div>'
       + '<div class="wa-bc-step"><h4><span class="n">2</span>Pesan</h4>'
       + (b.single ? '' : '<div class="wa-seg"><button class="' + (b.mode !== 'text' ? 'on' : '') + '" data-wa-act="bc-mode" data-mode="template">Template</button><button class="' + (b.mode === 'text' ? 'on' : '') + '" data-wa-act="bc-mode" data-mode="text">Teks bebas</button></div>')
-      + msg + '</div></div>'
+      + msg + '</div>' + hdrBlock + whenBlock + '</div>'
       + '<div class="wa-bc-prev"><div class="wa-bc-prev-head">Pratinjau di HP penerima (' + escapeHTML(sampleName) + ')</div>'
       + '<div class="wa-bc-prev-body"><div class="wa-day">Hari ini</div><div class="wa-b out">'
       + (b.mode !== 'text' && tpl ? '<div class="wa-tpl-label">Template · ' + escapeHTML(tpl.name) + '</div>' + (tpl.header ? '<b>' + escapeHTML(tpl.header) + '</b>\n' : '') : '')
+      + (hdrNeed ? (b.hdr && b.hdr.preview ? '<img src="' + escapeHTML(b.hdr.preview) + '" style="width:100%;border-radius:6px;margin-bottom:6px;display:block">' : b.hdr && b.hdr.link && hdrNeed === 'image' ? '<img src="' + escapeHTML(b.hdr.link) + '" style="width:100%;border-radius:6px;margin-bottom:6px;display:block" onerror="this.style.display=\'none\'">' : '<div class="wa-media">' + (hdrNeed === 'image' ? '🖼️ Gambar header' : hdrNeed === 'video' ? '🎬 Video header' : '📎 Dokumen header') + '</div>') : '')
       + escapeHTML(prevBody) + (b.mode !== 'text' && tpl && tpl.footer ? '<div style="font-size:11.5px;color:#667781;margin-top:4px">' + escapeHTML(tpl.footer) + '</div>' : '')
       + '<div class="wa-meta">' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' ✓✓</div>'
       + (prevBtns.length ? '<div class="wa-btns">' + prevBtns.map(x => '<span>' + escapeHTML(x) + '</span>').join('') + '</div>' : '')
       + '</div></div>'
       + '<div class="wa-bc-foot"><div class="wa-cost">' + (tg.list.length ? 'Akan dikirim ke <b>' + tg.list.length + '</b> nomor' + (b.mode !== 'text' && tpl ? ' · template <b>' + escapeHTML((tpl.category || '').toLowerCase()) + '</b> dikenai biaya Meta per pesan' : '') : 'Pilih penerima dulu') + '</div>'
-      + '<button class="btn wa-btn-green" data-wa-act="bc-send"' + (canSend ? '' : ' disabled style="opacity:.5;cursor:not-allowed"') + '>' + (waUI.bcSending ? 'Mengirim…' : (b.single ? '📨 Kirim template' : '📣 Kirim broadcast')) + '</button></div>'
+      + '<button class="btn wa-btn-green" data-wa-act="bc-send"' + (canSend ? '' : ' disabled style="opacity:.5;cursor:not-allowed"') + '>' + (waUI.bcSending ? (later ? 'Menjadwalkan…' : 'Mengirim…') : later ? '⏰ Jadwalkan' + (atOk ? ' · ' + new Date(b.at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '') : (b.single ? '📨 Kirim template' : '📣 Kirim broadcast')) + '</button></div>'
       + '</div></div>';
   }
   function waHistoryHtml() {
@@ -7947,6 +8095,13 @@
       const phones = {}; ms.forEach(m => { phones[m.contact_phone] = 1; });
       const replied = Object.keys(phones).filter(p => waUI.msgs.some(m => m.direction === 'in' && m.contact_phone === p && new Date(m.sent_at).getTime() > t0 && new Date(m.sent_at).getTime() < t0 + 72 * 3600e3)).length;
       const title = h.audience_name || (h.message || '').slice(0, 60) || 'Broadcast';
+      if (h.status === 'scheduled' || h.status === 'canceled' || (h.status === 'failed' && !ms.length)) {
+        const st = h.status === 'scheduled' ? '<span style="color:#b45309;font-weight:600">⏰ Terjadwal ' + escapeHTML(new Date(h.scheduled_at).toLocaleString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) + '</span>'
+          : h.status === 'canceled' ? '<span style="color:#6b7280">Dibatalkan</span>' : '<span style="color:#dc2626">⚠ Gagal dikirim</span>';
+        return '<div class="wa-hist-item"><div class="wa-av" style="background:#fef3c7;color:#b45309;width:38px;height:38px">⏰</div>'
+          + '<div style="flex:1;min-width:0"><b>' + escapeHTML(title) + '</b><div class="wa-snip">' + escapeHTML((h.message || '').replace(/\s+/g, ' ').slice(0, 120)) + '</div><div class="wa-hist-stats">' + st + '</div></div>'
+          + (h.status === 'scheduled' ? '<button class="btn btn-outline" style="font-size:11.5px;padding:4px 10px;color:#dc2626" data-wa-act="sch-cancel" data-id="' + escapeHTML(h.id) + '">Batalkan</button>' : '') + '</div>';
+      }
       return '<div class="wa-hist-item"><div class="wa-av" style="background:#e7fce3;color:#128c7e;width:38px;height:38px">📣</div>'
         + '<div style="flex:1;min-width:0"><b>' + escapeHTML(title) + '</b><div class="wa-snip">' + escapeHTML((h.message || '').replace(/\s+/g, ' ').slice(0, 120)) + '</div>'
         + '<div class="wa-hist-stats"><span>👥 ' + sent + ' terkirim</span>' + (ms.length ? '<span>✓✓ ' + delivered + ' sampai</span><span style="color:#027eb5">👁 ' + read + ' dibaca</span><span style="color:#128c7e">↩ ' + replied + ' membalas</span>' + (failed ? '<span style="color:#dc2626">⚠ ' + failed + ' gagal</span>' : '') : '') + '</div></div>'
@@ -7981,9 +8136,144 @@
       + '<div class="wa-hint" style="margin-top:0">Kalau kontak belum chat ke kamu dalam 24 jam, pesan pertama <b>wajib template</b> (aturan WhatsApp). Setelah dia membalas, kamu bisa chat bebas.' + (noPhone ? ' · ' + noPhone + ' lead tanpa nomor WA tidak ditampilkan.' : '') + '</div>'
       + '</div><div class="wa-nc-list">' + (rows || '<div class="wa-empty" style="padding:40px">Tidak ada lead dengan nomor WA' + (q ? ' yang cocok' : '') + '.</div>') + '</div></div>';
   }
+  /* ---------- Media di chat (gambar / dokumen / video / audio) ---------- */
+  const WA_MAX_UPLOAD = 3 * 1024 * 1024;
+  function waReadFile(file) {
+    return new Promise(function (res, rej) { const fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = function () { rej(new Error('Gagal membaca file')); }; fr.readAsDataURL(file); });
+  }
+  function waMediaLabel(type, name) { return { image: '🖼️ Gambar', video: '🎬 Video', audio: '🎤 Audio', document: '📎 ' + (name || 'Dokumen') }[type] || '📎 File'; }
+  async function waUpload(file, action) {
+    if (!file) return null;
+    if (file.size > WA_MAX_UPLOAD) throw new Error('File terlalu besar (' + (file.size / 1048576).toFixed(1) + ' MB). Maksimal 3 MB lewat dashboard.');
+    const data = await waReadFile(file);
+    const out = await waPost('/api/wa-media', { brand_id: waUI.brandId, action: action || 'upload', filename: file.name, mime: file.type || 'application/octet-stream', data: data });
+    return Object.assign(out, { preview: /^image\//.test(file.type) ? data : null, filename: file.name });
+  }
+  async function waMediaFetch(id) {
+    if (!id || waUI.media[id]) return;
+    waUI.media[id] = { loading: true };
+    try {
+      const resp = await fetch('/api/wa-media', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (await waToken()) }, body: JSON.stringify({ brand_id: waUI.brandId, action: 'get', media_id: id }) });
+      if (!resp.ok) { let j = null; try { j = await resp.json(); } catch (e) {} throw new Error((j && j.error) || ('HTTP ' + resp.status)); }
+      const blob = await resp.blob();
+      waUI.media[id] = { url: URL.createObjectURL(blob), mime: blob.type };
+    } catch (e) { waUI.media[id] = { error: e.message }; }
+    if (state.view === 'wa-blast') waRender();
+  }
+  function waMediaHtml(md, label) {
+    const c = md.id ? waUI.media[md.id] : null;
+    if (md.type === 'image' && c && c.url) return '<img src="' + c.url + '" data-wa-act="media-open" data-id="' + escapeHTML(md.id) + '" style="max-width:100%;max-height:320px;border-radius:6px;display:block;margin-bottom:4px;cursor:zoom-in">';
+    if (md.type === 'image' && md.link && !md.id) return '<img src="' + escapeHTML(md.link) + '" style="max-width:100%;max-height:320px;border-radius:6px;display:block;margin-bottom:4px" onerror="this.style.display=\'none\'">';
+    if ((md.type === 'video' || md.type === 'audio') && c && c.url) return md.type === 'video' ? '<video src="' + c.url + '" controls style="max-width:100%;border-radius:6px;margin-bottom:4px"></video>' : '<audio src="' + c.url + '" controls style="width:240px;margin-bottom:4px"></audio>';
+    const act = md.id ? (c && c.loading ? '<span style="font-size:11px;color:#667781">memuat…</span>' : c && c.error ? '<span style="font-size:11px;color:#b91c1c" title="' + escapeHTML(c.error) + '">gagal dimuat</span>' : '<a href="#" data-wa-act="media-open" data-id="' + escapeHTML(md.id) + '" data-name="' + escapeHTML(md.filename || '') + '" style="font-size:12px;color:#027eb5;font-weight:600">' + (md.type === 'document' ? 'Unduh' : 'Lihat') + '</a>') : '';
+    return '<div class="wa-media"><span style="flex:1">' + escapeHTML(label) + '</span>' + act + '</div>';
+  }
+  async function waMediaOpen(id, name) {
+    const c = waUI.media[id];
+    if (!c || (!c.url && !c.loading)) { delete waUI.media[id]; await waMediaFetch(id); }
+    const c2 = waUI.media[id];
+    if (!c2 || !c2.url) { if (c2 && c2.error) toast(c2.error); return; }
+    if (/^image\//.test(c2.mime) || /^video\//.test(c2.mime) || /pdf/.test(c2.mime)) { window.open(c2.url, '_blank'); return; }
+    const a = document.createElement('a'); a.href = c2.url; a.download = name || 'file'; document.body.appendChild(a); a.click(); a.remove();
+  }
+  async function waSendFile(file) {
+    const phone = waUI.selected; if (!phone || !file || waUI.uploading) return;
+    const conv = waConversations(waUI.msgs, waLeadIdx(), new Date()).find(c => c.phone === phone);
+    if (!conv || !conv.windowOpen) { toast('Kirim file hanya bisa dalam 24 jam setelah customer chat'); return; }
+    const caption = (waUI.drafts[phone] || '').trim();
+    waUI.uploading = true; waRender();
+    const tmpId = 'tmp-' + Date.now();
+    try {
+      const up = await waUpload(file, 'upload');
+      const label = waMediaLabel(up.type, up.filename);
+      if (up.preview) waUI.media[up.id] = { url: up.preview, mime: up.mime };
+      const row = { id: tmpId, brand_id: waUI.brandId, direction: 'out', contact_phone: phone, contact_name: conv.name, msg_type: up.type, body: caption ? label + ' · ' + caption : label,
+        media: { type: up.type, id: up.id, filename: up.filename, mime: up.mime }, status: 'sending', read_by_agent: true, sent_at: new Date().toISOString() };
+      waUI.msgs.push(row); waUI.drafts[phone] = ''; waRender();
+      const out = await waPost('/api/send-wa', { brand_id: waUI.brandId, mode: 'media', media: { type: up.type, id: up.id, filename: up.filename, caption: up.type === 'audio' ? '' : caption }, recipients: [{ lead_id: conv.lead ? conv.lead.id : '', phone: phone }] });
+      const r = (out.results || [])[0] || {};
+      waUI.msgs = waUI.msgs.filter(m => m.id !== tmpId);
+      if (r.ok && r.wa_message_id) {
+        await waLogOutgoing([Object.assign({}, row, { id: r.wa_message_id, status: 'sent' })]);
+        if (conv.lead) { try { appPrependActivities([{ id: generateActivityId(), lead_id: conv.lead.id, type: 'whatsapp', title: 'Kirim WA: ' + label, notes: caption, created_at: new Date().toISOString() }]); } catch (e) {} }
+      } else {
+        await waLogOutgoing([waFailRow(phone, conv.name, up.type, row.body, row.media, r.error || 'Gagal terkirim')]);
+        waUI.drafts[phone] = caption;
+      }
+    } catch (e) {
+      waUI.msgs = waUI.msgs.filter(m => m.id !== tmpId);
+      toast(e.message); waUI.drafts[phone] = caption;
+    }
+    waUI.uploading = false; waRender();
+  }
+
+  /* ---------- Balasan cepat (teks tersimpan, dipakai bersama satu brand) ---------- */
+  async function waLoadQr() {
+    if (!window.sb || !waUI.brandId) return;
+    const r = await window.sb.from('wa_quick_replies').select('*').eq('brand_id', waUI.brandId).order('title', { ascending: true });
+    if (r.error) { waUI.qr = []; waUI.qrError = /does not exist|schema cache|wa_quick_replies/i.test(r.error.message) ? 'Jalankan supabase-wa-fitur-lanjutan.sql untuk mengaktifkan balasan cepat.' : r.error.message; }
+    else { waUI.qr = r.data || []; waUI.qrError = ''; }
+    if (state.view === 'wa-blast') waRender();
+  }
+  function waQrFill(body, conv) {
+    const lead = conv && conv.lead ? conv.lead : { name: conv ? conv.name : '' };
+    const first = String((lead && lead.name) || '').replace(/^\+.*/, '').trim().split(/\s+/)[0] || 'Kak';
+    return String(body || '').replace(/\{\{?\s*(nama|first_name|name)\s*\}?\}/gi, first);
+  }
+  function waQrHtml(conv) {
+    const draft = waUI.drafts[waUI.selected] || '';
+    const slash = /^\/\S*$/.test(draft);
+    if (!waUI.qrOpen && !slash) return '';
+    const q = slash ? draft.slice(1).toLowerCase() : '';
+    const list = (waUI.qr || []).filter(x => !q || (x.title + ' ' + x.body).toLowerCase().includes(q));
+    const items = waUI.qr === null ? '<div class="wa-hint" style="padding:8px 12px">Memuat…</div>'
+      : waUI.qrError ? '<div class="wa-hint" style="padding:8px 12px;color:#92400e">' + escapeHTML(waUI.qrError) + '</div>'
+      : list.length ? list.slice(0, 30).map(x => '<div class="wa-qr-item" data-wa-act="qr-use" data-id="' + escapeHTML(x.id) + '"><div style="flex:1;min-width:0"><b>/' + escapeHTML(x.title) + '</b><div class="wa-snip">' + escapeHTML(waQrFill(x.body, conv)) + '</div></div><button class="wa-qr-del" data-wa-act="qr-del" data-id="' + escapeHTML(x.id) + '" title="Hapus">✕</button></div>').join('')
+      : '<div class="wa-hint" style="padding:8px 12px">' + (q ? 'Tidak ada yang cocok dengan "/' + escapeHTML(q) + '".' : 'Belum ada balasan cepat. Ketik pesan di bawah lalu klik <b>+ Simpan teks ini</b>.') + '</div>';
+    return '<div class="wa-qr"><div class="wa-qr-head"><b>⚡ Balasan cepat</b><span style="font-size:11px;color:#667781">ketik / untuk mencari · {nama} = nama customer</span>'
+      + '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px;margin-left:auto" data-wa-act="qr-add">+ Simpan teks ini</button><button class="wa-qr-del" data-wa-act="qr-toggle" title="Tutup">✕</button></div>'
+      + '<div class="wa-qr-list">' + items + '</div></div>';
+  }
+  async function waQrAdd() {
+    const draft = (waUI.drafts[waUI.selected] || '').trim();
+    if (!draft || /^\//.test(draft)) { toast('Tulis dulu teks balasannya di kolom chat, lalu klik Simpan'); return; }
+    const title = prompt('Nama singkat balasan cepat (dipakai dengan /nama):', draft.split(/\s+/).slice(0, 2).join('_').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20));
+    if (title === null) return;
+    const t = String(title).trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').slice(0, 30);
+    if (!t) { toast('Nama tidak boleh kosong'); return; }
+    const row = { id: uid('QR'), brand_id: waUI.brandId, title: t, body: draft };
+    const r = await window.sb.from('wa_quick_replies').insert(row);
+    if (r.error) { toast('Gagal menyimpan: ' + r.error.message); return; }
+    (waUI.qr = waUI.qr || []).push(row); waUI.qr.sort((a, b) => a.title.localeCompare(b.title));
+    toast('⚡ Disimpan sebagai /' + t); waRender();
+  }
+  async function waQrDel(id) {
+    const x = (waUI.qr || []).find(q => q.id === id); if (!x) return;
+    if (!confirm('Hapus balasan cepat /' + x.title + '?')) return;
+    const r = await window.sb.from('wa_quick_replies').delete().eq('id', id);
+    if (r.error) { toast('Gagal: ' + r.error.message); return; }
+    waUI.qr = waUI.qr.filter(q => q.id !== id); waRender();
+  }
+
+  /* ---------- Notifikasi status template dari webhook Meta ---------- */
+  async function waCheckTplEvents() {
+    if (!window.sb || !waUI.brandId) return;
+    const r = await window.sb.from('wa_template_events').select('*').eq('brand_id', waUI.brandId).eq('seen', false).order('created_at', { ascending: true }).limit(20);
+    if (r.error || !r.data || !r.data.length) return;
+    r.data.slice(-3).forEach(ev => waTplEventToast(ev));
+    await window.sb.from('wa_template_events').update({ seen: true }).in('id', r.data.map(e => e.id));
+    waUI.templates = null;
+    if (waUI.tm.list || waUI.view === 'templates') waLoadTm(true);
+  }
+  function waTplEventToast(ev) {
+    const e = String(ev.event || '').toUpperCase();
+    const map = { APPROVED: '✅ Template "' + ev.name + '" sudah Approved — siap dipakai broadcast', REJECTED: '❌ Template "' + ev.name + '" ditolak Meta' + (ev.reason ? ' (' + ev.reason + ')' : ''), PAUSED: '⏸ Template "' + ev.name + '" di-pause Meta karena kualitas rendah', DISABLED: '⛔ Template "' + ev.name + '" dinonaktifkan Meta' };
+    toast(map[e] || ('Template "' + ev.name + '": ' + e.replace(/_/g, ' ').toLowerCase()));
+  }
+
   /* ---------- Template manager (buat / pantau status / hapus) ---------- */
   function waTfNew() {
-    return { name: '', category: 'MARKETING', language: 'id', header: '', body: '', footer: (window.currentBrand ? window.currentBrand.name : '').slice(0, 60), examples: [], buttons: [] };
+    return { name: '', category: 'MARKETING', language: 'id', hkind: 'text', header: '', header_handle: '', header_preview: '', header_name: '', body: '', footer: (window.currentBrand ? window.currentBrand.name : '').slice(0, 60), examples: [], buttons: [] };
   }
   function waTfVarCount(body) { const n = (String(body || '').match(/\{\{(\d+)\}\}/g) || []).map(x => parseInt(x.replace(/\D/g, ''), 10)); return n.length ? Math.max.apply(null, n) : 0; }
   function waTplPending() { return (waUI.tm.list || []).filter(t => t.status === 'PENDING' || t.status === 'IN_APPEAL').length; }
@@ -8026,8 +8316,11 @@
     body = body.replace(/\{\{(\d+)\}\}/g, (m, n) => { const v = tf.examples[n - 1]; return v ? '<b style="background:#fff3c4">' + escapeHTML(v) + '</b>' : '<b style="color:#128c7e">' + m + '</b>'; });
     body = body.replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/_([^_\n]+)_/g, '<i>$1</i>');
     const btns = tf.buttons.filter(b => (b.text || '').trim());
+    const hk = tf.hkind || 'text';
     return '<div class="wa-day">Hari ini</div><div class="wa-b in" style="max-width:95%">'
-      + (tf.header ? '<div style="font-weight:700;margin-bottom:3px">' + escapeHTML(tf.header) + '</div>' : '')
+      + (hk === 'text' && tf.header ? '<div style="font-weight:700;margin-bottom:3px">' + escapeHTML(tf.header) + '</div>' : '')
+      + (hk === 'image' && tf.header_preview ? '<img src="' + tf.header_preview + '" style="width:100%;border-radius:6px;margin-bottom:6px;display:block">' : '')
+      + (hk !== 'text' && !(hk === 'image' && tf.header_preview) ? '<div class="wa-media">' + waMediaLabel(hk, tf.header_name || 'Dokumen') + '</div>' : '')
       + '<div>' + body + '</div>'
       + (tf.footer ? '<div style="font-size:11.5px;color:#8696a0;margin-top:4px">' + escapeHTML(tf.footer) + '</div>' : '')
       + '<div class="wa-meta">' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + '</div>'
@@ -8051,7 +8344,7 @@
       if (!t.sample) acts.push('<button class="btn btn-ghost" style="color:var(--danger)" data-wa-act="tm-del" data-name="' + escapeHTML(t.name) + '">Hapus</button>');
       return '<div class="wa-tpl-row"><div style="flex:1;min-width:0">'
         + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>' + escapeHTML(t.name) + '</b><span class="wa-st wa-st-' + stCls + '">' + icon + ' ' + escapeHTML(t.status_label) + '</span></div>'
-        + '<div class="wa-tpl-meta"><span>' + escapeHTML(cat || '') + '</span><span>· ' + escapeHTML(t.language) + '</span>' + (t.params ? '<span>· ' + t.params + ' variabel</span>' : '') + (t.buttons.length ? '<span>· ' + t.buttons.length + ' tombol</span>' : '') + (t.quality && t.quality !== 'UNKNOWN' ? '<span>· kualitas ' + escapeHTML(t.quality) + '</span>' : '') + (t.sample ? '<span>· contoh Meta (tidak bisa dipakai di nomor asli)</span>' : '') + '</div>'
+        + '<div class="wa-tpl-meta"><span>' + escapeHTML(cat || '') + '</span><span>· ' + escapeHTML(t.language) + '</span>' + (t.params ? '<span>· ' + t.params + ' variabel</span>' : '') + (t.header_format ? '<span>· header ' + escapeHTML(t.header_format) + '</span>' : '') + (t.buttons.length ? '<span>· ' + t.buttons.length + ' tombol</span>' : '') + (t.quality && t.quality !== 'UNKNOWN' ? '<span>· kualitas ' + escapeHTML(t.quality) + '</span>' : '') + (t.sample ? '<span>· contoh Meta (tidak bisa dipakai di nomor asli)</span>' : '') + '</div>'
         + '<div class="wa-snip" style="white-space:normal;max-height:38px;overflow:hidden;margin-top:4px">' + escapeHTML((t.header ? t.header + ' — ' : '') + t.body) + '</div>'
         + (t.status === 'REJECTED' ? '<div class="wa-tpl-reject">❌ Ditolak: ' + escapeHTML(t.rejected_label || 'Meta tidak memberi alasan spesifik') + '. Klik <b>Perbaiki</b> untuk bikin versi baru (nama harus beda).</div>' : '')
         + (t.status === 'APPROVED' && !t.supported && !t.sample ? '<div class="wa-hint">⚠ ' + escapeHTML(t.reason) + '</div>' : '')
@@ -8089,7 +8382,12 @@
       + '<div class="wa-tf-lbl">Kategori</div><div class="wa-seg">' + seg('category', 'MARKETING', '📣 Marketing') + seg('category', 'UTILITY', '🧾 Utility') + '</div>'
       + '<div class="wa-hint" style="margin-top:0">' + (tf.category === 'MARKETING' ? 'Promo, penawaran, follow-up checkout, info produk. Pilih ini kalau ragu — template promo yang diajukan sebagai Utility biasanya ditolak/diubah Meta.' : 'Hanya untuk info transaksi/akun yang sudah ada (konfirmasi order, pengingat pembayaran, status). Tidak boleh ada unsur promosi.') + '</div>'
       + '<div class="wa-tf-lbl">Bahasa</div><select class="wa-inp" data-wa-act="tf" data-f="language"><option value="id"' + (tf.language === 'id' ? ' selected' : '') + '>Indonesia (id)</option><option value="en_US"' + (tf.language === 'en_US' ? ' selected' : '') + '>English US (en_US)</option><option value="en"' + (tf.language === 'en' ? ' selected' : '') + '>English (en)</option></select>'
-      + '<div class="wa-tf-lbl">Header <small>opsional · maks 60</small></div>' + inp('header', 'mis. Gipsy AI PRO', 60)
+      + '<div class="wa-tf-lbl">Header <small>opsional</small></div><div class="wa-seg" style="flex-wrap:wrap">' + seg('hkind', 'text', 'Teks') + seg('hkind', 'image', '🖼️ Gambar') + seg('hkind', 'document', '📎 Dokumen') + seg('hkind', 'video', '🎬 Video') + '</div>'
+      + ((tf.hkind || 'text') === 'text' ? inp('header', 'mis. Gipsy AI PRO (boleh kosong)', 60)
+        : '<label class="btn btn-outline" style="font-size:12px;cursor:pointer">' + (waUI.uploading ? '⏳ Mengunggah ke Meta…' : '📤 Unggah contoh ' + ({ image: 'gambar (JPG/PNG)', document: 'dokumen (PDF)', video: 'video (MP4)' }[tf.hkind]) + ' · maks 3 MB')
+          + '<input type="file" data-wa-act="tf-hfile" accept="' + (tf.hkind === 'image' ? 'image/jpeg,image/png' : tf.hkind === 'video' ? 'video/mp4' : 'application/pdf') + '" style="display:none"></label>'
+          + (tf.header_handle ? '<div class="wa-chips"><span class="wa-chip">✓ ' + escapeHTML(tf.header_name || 'Contoh terunggah') + '</span></div>' : '')
+          + '<div class="wa-hint">Contoh ini hanya untuk review Meta. Saat broadcast, kamu bisa pakai ' + (tf.hkind === 'image' ? 'gambar' : 'file') + ' lain setiap kali kirim.</div>')
       + '<div class="wa-tf-lbl">Isi pesan <span><button class="btn btn-outline" style="padding:2px 8px;font-size:11px" data-wa-act="tf-var">+ Variabel {{' + (nv + 1) + '}}</button></span></div>'
       + '<textarea class="wa-inp" id="wa-tf-body" data-wa-act="tf" data-f="body" maxlength="1024" placeholder="Halo {{1}} 👋&#10;&#10;Kami lihat kamu sempat checkout Gipsy AI PRO tapi belum selesai. Ada yang bisa kami bantu?">' + escapeHTML(tf.body) + '</textarea>'
       + '<div class="wa-hint"><span id="wa-tf-cnt">' + (tf.body || '').length + '</span>/1024 · *tebal* _miring_ · {{1}} = nama depan lead saat broadcast. Jangan awali/akhiri pesan dengan variabel.</div>'
@@ -8112,7 +8410,11 @@
     if ((waUI.tm.list || []).some(t => t.name === tf.name && t.language === tf.language)) { toast('Nama "' + tf.name + '" sudah dipakai — ganti nama lain'); return; }
     waUI.tm.saving = true; waRender();
     try {
-      const out = await waPost('/api/wa-templates', { brand_id: window.currentBrand.id, action: 'create', template: Object.assign({}, tf, { examples: tf.examples.slice(0, nv) }) });
+      const hk = tf.hkind || 'text';
+      if (hk !== 'text' && !tf.header_handle) { toast('Unggah contoh ' + (hk === 'image' ? 'gambar' : 'file') + ' header dulu'); waUI.tm.saving = false; waRender(); return; }
+      const sendTf = Object.assign({}, tf, { examples: tf.examples.slice(0, nv), header: hk === 'text' ? tf.header : '', header_format: hk === 'text' ? '' : hk.toUpperCase(), header_handle: hk === 'text' ? '' : tf.header_handle });
+      delete sendTf.header_preview;
+      const out = await waPost('/api/wa-templates', { brand_id: window.currentBrand.id, action: 'create', template: sendTf });
       toast('📤 Template "' + out.name + '" dikirim ke Meta — status: ' + (out.status === 'APPROVED' ? 'Approved' : 'sedang direview'));
       if (out.category && out.category !== tf.category) toast('ℹ Meta mengubah kategori jadi ' + out.category);
       waUI.tf = null; waUI.view = 'templates';
@@ -8131,7 +8433,7 @@
   function waTmCopy(name, lang) {
     const t = (waUI.tm.list || []).find(x => x.name === name && x.language === lang); if (!t) return;
     const nv = waTfVarCount(t.body);
-    waUI.tf = { name: name + '_v2', category: t.category === 'UTILITY' ? 'UTILITY' : 'MARKETING', language: t.language, header: t.header || '', body: t.body || '', footer: t.footer || '',
+    waUI.tf = { name: name + '_v2', category: t.category === 'UTILITY' ? 'UTILITY' : 'MARKETING', language: t.language, hkind: t.header_format || 'text', header_handle: '', header_preview: '', header_name: '', header: t.header || '', body: t.body || '', footer: t.footer || '',
       examples: Array.from({ length: nv }, (_, i) => i === 0 ? 'Andi' : ''), buttons: (t.buttons || []).filter(b => ['QUICK_REPLY', 'URL', 'PHONE_NUMBER'].indexOf(b.type) >= 0).map(b => ({ type: b.type, text: b.text || '', url: b.url || '', phone: b.phone || '' })) };
     waUI.view = 'tplform'; waRender();
   }
@@ -8201,6 +8503,11 @@
     const ta = document.getElementById('wa-reply');
     if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; }
     waBadge();
+    // Gambar/video di percakapan yang dibuka dimuat otomatis (maks 12 terakhir)
+    if (waUI.view === 'chat' && waUI.selected) {
+      waUI.msgs.filter(m => m.contact_phone === waUI.selected && m.media && m.media.id && (m.media.type === 'image' || (m.media.header && m.media.header.id)) ).slice(-12)
+        .forEach(m => { const id = m.media.type === 'image' ? m.media.id : m.media.header.id; if (!waUI.media[id]) waMediaFetch(id); });
+    }
     // Di HP: chat/broadcast terbuka = satu langkah "kembali"
     const shell = host.querySelector('.wa-shell');
     const isOpen = !!(shell && shell.classList.contains('chat-open') && window.matchMedia('(max-width: 760px)').matches);
@@ -8251,8 +8558,16 @@
     if (!tg.list.length) { toast('Tidak ada penerima dengan nomor valid'); return; }
     if (b.mode === 'text' && !(b.text || '').trim()) { toast('Isi pesan masih kosong'); return; }
     if (b.mode !== 'text' && !(tpl && tpl.supported)) { toast('Pilih template dulu'); return; }
+    const hdrNeed = b.mode !== 'text' && tpl.header_format ? tpl.header_format : null;
+    const hdr = hdrNeed && b.hdr && b.hdr.type === hdrNeed && (b.hdr.id || b.hdr.link) ? { type: b.hdr.type, id: b.hdr.id || null, link: b.hdr.id ? null : b.hdr.link, filename: b.hdr.filename || null } : null;
+    if (hdrNeed && !hdr) { toast('Isi ' + hdrNeed + ' header dulu'); return; }
+    const later = b.when === 'later';
+    if (later && !(b.at && new Date(b.at).getTime() > Date.now() + 60000)) { toast('Pilih waktu kirim minimal beberapa menit dari sekarang'); return; }
     const what = b.mode === 'text' ? 'teks bebas' : 'template "' + tpl.name + '"';
-    if (!confirm('Kirim ' + what + ' ke ' + tg.list.length + ' nomor?' + (tg.noPhone ? '\n\n' + tg.noPhone + ' kontak dilewati karena nomor tidak valid.' : '') + (tg.outside ? '\n' + tg.outside + ' kontak dilewati karena di luar 24 jam.' : '') + '\n\nPesan WhatsApp tidak bisa ditarik kembali.')) return;
+    const whenTxt = later ? new Date(b.at).toLocaleString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : '';
+    if (!confirm((later ? 'Jadwalkan ' : 'Kirim ') + what + ' ke ' + tg.list.length + ' nomor' + (later ? ' pada ' + whenTxt : '') + '?' + (tg.noPhone ? '\n\n' + tg.noPhone + ' kontak dilewati karena nomor tidak valid.' : '') + (tg.outside ? '\n' + tg.outside + ' kontak dilewati karena di luar 24 jam.' : '') + (later ? '\n\nBisa dibatalkan dari Riwayat sebelum waktunya.' : '\n\nPesan WhatsApp tidak bisa ditarik kembali.'))) return;
+    const mediaLog = b.mode === 'text' ? null : { template: tpl.name, buttons: waBtnLabels(tpl), header: hdr ? { type: hdr.type, id: hdr.id, link: hdr.link } : null };
+    if (later) { await waScheduleBroadcast(b, tpl, tg, hdr, mediaLog); return; }
     waUI.bcSending = true; waRender();
     const blastId = b.single ? null : uid('WB');
     const sentAt = new Date().toISOString();
@@ -8266,25 +8581,25 @@
         else { o.params = waParamsFor(tpl, t.lead, t.name); bodyByPhone[t.phone] = waRenderTpl(tpl, o.params); }
         return o;
       }) };
-      if (b.mode === 'text') payload.text = b.text; else payload.template = { name: tpl.name, language: tpl.language };
+      if (b.mode === 'text') payload.text = b.text; else payload.template = { name: tpl.name, language: tpl.language, header: hdr };
       try {
         const out = await waPost('/api/send-wa', payload);
         (out.results || []).forEach(r => {
           const t = batch.find(x => x.phone === r.phone) || batch.find(x => x.lead && x.lead.id === r.lead_id) || {};
           if (r.ok && r.wa_message_id) {
             rows.push({ id: r.wa_message_id, brand_id: waUI.brandId, direction: 'out', contact_phone: r.phone, contact_name: t.name || null,
-              msg_type: b.mode === 'text' ? 'text' : 'template', body: bodyByPhone[r.phone] || '', media: b.mode === 'text' ? null : { template: tpl.name, buttons: waBtnLabels(tpl) },
+              msg_type: b.mode === 'text' ? 'text' : 'template', body: bodyByPhone[r.phone] || '', media: mediaLog,
               status: 'sent', read_by_agent: true, blast_id: blastId, sent_at: sentAt });
             if (t.lead) okLeads.push(t.lead.id);
           } else {
             failed.push((t.name || r.phone) + ' — ' + (r.error || 'gagal'));
-            failRows.push(waFailRow(r.phone || t.phone, t.name, b.mode === 'text' ? 'text' : 'template', bodyByPhone[r.phone || t.phone] || '', b.mode === 'text' ? null : { template: tpl.name, buttons: waBtnLabels(tpl) }, r.error || 'Gagal terkirim', blastId, sentAt));
+            failRows.push(waFailRow(r.phone || t.phone, t.name, b.mode === 'text' ? 'text' : 'template', bodyByPhone[r.phone || t.phone] || '', mediaLog, r.error || 'Gagal terkirim', blastId, sentAt));
           }
         });
       } catch (e) {
         batch.forEach(t => {
           failed.push((t.name || t.phone) + ' — ' + e.message);
-          failRows.push(waFailRow(t.phone, t.name, b.mode === 'text' ? 'text' : 'template', bodyByPhone[t.phone] || '', b.mode === 'text' ? null : { template: tpl.name, buttons: waBtnLabels(tpl) }, e.message, blastId, sentAt));
+          failRows.push(waFailRow(t.phone, t.name, b.mode === 'text' ? 'text' : 'template', bodyByPhone[t.phone] || '', mediaLog, e.message, blastId, sentAt));
         });
       }
     }
@@ -8307,6 +8622,50 @@
     }
     waRender();
   }
+
+  /* ---------- Broadcast terjadwal ---------- */
+  async function waScheduleBroadcast(b, tpl, tg, hdr, mediaLog) {
+    waUI.bcSending = true; waRender();
+    const id = uid('WB');
+    const runAt = new Date(b.at).toISOString();
+    const recipients = tg.list.map(t => {
+      const o = { lead_id: t.lead ? t.lead.id : '', phone: t.phone, name: t.name || null };
+      if (b.mode === 'text') { o.text = waFillTokens(b.text, t.lead || { name: t.name }); o.body = o.text; }
+      else { o.params = waParamsFor(tpl, t.lead, t.name); o.body = waRenderTpl(tpl, o.params); }
+      return o;
+    });
+    const summary = b.mode === 'text' ? b.text : '[Template: ' + tpl.name + ']';
+    const payload = { mode: b.mode === 'text' ? 'text' : 'template', text: b.mode === 'text' ? b.text : '', recipients: recipients,
+      template: b.mode === 'text' ? null : { name: tpl.name, language: tpl.language, header: hdr }, media_log: mediaLog, summary: summary };
+    try {
+      const r = await window.sb.from('wa_scheduled').insert({ id: id, brand_id: waUI.brandId, run_at: runAt, status: 'scheduled', payload: payload });
+      if (r.error) throw r.error;
+      waBlast.history = [{ id: id, channel: 'wa', subject: null, body: null, message: summary, recipients: [],
+        audience_id: b.audience || null, audience_name: tg.label || (recipients[0] && recipients[0].name) || null, status: 'scheduled', scheduled_at: runAt, sent_at: null, created_at: new Date().toISOString() }].concat(waBlast.history || []);
+      saveBlast(STORAGE_KEY_BLAST_WA, waBlast);
+      toast('⏰ Dijadwalkan ' + new Date(runAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' ke ' + recipients.length + ' nomor');
+      waUI.bc.single = null; waUI.bc.when = 'now'; waUI.bc.at = ''; waUI.view = 'history';
+    } catch (e) {
+      const m = (e && e.message) || String(e);
+      alert('Gagal menjadwalkan:\n\n' + (/wa_scheduled|does not exist|schema cache/i.test(m) ? 'Tabel jadwal belum dibuat — jalankan supabase-wa-fitur-lanjutan.sql di Supabase.' : m));
+    }
+    waUI.bcSending = false; waRender();
+  }
+  async function waCancelScheduled(id) {
+    if (!confirm('Batalkan broadcast terjadwal ini?')) return;
+    const r = await window.sb.from('wa_scheduled').update({ status: 'canceled' }).eq('id', id).eq('status', 'scheduled').select('id');
+    if (r.error) { toast('Gagal membatalkan: ' + r.error.message); return; }
+    if (!r.data || !r.data.length) { toast('Tidak bisa dibatalkan — broadcast ini sudah mulai/selesai dikirim'); return; }
+    waBlast.history = (waBlast.history || []).map(h => h.id === id ? Object.assign({}, h, { status: 'canceled' }) : h);
+    saveBlast(STORAGE_KEY_BLAST_WA, waBlast);
+    toast('Broadcast terjadwal dibatalkan'); waRender();
+  }
+  // Cadangan penjadwal: selama dashboard terbuka, jadwal yang sudah lewat waktunya ikut dipicu dari sini
+  setInterval(function () {
+    if (!window.currentBrand || !waUI || !waUI.brandId) return;
+    const due = (waBlast.history || []).some(h => h.status === 'scheduled' && h.scheduled_at && new Date(h.scheduled_at).getTime() <= Date.now() - 30000);
+    if (due) waPost('/api/wa-cron', { brand_id: waUI.brandId }).then(function (o) { if (o && o.processed && o.processed.length) { try { window.cloudStart(); } catch (e) {} } }).catch(function () {});
+  }, 60000);
   function waAddLead() {
     const phone = waUI.selected; if (!phone) return;
     const conv = waConversations(waUI.msgs, {}, new Date()).find(c => c.phone === phone);
@@ -8321,7 +8680,7 @@
     const el = e.target.closest && e.target.closest('[data-wa-act]');
     if (!el || !document.getElementById('wa-blast-host').contains(el)) return;
     const a = el.getAttribute('data-wa-act');
-    if (['open', 'filter', 'back', 'close-panel', 'broadcast', 'history', 'refresh', 'send', 'tpl-single', 'tpl-reload', 'open-lead', 'add-lead', 'bc-mode', 'bc-send', 'go-profile', 'newchat', 'nc-pick', 'nc-go', 'templates', 'tm-refresh', 'tm-new', 'tm-back', 'tm-use', 'tm-copy', 'tm-del', 'tf-set', 'tf-var', 'tf-btn-add', 'tf-btn-del', 'tf-submit'].indexOf(a) >= 0) e.preventDefault();
+    if (['open', 'filter', 'back', 'close-panel', 'broadcast', 'history', 'refresh', 'send', 'tpl-single', 'tpl-reload', 'open-lead', 'add-lead', 'bc-mode', 'bc-send', 'go-profile', 'newchat', 'nc-pick', 'nc-go', 'templates', 'tm-refresh', 'tm-new', 'tm-back', 'tm-use', 'tm-copy', 'tm-del', 'tf-set', 'tf-var', 'tf-btn-add', 'tf-btn-del', 'tf-submit', 'bc-when', 'bc-hclear', 'sch-cancel', 'qr-toggle', 'qr-use', 'qr-del', 'qr-add', 'media-open'].indexOf(a) >= 0) e.preventDefault();
     if (a === 'open') { waUI.view = 'chat'; waUI.selected = el.getAttribute('data-phone'); waMarkRead(waUI.selected); waRender(); }
     else if (a === 'filter') { waUI.filter = el.getAttribute('data-filter'); waRender(); }
     else if (a === 'back') { if (waUI.view !== 'chat') waUI.view = 'chat'; else waUI.selected = null; waUI.bc.single = null; waRender(); }
@@ -8357,6 +8716,19 @@
     else if (a === 'tf-btn-add') { waUI.tf.buttons.push({ type: 'QUICK_REPLY', text: '', url: '', phone: '' }); waRender(); }
     else if (a === 'tf-btn-del') { waUI.tf.buttons.splice(parseInt(el.getAttribute('data-i'), 10), 1); waRender(); }
     else if (a === 'tf-submit') waTfSubmit();
+    else if (a === 'bc-when') { waUI.bc.when = el.getAttribute('data-v'); if (waUI.bc.when === 'later' && !waUI.bc.at) { const d = new Date(Date.now() + 3600e3); d.setMinutes(0, 0, 0); waUI.bc.at = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); } waRender(); }
+    else if (a === 'bc-hclear') { waUI.bc.hdr = null; waRender(); }
+    else if (a === 'sch-cancel') waCancelScheduled(el.getAttribute('data-id'));
+    else if (a === 'qr-toggle') { const d = waUI.drafts[waUI.selected] || ''; if (/^\/\S*$/.test(d)) { waUI.drafts[waUI.selected] = ''; waUI.qrOpen = false; } else waUI.qrOpen = !waUI.qrOpen; if (waUI.qr === null) waLoadQr(); waRender(); }
+    else if (a === 'qr-use') {
+      const x = (waUI.qr || []).find(q => q.id === el.getAttribute('data-id')); if (!x) return;
+      const conv = waConversations(waUI.msgs, waLeadIdx(), new Date()).find(c => c.phone === waUI.selected);
+      waUI.drafts[waUI.selected] = waQrFill(x.body, conv); waUI.qrOpen = false; waRender();
+      const ta = document.getElementById('wa-reply'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    }
+    else if (a === 'qr-del') { e.stopPropagation(); waQrDel(el.getAttribute('data-id')); }
+    else if (a === 'qr-add') waQrAdd();
+    else if (a === 'media-open') waMediaOpen(el.getAttribute('data-id'), el.getAttribute('data-name'));
     else if (a === 'nc-go') { const p = normWaPhone(waUI.ncNum); if (!p) { toast('Nomor WA tidak valid (contoh: 0812xxxxxxx atau +62812xxxxxxx)'); return; } waStartChat(p); }
   });
   document.addEventListener('change', function (e) {
@@ -8366,6 +8738,18 @@
     if (a === 'bc-audience') { waUI.bc.audience = el.value; waRender(); }
     else if (a === 'bc-template') { waUI.bc.template = el.value; waRender(); }
     else if (a === 'tf' && el.tagName === 'SELECT') { waUI.tf[el.getAttribute('data-f')] = el.value; waRender(); }
+    else if (a === 'bc-at') { waUI.bc.at = el.value; waRender(); }
+    else if (a === 'bc-hasset') { if (el.value) { waUI.bc.hdr = { type: 'image', link: el.value, filename: el.options[el.selectedIndex].text }; } waRender(); }
+    else if (a === 'chat-file') { const f = el.files && el.files[0]; el.value = ''; if (f) waSendFile(f); }
+    else if (a === 'bc-hfile' || a === 'tf-hfile') {
+      const f = el.files && el.files[0]; el.value = ''; if (!f || waUI.uploading) return;
+      waUI.uploading = true; waRender();
+      waUpload(f, a === 'tf-hfile' ? 'header-handle' : 'upload').then(function (up) {
+        if (a === 'tf-hfile') { Object.assign(waUI.tf, { header_handle: up.handle, header_preview: up.preview || '', header_name: f.name }); }
+        else waUI.bc.hdr = { type: up.type, id: up.id, filename: f.name, preview: up.preview || '' };
+        toast('✓ ' + f.name + ' terunggah');
+      }).catch(function (err) { alert('Gagal mengunggah:\n\n' + err.message); }).finally(function () { waUI.uploading = false; waRender(); });
+    }
     else if (a === 'tf-btn' && el.tagName === 'SELECT') { waUI.tf.buttons[parseInt(el.getAttribute('data-i'), 10)].type = el.value; waRender(); }
     else if (a === 'bc-var-src') { const tpl = (waUI.templates || []).find(t => t.name === waUI.bc.template); if (tpl) { waTplVars(tpl)[el.getAttribute('data-n')].src = el.value; waRender(); } }
   });
@@ -8384,8 +8768,12 @@
       if (waTfVarCount(tf.body) !== before) waRender();
       else { const pv = document.getElementById('wa-tf-prev'); if (pv) pv.innerHTML = waTfPreviewHtml(tf); const c = document.getElementById('wa-tf-cnt'); if (c) c.textContent = (tf.body || '').length; }
     }
+    else if (a === 'bc-hlink') { const v = el.value.trim(); const t = (waUI.templates || []).find(x => x.name === waUI.bc.template); waUI.bc.hdr = v ? { type: (t && t.header_format) || 'image', link: v, filename: 'Link' } : null; clearTimeout(waUI._hl); waUI._hl = setTimeout(waRender, 500); }
+    else if (a === 'bc-at') { waUI.bc.at = el.value; }
     else if (a === 'draft') {
+      const wasSlash = /^\/\S*$/.test(waUI.drafts[waUI.selected] || '');
       waUI.drafts[waUI.selected] = el.value;
+      if (wasSlash !== /^\/\S*$/.test(el.value) || wasSlash) { if (waUI.qr === null) waLoadQr(); waRender(); return; }
       const btn = document.querySelector('[data-wa-act="send"]'); if (btn) btn.disabled = !el.value.trim() || waUI.sendingReply;
       el.style.height = 'auto'; el.style.height = Math.min(120, el.scrollHeight) + 'px';
     }
@@ -8393,7 +8781,13 @@
     else if (a === 'bc-var-txt') { const tpl = (waUI.templates || []).find(t => t.name === waUI.bc.template); if (tpl) { waTplVars(tpl)[el.getAttribute('data-n')].txt = el.value; } clearTimeout(waUI._vt); waUI._vt = setTimeout(waRender, 250); }
   });
   document.addEventListener('keydown', function (e) {
-    if (e.target && e.target.id === 'wa-reply' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); waSendReply(); }
+    if (e.target && e.target.id === 'wa-reply' && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const d = waUI.drafts[waUI.selected] || '';
+      if (/^\/\S*$/.test(d)) { const first = document.querySelector('.wa-qr-item[data-wa-act="qr-use"]'); if (first) first.click(); return; }
+      waSendReply();
+    }
+    if (e.target && e.target.id === 'wa-reply' && e.key === 'Escape' && waUI.qrOpen) { waUI.qrOpen = false; waRender(); }
     if (e.target && e.target.id === 'wa-nc-num' && e.key === 'Enter') { e.preventDefault(); const b = document.querySelector('[data-wa-act="nc-go"]'); if (b) b.click(); }
   });
 
