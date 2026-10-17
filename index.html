@@ -7626,6 +7626,12 @@
     const n = waUI.msgs.filter(m => m.direction === 'in' && !m.read_by_agent).length;
     el.textContent = n; el.style.display = n ? '' : 'none';
   }
+  // Pesan yang gagal dikirim tetap dicatat supaya kelihatan di riwayat chat (dengan alasan gagalnya)
+  function waFailRow(phone, name, type, body, media, error, blastId, at) {
+    return { id: 'fail-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '-' + phone, brand_id: waUI.brandId, direction: 'out',
+      contact_phone: String(phone || ''), contact_name: name || null, msg_type: type, body: body || '', media: media || null,
+      status: 'failed', error: String(error || 'Gagal terkirim').slice(0, 300), read_by_agent: true, blast_id: blastId || null, sent_at: at || new Date().toISOString() };
+  }
   async function waLogOutgoing(rows) {
     if (!rows.length) return;
     rows.forEach(r => { if (!waUI.msgs.some(x => x.id === r.id)) waUI.msgs.push(r); });
@@ -7918,12 +7924,12 @@
         await waLogOutgoing([Object.assign({}, row, { id: r.wa_message_id, status: 'sent' })]);
         if (conv && conv.lead) { try { appPrependActivities([{ id: generateActivityId(), lead_id: conv.lead.id, type: 'whatsapp', title: 'Balas WA: ' + text.slice(0, 60), notes: text, created_at: new Date().toISOString() }]); } catch (e) {} }
       } else {
-        waUI.msgs.push(Object.assign({}, row, { id: 'fail-' + Date.now(), status: 'failed', error: r.error || 'Gagal terkirim' }));
+        await waLogOutgoing([waFailRow(phone, row.contact_name, 'text', text, null, r.error || 'Gagal terkirim')]);
         waUI.drafts[phone] = text;
       }
     } catch (e) {
       waUI.msgs = waUI.msgs.filter(m => m.id !== tmpId);
-      waUI.msgs.push(Object.assign({}, row, { id: 'fail-' + Date.now(), status: 'failed', error: e.message }));
+      await waLogOutgoing([waFailRow(phone, row.contact_name, 'text', text, null, e.message)]);
       waUI.drafts[phone] = text;
     }
     waUI.sendingReply = false; waRender();
@@ -7942,7 +7948,7 @@
     waUI.bcSending = true; waRender();
     const blastId = b.single ? null : uid('WB');
     const sentAt = new Date().toISOString();
-    const rows = [], failed = [], okLeads = [];
+    const rows = [], failed = [], okLeads = [], failRows = [];
     for (let i = 0; i < tg.list.length; i += 50) {
       const batch = tg.list.slice(i, i + 50);
       const bodyByPhone = {};
@@ -7962,11 +7968,19 @@
               msg_type: b.mode === 'text' ? 'text' : 'template', body: bodyByPhone[r.phone] || '', media: b.mode === 'text' ? null : { template: tpl.name, buttons: waBtnLabels(tpl) },
               status: 'sent', read_by_agent: true, blast_id: blastId, sent_at: sentAt });
             if (t.lead) okLeads.push(t.lead.id);
-          } else failed.push((t.name || r.phone) + ' — ' + (r.error || 'gagal'));
+          } else {
+            failed.push((t.name || r.phone) + ' — ' + (r.error || 'gagal'));
+            failRows.push(waFailRow(r.phone || t.phone, t.name, b.mode === 'text' ? 'text' : 'template', bodyByPhone[r.phone || t.phone] || '', b.mode === 'text' ? null : { template: tpl.name, buttons: waBtnLabels(tpl) }, r.error || 'Gagal terkirim', blastId, sentAt));
+          }
         });
-      } catch (e) { batch.forEach(t => failed.push((t.name || t.phone) + ' — ' + e.message)); }
+      } catch (e) {
+        batch.forEach(t => {
+          failed.push((t.name || t.phone) + ' — ' + e.message);
+          failRows.push(waFailRow(t.phone, t.name, b.mode === 'text' ? 'text' : 'template', bodyByPhone[t.phone] || '', b.mode === 'text' ? null : { template: tpl.name, buttons: waBtnLabels(tpl) }, e.message, blastId, sentAt));
+        });
+      }
     }
-    await waLogOutgoing(rows);
+    await waLogOutgoing(rows.concat(failRows));
     if (rows.length) {
       const summary = b.mode === 'text' ? b.text : '[Template: ' + tpl.name + ']';
       if (blastId) {
@@ -7979,7 +7993,7 @@
     waUI.bcSending = false;
     if (failed.length) alert((rows.length ? 'Terkirim ke ' + rows.length + ' nomor, tapi ' : '') + failed.length + ' gagal:\n\n' + failed.slice(0, 8).join('\n') + (failed.length > 8 ? '\n…dan ' + (failed.length - 8) + ' lainnya' : ''));
     else toast('📣 Terkirim ke ' + rows.length + ' nomor');
-    if (rows.length) {
+    if (rows.length || (b.single && failRows.length)) {
       if (b.single) { waUI.view = 'chat'; waUI.selected = b.single; waUI.bc.single = null; }
       else waUI.view = 'history';
     }
