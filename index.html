@@ -7946,7 +7946,8 @@
       const isMedia = md.type && ['image', 'video', 'audio', 'document', 'sticker'].indexOf(md.type) >= 0;
       const parts = String(m.body || '').split(' · ');
       const media = isMedia ? waMediaHtml(md, parts[0]) : (md.header && (md.header.id || md.header.link) ? waMediaHtml(md.header, waMediaLabel(md.header.type)) : '');
-      const body = isMedia ? parts.slice(1).join(' · ') : (m.body || '');
+      let body = isMedia ? parts.slice(1).join(' · ') : (m.body || '');
+      if (/^\[Pesan (unsupported|unknown) belum didukung\]$/.test(body)) body = '⚠️ Pesan ini tidak bisa dibaca lewat WhatsApp API — biasanya kode verifikasi/OTP, polling, atau pesan sekali lihat. Minta pengirim memakai SMS/telepon atau kirim ulang sebagai teks biasa.';
       const tpl = m.msg_type === 'template' ? '<div class="wa-tpl-label">Template' + (md.template ? ' · ' + escapeHTML(md.template) : '') + '</div>' : '';
       const btns = (md.buttons && md.buttons.length) ? '<div class="wa-btns">' + md.buttons.map(b => '<span>' + escapeHTML(b) + '</span>').join('') + '</div>' : '';
       const btnReply = (m.msg_type === 'button' || m.msg_type === 'interactive') ? '<div style="font-size:10px;color:#128c7e;font-weight:600;margin-bottom:2px">↩ Klik tombol</div>' : '';
