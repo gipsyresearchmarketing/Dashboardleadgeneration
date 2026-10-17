@@ -26,14 +26,16 @@ function friendlyError(err) {
   const code = err && err.code;
   const msg = String((err && (err.error_data && err.error_data.details || err.message)) || 'Error tidak diketahui');
   const map = {
-    190: 'Access token kadaluarsa/tidak valid — buat token baru lalu update WA_ACCESS_TOKEN di Vercel.',
+    190: 'Access token kadaluarsa/tidak valid — buat token baru (System User) lalu tempel di Profile → WhatsApp → Cara manual.',
+    131042: 'Masalah pembayaran — tambahkan kartu di Billing Hub (business.facebook.com/billing_hub) untuk akun WhatsApp ini.',
+    131051: 'Jenis pesan ini tidak didukung.',
     131030: 'Nomor penerima belum terdaftar di daftar penerima uji (nomor test Meta hanya bisa kirim ke nomor yang sudah ditambahkan).',
     131047: 'Di luar jendela 24 jam — kontak ini belum chat dalam 24 jam terakhir, gunakan mode Template.',
     131026: 'Pesan tidak bisa dikirim ke nomor ini (tidak punya WhatsApp / belum menerima undangan / nomor salah).',
     131049: 'Meta membatasi pengiriman ke nomor ini (kualitas/frekuensi pesan marketing).',
     131056: 'Terlalu banyak pesan ke nomor yang sama dalam waktu singkat, coba lagi nanti.',
     132000: 'Jumlah variabel tidak sama dengan template ({{1}}, {{2}}, ...).',
-    132001: 'Template tidak ditemukan — cek nama template & kode bahasa (harus persis sama dengan di Meta, dan statusnya Approved).',
+    132001: 'Template tidak ditemukan / tidak boleh dipakai nomor ini (hello_world hanya untuk nomor test Meta) — cek nama template & kode bahasa (harus persis sama dengan di Meta, dan statusnya Approved).',
     132005: 'Hasil terjemahan template terlalu panjang.',
     132007: 'Isi template melanggar kebijakan WhatsApp.',
     132012: 'Format variabel tidak cocok dengan template.',
