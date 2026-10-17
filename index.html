@@ -232,7 +232,16 @@
       z-index: 100;
       padding: 16px;
     }
+    .modal-x {
+      position: absolute; top: 14px; right: 14px; z-index: 5;
+      width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); font-size: 16px; line-height: 1;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    .modal-x:hover { background: #f3f4f6; color: var(--fg); }
+    @keyframes sheetUp { from { transform: translateY(40px); opacity: .6; } to { transform: none; opacity: 1; } }
     .modal {
+      position: relative;
       background: var(--surface);
       border-radius: 12px;
       width: 100%;
@@ -1800,9 +1809,20 @@
       #audiences-list .blast-history-row > div:nth-child(3) { justify-content: flex-start !important; flex-wrap: wrap; gap: 6px !important; }
       #audiences-list .blast-history-row > div:nth-child(3) .btn { padding: 7px 12px !important; font-size: 12px !important; }
 
-      /* Modal & panel: hampir full layar, mudah discroll */
-      .modal-backdrop { padding: 10px !important; align-items: flex-end !important; }
-      .modal { max-height: 92vh; border-radius: 14px; }
+      /* Modal = "bottom sheet": muncul dari bawah, judul & tombol Simpan selalu kelihatan */
+      .modal-backdrop { padding: 28px 0 0 !important; align-items: flex-end !important; }
+      .modal { max-width: 100% !important; width: 100%; max-height: calc(100vh - 28px); max-height: calc(100dvh - 28px); border-radius: 18px 18px 0 0; animation: sheetUp 220ms cubic-bezier(0.2, 0, 0, 1); }
+      .modal > div.border-b, .modal > header { position: sticky; top: 0; z-index: 3; background: var(--surface); padding: 16px 56px 14px 18px !important; }
+      .modal > div.border-b h2 { font-size: 17px; }
+      .modal .p-6 { padding: 16px 18px; }
+      .modal form > div:last-child:has(> .btn-primary) {
+        position: sticky; bottom: 0; z-index: 3; background: var(--surface);
+        flex-direction: row !important; margin: 0 -18px -16px; padding: 10px 18px calc(12px + env(safe-area-inset-bottom)) !important;
+        border-top: 1px solid var(--border);
+      }
+      .modal form > div:last-child:has(> .btn-primary) .btn { flex: 1; justify-content: center; padding: 11px; }
+      #lead-form label.flex-1 > div { height: 100%; padding: 10px; gap: 8px; }
+      .modal-x { top: 12px; right: 12px; }
       .toast { left: 12px; right: 12px; bottom: 14px; text-align: center; }
     }
 </style>
@@ -3431,6 +3451,14 @@
     let open = false;
     new MutationObserver(function () {
       const now = el.children.length > 0;
+      // Semua popup dapat tombol ✕ (tutup / kembali) di pojok kanan atas
+      el.querySelectorAll('.modal').forEach(function (m) {
+        if (m.querySelector(':scope > .modal-x')) return;
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'modal-x'; b.setAttribute('aria-label', 'Tutup'); b.title = 'Tutup'; b.textContent = '✕';
+        b.addEventListener('click', function () { if (id === 'modal-host') closeModal(); else el.innerHTML = ''; });
+        m.insertBefore(b, m.firstChild);
+      });
       if (now && !open) { try { history.pushState({ view: state.view, overlay: id }, ''); } catch (e) {} }
       if (!now && open && history.state && history.state.overlay === id) navOverlayClosedByUi();
       open = now;
