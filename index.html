@@ -2255,7 +2255,7 @@
       get: () => assets, set: (r) => { assets = r; } },
     audiences:    { table: 'audiences', order: 'created_at',
       cols: ['id','name','type','description','lead_ids','created_at','last_used','brand_id'],
-      get: () => audiences, set: (r) => { audiences = r; } },
+      get: () => audiences, set: (r) => { audiences = (r || []).map(function (a) { return Object.assign({}, a, { lead_ids: audLeadIds(a) }); }); } },
     drafts_email: { table: 'blast_drafts', channel: 'email', order: 'created_at',
       cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at','brand_id'],
       get: () => emailBlast.drafts, set: (r) => { emailBlast.drafts = r; } },
@@ -3501,6 +3501,30 @@
 
   function initials(name) {
     return name.trim().split(/\s+/).slice(0,2).map(w => w[0] || '').join('').toUpperCase();
+  }
+  /** lead_ids bisa tersimpan sebagai array, teks JSON, atau format {a,b} — samakan jadi array string. */
+  function audLeadIds(a) {
+    let v = a && a.lead_ids;
+    if (Array.isArray(v)) return v.map(String).filter(Boolean);
+    if (typeof v === 'string') {
+      const t = v.trim();
+      if (!t) return [];
+      if (t[0] === '[') { try { const j = JSON.parse(t); return Array.isArray(j) ? j.map(String).filter(Boolean) : []; } catch (e) {} }
+      if (t[0] === '{' && t[t.length - 1] === '}') return t.slice(1, -1).split(',').map(x => x.replace(/^"|"$/g, '').trim()).filter(Boolean);
+      return t.split(',').map(x => x.trim()).filter(Boolean);
+    }
+    return [];
+  }
+  /** Ringkasan anggota audience: yang masih ada di leads, yang hilang, yang punya email / nomor WA. */
+  function audStats(a) {
+    const ids = audLeadIds(a);
+    const byId = {}; state.leads.forEach(l => { byId[l.id] = l; });
+    const found = ids.map(id => byId[id]).filter(Boolean);
+    return {
+      ids, found, missing: ids.length - found.length,
+      withEmail: found.filter(l => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(l.email || '').trim())).length,
+      withPhone: found.filter(l => !!normWaPhone(l.phone)).length,
+    };
   }
   function getAudienceInitials(name) {
     if (!name) return '?';
@@ -6075,7 +6099,7 @@
             Belum ada audience tersimpan. Klik <strong>+ New Audience</strong> untuk bikin yang pertama.
           </div>
         ` : audiences.map(a => {
-          const members = (a.lead_ids || []).length;
+          const st = audStats(a); const members = st.found.length;
           const typeColor = a.type === 'company' ? '#1e40af' : '#b45309';
           const typeBadge = a.type === 'company' ? 'badge-busdev' : 'badge-marketing';
           return `
@@ -6090,14 +6114,16 @@
                   <div class="text-xs text-gray-500" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Created ${formatDate(a.created_at)}${a.last_used ? ' · Last used ' + formatDate(a.last_used) : ''}</div>
                 </div>
               </div>
-              <div style="display:flex;align-items:center;justify-content:center">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center">
                 <div style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:12px;font-weight:600">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
                   ${members} member${members === 1 ? '' : 's'}
                 </div>
+                ${st.missing ? '<div style="font-size:11px;color:#b91c1c;margin-top:4px" title="Lead sudah dihapus / di-import ulang dengan ID baru. Klik Edit untuk memilih ulang.">⚠ ' + st.missing + ' tidak ditemukan</div>' : ''}
+                <div style="font-size:10.5px;color:var(--muted);margin-top:3px">✉ ${st.withEmail} email · 💬 ${st.withPhone} WA</div>
               </div>
               <div class="flex gap-1" style="align-items:center;justify-content:flex-end">
-                <button class="btn btn-outline" data-audience-action="blast" data-channel="${a.type === 'company' ? 'email' : 'wa'}" data-id="${a.id}" style="padding:4px 10px;font-size:11px" title="Load this audience & open ${a.type === 'company' ? 'Email' : 'WA'} Blast">${a.type === 'company' ? '✉' : '📱'} Blast</button>
+                <button class="btn btn-outline" data-audience-action="blast" data-channel="email" data-id="${a.id}" style="padding:4px 10px;font-size:11px" title="Buka Email dengan audience ini">✉ Email</button><button class="btn btn-outline" data-audience-action="blast" data-channel="wa" data-id="${a.id}" style="padding:4px 10px;font-size:11px" title="Buka WhatsApp Broadcast dengan audience ini">💬 WA</button>
                 <button class="btn btn-outline" data-audience-action="edit" data-id="${a.id}" style="padding:4px 8px;font-size:11px" title="Edit this audience">Edit</button>
                 <button class="btn btn-ghost" data-audience-action="delete" data-id="${a.id}" style="padding:4px 8px;font-size:11px;color:var(--danger)">Delete</button>
               </div>
@@ -6134,7 +6160,7 @@
     const initName = editing && editing.name ? editing.name : (prefill.name || '');
     const initDesc = editing && editing.description ? editing.description : (prefill.description || '');
     const initType = (editing && editing.type) || prefill.type || 'person';
-    const initLeadIds = (editing && editing.lead_ids) || prefill.lead_ids || [];
+    const initLeadIds = editing ? audLeadIds(editing) : (prefill.lead_ids || []);
 
     const host = document.getElementById('modal-host');
     if (!host) { console.error('modal-host missing'); return; }
@@ -6287,7 +6313,8 @@
   function loadAudienceIntoComposer(audienceId, channel) {
     const a = audiences.find(x => x.id === audienceId);
     if (!a) return;
-    const leadIds = a.lead_ids || [];
+    const st = audStats(a);
+    const leadIds = st.found.map(l => l.id);
     if (channel === 'email') {
       emailBlast.compose.recipients = leadIds.map(id => ({ lead_id: id }));
       emailBlast.compose.loadedAudienceName = a.name;
@@ -6303,7 +6330,11 @@
       audiences[idx].last_used = new Date().toISOString();
       saveAudiences(audiences);
     }
-    toast(`Loaded "${a.name}" (${leadIds.length} recipients)`);
+    const extra = [];
+    if (st.missing) extra.push(st.missing + ' tidak ditemukan di leads');
+    if (channel === 'email' && st.withEmail < leadIds.length) extra.push((leadIds.length - st.withEmail) + ' tanpa email');
+    if (channel !== 'email' && st.withPhone < leadIds.length) extra.push((leadIds.length - st.withPhone) + ' tanpa nomor WA');
+    toast('Audience "' + a.name + '": ' + leadIds.length + ' kontak' + (extra.length ? ' (' + extra.join(', ') + ')' : ''));
   }
 
   /* =================================================================
@@ -6392,9 +6423,9 @@
           '<label>Recipients</label>' +
           '<select data-blast-action="load-audience" data-channel="' + channel + '" class="input" style="font-size:11px;padding:4px 8px">' +
             '<option value="">— Load audience —</option>' +
-            audiences.filter(a => a.type === (isEmail ? 'company' : 'person')).map(a =>
-              '<option value="' + a.id + '">' + escapeHTML(a.name) + ' (' + (a.lead_ids || []).length + ')</option>'
-            ).join('') +
+            audiences.map(a => { const st = audStats(a);
+              return '<option value="' + a.id + '">[' + (a.type === 'company' ? 'B' : 'M') + '] ' + escapeHTML(a.name) + ' (' + st.found.length + (isEmail ? ' · ' + st.withEmail + ' email' : '') + ')</option>';
+            }).join('') +
           '</select>' +
           '<div class="hub-help">👥 ' + recipientCount + ' recipient' + (recipientCount === 1 ? '' : 's') + ' selected</div>' +
         '</div>' +
@@ -6725,7 +6756,7 @@
             <label style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#6b7280;display:block;margin-bottom:4px">Load saved audience</label>
             <select data-blast-action="load-audience" data-channel="${channel}" class="input" style="font-size:12px;padding:6px 10px">
               <option value="">— Select audience (optional) —</option>
-              ${audiences.map(a => '<option value="' + a.id + '">[' + (a.type === 'company' ? 'B' : 'M') + '] ' + escapeHTML(a.name) + ' (' + ((a.lead_ids || []).length) + ')</option>').join('')}
+              ${audiences.map(a => '<option value="' + a.id + '">[' + (a.type === 'company' ? 'B' : 'M') + '] ' + escapeHTML(a.name) + ' (' + audStats(a).found.length + ')</option>').join('')}
             </select>
           </div>
           <details>
@@ -7673,8 +7704,8 @@
     } else if (b.audience) {
       const a = audiences.find(x => x.id === b.audience);
       const seen = {};
-      ((a && a.lead_ids) || []).forEach(id => {
-        const l = appLeads().find(x => x.id === id); if (!l) return;
+      audLeadIds(a).forEach(id => {
+        const l = appLeads().find(x => x.id === id); if (!l) { noPhone++; return; }
         const p = normWaPhone(l.phone); if (!p) { noPhone++; return; }
         if (seen[p]) return; seen[p] = 1; list.push({ phone: p, lead: l, name: l.name });
       });
@@ -7699,8 +7730,8 @@
     let recip;
     if (b.single) recip = '<div class="wa-chips"><span class="wa-chip">👤 ' + escapeHTML(tg.label) + ' · ' + waFmtPhone(b.single) + '</span></div><div class="wa-hint">Kirim template ke 1 kontak ini saja.</div>';
     else recip = '<select class="wa-inp" data-wa-act="bc-audience"><option value="">— Pilih audience tersimpan —</option>'
-      + audiences.map(a => '<option value="' + escapeHTML(a.id) + '"' + (b.audience === a.id ? ' selected' : '') + '>' + escapeHTML(a.name) + ' (' + ((a.lead_ids || []).length) + ' kontak)</option>').join('') + '</select>'
-      + (b.audience ? '<div class="wa-chips"><span class="wa-chip">👥 ' + tg.list.length + ' nomor siap kirim</span>' + (tg.noPhone ? '<span class="wa-chip gray">' + tg.noPhone + ' tanpa nomor valid (dilewati)</span>' : '') + (tg.outside ? '<span class="wa-chip gray">' + tg.outside + ' di luar 24 jam (dilewati)</span>' : '') + '</div>'
+      + audiences.map(a => '<option value="' + escapeHTML(a.id) + '"' + (b.audience === a.id ? ' selected' : '') + '>' + escapeHTML(a.name) + ' (' + audStats(a).withPhone + ' nomor WA)</option>').join('') + '</select>'
+      + (b.audience ? '<div class="wa-chips"><span class="wa-chip">👥 ' + tg.list.length + ' nomor siap kirim</span>' + (tg.noPhone ? '<span class="wa-chip gray">' + tg.noPhone + ' tanpa nomor valid / lead hilang (dilewati)</span>' : '') + (tg.outside ? '<span class="wa-chip gray">' + tg.outside + ' di luar 24 jam (dilewati)</span>' : '') + '</div>'
         : '<div class="wa-hint">Belum punya audience? Buat dulu di menu <b>Audiences</b> (pilih kontak yang mau dikirimi).</div>');
 
     let msg;
