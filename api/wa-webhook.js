@@ -7,7 +7,10 @@
  * Yang dilakukan:
  *  - pesan masuk dari customer  -> disimpan ke tabel wa_messages (direction 'in') milik brand yang punya nomor itu
  *  - status pesan keluar        -> update status (sent / delivered / read / failed)
- * Brand ditentukan dari phone_number_id penerima (kolom brand_settings.wa_phone_number_id).
+ *  - status template (Approved / Ditolak / di-pause) -> tabel wa_template_events (dashboard langsung dapat notifikasi)
+ * Brand ditentukan dari phone_number_id penerima (kolom brand_settings.wa_phone_number_id),
+ * atau dari WABA ID untuk event template (kolom brand_settings.wa_waba_id).
+ * Di Meta → Webhooks centang field: messages  DAN  message_template_status_update
  *
  * Env: WA_WEBHOOK_VERIFY_TOKEN, SUPABASE_SERVICE_ROLE_KEY (kunci server, JANGAN dipakai di browser),
  *      SUPABASE_URL (opsional)
@@ -21,6 +24,15 @@ function svc() {
   // Kunci baru "sb_secret_..." bukan JWT: cukup di header apikey. Kunci legacy service_role (eyJ...) dipakai di dua header.
   if (/^sb_secret_/.test(k)) return { apikey: k, 'Content-Type': 'application/json' };
   return { apikey: k, Authorization: `Bearer ${k}`, 'Content-Type': 'application/json' };
+}
+
+async function brandForWaba(waba, cache) {
+  const k = 'waba:' + waba;
+  if (cache[k] !== undefined) return cache[k];
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/brand_settings?select=brand_id&wa_waba_id=eq.${encodeURIComponent(waba)}`, { headers: svc() });
+  const rows = r.ok ? await r.json() : [];
+  cache[k] = rows && rows[0] ? rows[0].brand_id : null;
+  return cache[k];
 }
 
 async function brandForPhoneId(phoneId, cache) {
@@ -71,6 +83,20 @@ module.exports = async (req, res) => {
   try {
     for (const en of (b && b.entry) || []) {
       for (const ch of en.changes || []) {
+        if (ch.field === 'message_template_status_update' || ch.field === 'template_category_update') {
+          const v = ch.value || {};
+          const brandT = await brandForWaba(String(en.id || ''), cache);
+          if (!brandT) { console.warn('[wa-webhook] WABA', en.id, 'tidak terhubung ke brand mana pun'); continue; }
+          const ev = {
+            brand_id: brandT, waba_id: String(en.id || ''), template_id: String(v.message_template_id || ''),
+            name: String(v.message_template_name || ''), language: String(v.message_template_language || ''),
+            event: ch.field === 'template_category_update' ? 'CATEGORY_' + String(v.new_category || '') : String(v.event || ''),
+            reason: v.reason && v.reason !== 'NONE' ? String(v.reason) : (v.other_info && v.other_info.title ? String(v.other_info.title) : null),
+          };
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/wa_template_events`, { method: 'POST', headers: Object.assign(svc(), { Prefer: 'return=minimal' }), body: JSON.stringify(ev) });
+          if (!r.ok) console.error('[wa-webhook] gagal simpan event template', r.status, (await r.text()).slice(0, 200));
+          continue;
+        }
         if (ch.field !== 'messages') continue;
         const v = ch.value || {};
         const phoneId = v.metadata && v.metadata.phone_number_id;
