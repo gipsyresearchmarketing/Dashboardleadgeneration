@@ -2,31 +2,15 @@
  * Vercel Serverless Function — tarik balasan customer dari Gmail (IMAP) untuk Inbox dashboard.
  *
  * Auth   : header "Authorization: Bearer <Supabase access token>" (user harus login & member brand).
- * Env    : SMTP_USER, SMTP_PASS  (App Password Gmail yang sama dengan pengiriman email)
- *          IMAP_HOST (opsional, default imap.gmail.com), IMAP_USER / IMAP_PASS (opsional, default = SMTP_USER / SMTP_PASS)
+ * Akun  : Gmail + App Password MILIK BRAND (tabel brand_settings, terenkripsi) — sama dengan yang dipakai kirim email.
+ * Env    : SECRETS_KEY (membuka password yang tersimpan)
  * Body   : { brand_id, emails: ["customer@x.com", ...], since_days: 14, max: 40 }
  *          Hanya email dari alamat yang ada di `emails` (daftar lead) yang diambil — email lain di Gmail diabaikan.
  * Return : { messages: [{ message_id, from_email, from_name, to_email, subject, body, snippet, received_at, has_attachments, attachments }], partial }
  */
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ugxrtiitmqrfrdpmcxka.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_JTxgxH__IgjcJhGkncaIkQ_erJNnZDG';
+const { authBrand, getMailConfig } = require('./_lib/brand');
 const MAX_ALLOWLIST = 1000;
 const DEADLINE_MS = 8500;
-
-async function verifyUser(token) {
-  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
-  if (!r.ok) return null;
-  const u = await r.json();
-  return u && u.id ? u : null;
-}
-
-async function isBrandMember(token, brandId, userId) {
-  const url = `${SUPABASE_URL}/rest/v1/brand_members?select=brand_id&brand_id=eq.${encodeURIComponent(brandId)}&user_id=eq.${encodeURIComponent(userId)}`;
-  const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
-  if (!r.ok) return false;
-  const rows = await r.json();
-  return Array.isArray(rows) && rows.length > 0;
-}
 
 /** Buang kutipan email lama ("On ... wrote:", "Pada ... menulis:", baris yang diawali ">"). */
 function stripQuoted(text) {
@@ -55,10 +39,6 @@ function friendlyImapError(e) {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); }
 
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  if (!token) return res.status(401).json({ error: 'Belum login' });
-
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = null; } }
   if (!body || typeof body !== 'object') return res.status(400).json({ error: 'Body tidak valid' });
@@ -74,14 +54,13 @@ module.exports = async (req, res) => {
   const started = Date.now();
   let client = null;
   try {
-    const user = await verifyUser(token);
-    if (!user) return res.status(401).json({ error: 'Session tidak valid, coba login ulang' });
-    const brandId = String(body.brand_id || '');
-    if (!brandId || !(await isBrandMember(token, brandId, user.id))) return res.status(403).json({ error: 'Kamu bukan member brand ini' });
-
-    const imapUser = process.env.IMAP_USER || process.env.SMTP_USER;
-    const imapPass = process.env.IMAP_PASS || process.env.SMTP_PASS;
-    if (!imapUser || !imapPass) return res.status(500).json({ error: 'Gmail belum dikonfigurasi di Vercel (isi SMTP_USER dan SMTP_PASS)' });
+    const a = await authBrand(req, body.brand_id);
+    if (a.error) return res.status(a.status).json({ error: a.error });
+    const mc = await getMailConfig(a.token, a.brandId);
+    if (!mc) return res.status(400).json({ error: 'Email brand ini belum diatur. Buka Profile -> Pengaturan Pengiriman.' });
+    const imapUser = mc.user;
+    const imapPass = mc.pass;
+    const imapHost = process.env.IMAP_HOST || (/^smtp\./i.test(mc.host) ? mc.host.replace(/^smtp\./i, 'imap.') : 'imap.gmail.com');
 
     const allow = new Set((Array.isArray(body.emails) ? body.emails : []).slice(0, MAX_ALLOWLIST).map((e) => String(e || '').trim().toLowerCase()).filter(Boolean));
     if (!allow.size) return res.status(200).json({ messages: [], partial: false });
@@ -90,7 +69,7 @@ module.exports = async (req, res) => {
     const self = String(imapUser).toLowerCase();
 
     client = new ImapFlow({
-      host: process.env.IMAP_HOST || 'imap.gmail.com', port: 993, secure: true,
+      host: imapHost, port: 993, secure: true,
       auth: { user: imapUser, pass: imapPass }, logger: false,
     });
     client.on('error', () => {});
