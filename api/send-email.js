@@ -1,15 +1,13 @@
 /**
- * Vercel Serverless Function — kirim email blast dari dashboard.
+ * Vercel Serverless Function — kirim email blast dari dashboard, memakai pengaturan email MILIK BRAND.
  *
- * Auth   : butuh header "Authorization: Bearer <Supabase access token>" (user harus login & member brand).
- * Provider (pilih salah satu lewat Environment Variables di Vercel):
- *   A) Resend : RESEND_API_KEY, EMAIL_FROM  (domain pengirim harus diverifikasi di Resend)
- *   B) SMTP   : SMTP_USER, SMTP_PASS  (+ opsional SMTP_HOST, SMTP_PORT, EMAIL_FROM, EMAIL_FROM_NAME)
- *               Default host smtp.gmail.com:465 -> pakai Gmail + App Password.
- * Opsional : REPLY_TO, SUPABASE_URL, SUPABASE_ANON_KEY
+ * Auth   : header "Authorization: Bearer <Supabase access token>" (user harus login & member brand).
+ * Pengirim: diambil dari tabel brand_settings (Gmail + App Password milik brand, tersimpan terenkripsi).
+ *           Diatur dari dashboard: Profile -> Pengaturan Pengiriman.
+ * Env    : SECRETS_KEY (untuk membuka password yang tersimpan terenkripsi)
  */
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ugxrtiitmqrfrdpmcxka.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_JTxgxH__IgjcJhGkncaIkQ_erJNnZDG';
+const { authBrand, getMailConfig } = require('./_lib/brand');
+
 const MAX_RECIPIENTS = 100;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -60,72 +58,17 @@ function parseEmails(v) {
   return arr.map((s) => String(s).trim()).filter((s) => EMAIL_RE.test(s));
 }
 
-async function verifyUser(token) {
-  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
-  if (!r.ok) return null;
-  const u = await r.json();
-  return u && u.id ? u : null;
-}
-
-async function isBrandMember(token, brandId, userId) {
-  const url = `${SUPABASE_URL}/rest/v1/brand_members?select=brand_id&brand_id=eq.${encodeURIComponent(brandId)}&user_id=eq.${encodeURIComponent(userId)}`;
-  const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` } });
-  if (!r.ok) return false;
-  const rows = await r.json();
-  return Array.isArray(rows) && rows.length > 0;
-}
-
-/** Return async function send(msg) sesuai provider yang dikonfigurasi, atau null kalau belum diset. */
-function getSender() {
-  const replyTo = process.env.REPLY_TO || undefined;
-  if (process.env.RESEND_API_KEY) {
-    const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
-    return async (m) => {
-      const r = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to: [m.to], subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, reply_to: replyTo, attachments: (m.attachments || []).length ? m.attachments.map((a) => ({ filename: a.filename, content: a.content, content_type: a.contentType, ...(a.cid ? { content_id: a.cid } : {}) })) : undefined }),
-      });
-      if (!r.ok) {
-        let msg = `Resend HTTP ${r.status}`;
-        try { const j = await r.json(); msg = j.message || j.error || msg; } catch (e) {}
-        throw new Error(msg);
-      }
-    };
-  }
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    const nodemailer = require('nodemailer');
-    const port = Number(process.env.SMTP_PORT || 465);
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port,
-      secure: port === 465,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
-    const from = process.env.EMAIL_FROM || `"${process.env.EMAIL_FROM_NAME || 'Leads CRM'}" <${process.env.SMTP_USER}>`;
-    return async (m) => {
-      await transporter.sendMail({ from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo, attachments: (m.attachments || []).map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64', contentType: a.contentType, ...(a.cid ? { cid: a.cid, contentDisposition: 'inline' } : {}) })) });
-    };
-  }
-  return null;
-}
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); }
-
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  if (!token) return res.status(401).json({ error: 'Belum login' });
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = null; } }
   if (!body || typeof body !== 'object') return res.status(400).json({ error: 'Body tidak valid' });
 
   try {
-    const user = await verifyUser(token);
-    if (!user) return res.status(401).json({ error: 'Session tidak valid, coba login ulang' });
-    const brandId = String(body.brand_id || '');
-    if (!brandId || !(await isBrandMember(token, brandId, user.id))) return res.status(403).json({ error: 'Kamu bukan member brand ini' });
+    const a = await authBrand(req, body.brand_id);
+    if (a.error) return res.status(a.status).json({ error: a.error });
 
     const subject = String(body.subject || '').trim().slice(0, 200);
     const extracted = extractInlineImages(String(body.html || ''));
@@ -142,8 +85,17 @@ module.exports = async (req, res) => {
     if (!recipients.length) return res.status(400).json({ error: 'Tidak ada penerima' });
     if (recipients.length > MAX_RECIPIENTS) return res.status(400).json({ error: `Maksimal ${MAX_RECIPIENTS} penerima per request` });
 
-    const send = getSender();
-    if (!send) return res.status(500).json({ error: 'Pengirim email belum dikonfigurasi di Vercel (isi RESEND_API_KEY, atau SMTP_USER + SMTP_PASS)' });
+    const mc = await getMailConfig(a.token, a.brandId);
+    if (!mc) return res.status(400).json({ error: 'Email pengirim brand ini belum diatur. Buka Profile -> Pengaturan Pengiriman, isi Gmail dan App Password-nya.' });
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({ host: mc.host, port: mc.port, secure: mc.port === 465, auth: { user: mc.user, pass: mc.pass } });
+    const from = `"${mc.fromName}" <${mc.user}>`;
+    const send = async (m) => {
+      await transporter.sendMail({
+        from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo: mc.replyTo,
+        attachments: (m.attachments || []).map((x) => ({ filename: x.filename, content: x.content, encoding: 'base64', contentType: x.contentType, ...(x.cid ? { cid: x.cid, contentDisposition: 'inline' } : {}) })),
+      });
+    };
 
     const text = htmlToText(html);
     const cc = parseEmails(body.cc);
