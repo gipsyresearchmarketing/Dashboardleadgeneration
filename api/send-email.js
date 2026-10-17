@@ -2,11 +2,11 @@
  * Vercel Serverless Function — kirim email blast dari dashboard, memakai pengaturan email MILIK BRAND.
  *
  * Auth   : header "Authorization: Bearer <Supabase access token>" (user harus login & member brand).
- * Pengirim: diambil dari tabel brand_settings (Gmail + App Password milik brand, tersimpan terenkripsi).
- *           Diatur dari dashboard: Profile -> Pengaturan Pengiriman.
- * Env    : SECRETS_KEY (untuk membuka password yang tersimpan terenkripsi)
+ * Pengirim: Gmail milik brand — lewat tombol "Hubungkan Gmail" (Google OAuth, tanpa App Password),
+ *           atau cadangan SMTP + App Password. Diatur dari dashboard: Profile -> Pengaturan Pengiriman.
+ * Env    : SECRETS_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
  */
-const { authBrand, getMailConfig } = require('./_lib/brand');
+const { authBrand, getMailConfig, createMailer } = require('./_lib/brand');
 
 const MAX_RECIPIENTS = 100;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -86,12 +86,11 @@ module.exports = async (req, res) => {
     if (recipients.length > MAX_RECIPIENTS) return res.status(400).json({ error: `Maksimal ${MAX_RECIPIENTS} penerima per request` });
 
     const mc = await getMailConfig(a.token, a.brandId);
-    if (!mc) return res.status(400).json({ error: 'Email pengirim brand ini belum diatur. Buka Profile -> Pengaturan Pengiriman, isi Gmail dan App Password-nya.' });
-    const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport({ host: mc.host, port: mc.port, secure: mc.port === 465, auth: { user: mc.user, pass: mc.pass } });
+    if (!mc) return res.status(400).json({ error: 'Gmail brand ini belum dihubungkan. Buka Profile -> Pengaturan Pengiriman -> klik "Hubungkan Gmail".' });
+    const mailer = await createMailer(mc);
     const from = `"${mc.fromName}" <${mc.user}>`;
     const send = async (m) => {
-      await transporter.sendMail({
+      await mailer.send({
         from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo: mc.replyTo,
         attachments: (m.attachments || []).map((x) => ({ filename: x.filename, content: x.content, encoding: 'base64', contentType: x.contentType, ...(x.cid ? { cid: x.cid, contentDisposition: 'inline' } : {}) })),
       });
@@ -120,6 +119,6 @@ module.exports = async (req, res) => {
     return res.status(200).json({ results });
   } catch (e) {
     console.error('[send-email]', e);
-    return res.status(500).json({ error: String((e && e.message) || e).slice(0, 300) });
+    return res.status((e && e.status) || 500).json({ error: String((e && e.message) || e).slice(0, 300) });
   }
 };
