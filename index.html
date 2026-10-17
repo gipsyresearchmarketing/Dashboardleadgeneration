@@ -8486,6 +8486,9 @@
   function waRender() {
     const host = document.getElementById('wa-blast-host');
     if (!host) return;
+    // Jangan ganggu saat sedang mengetik tanggal/jam jadwal (render ulang bikin kursor loncat)
+    const ae = document.activeElement;
+    if (ae && ae.id === 'wa-bc-at' && host.contains(ae)) { waBadge(); return; }
     const a = document.activeElement;
     const keepId = a && host.contains(a) && a.id ? a.id : null;
     const selStart = keepId && a.selectionStart != null ? a.selectionStart : null;
@@ -8624,6 +8627,14 @@
   }
 
   /* ---------- Broadcast terjadwal ---------- */
+  // Saat mengetik tanggal/jam JANGAN render ulang (bikin kursor loncat ke kolom tanggal); cukup perbarui tombol kirim
+  function waBcAtSync() {
+    const btn = document.querySelector('[data-wa-act="bc-send"]'); if (!btn || waUI.bc.when !== 'later') return;
+    const at = waUI.bc.at, ok = at && new Date(at).getTime() > Date.now() + 60000;
+    btn.textContent = '⏰ Jadwalkan' + (ok ? ' · ' + new Date(at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+    btn.disabled = !ok || waUI.bcSending || waUI.uploading;
+    btn.style.opacity = btn.disabled ? '.5' : ''; btn.style.cursor = btn.disabled ? 'not-allowed' : '';
+  }
   async function waScheduleBroadcast(b, tpl, tg, hdr, mediaLog) {
     waUI.bcSending = true; waRender();
     const id = uid('WB');
@@ -8738,7 +8749,7 @@
     if (a === 'bc-audience') { waUI.bc.audience = el.value; waRender(); }
     else if (a === 'bc-template') { waUI.bc.template = el.value; waRender(); }
     else if (a === 'tf' && el.tagName === 'SELECT') { waUI.tf[el.getAttribute('data-f')] = el.value; waRender(); }
-    else if (a === 'bc-at') { waUI.bc.at = el.value; waRender(); }
+    else if (a === 'bc-at') { waUI.bc.at = el.value; waBcAtSync(); }
     else if (a === 'bc-hasset') { if (el.value) { waUI.bc.hdr = { type: 'image', link: el.value, filename: el.options[el.selectedIndex].text }; } waRender(); }
     else if (a === 'chat-file') { const f = el.files && el.files[0]; el.value = ''; if (f) waSendFile(f); }
     else if (a === 'bc-hfile' || a === 'tf-hfile') {
@@ -8769,7 +8780,7 @@
       else { const pv = document.getElementById('wa-tf-prev'); if (pv) pv.innerHTML = waTfPreviewHtml(tf); const c = document.getElementById('wa-tf-cnt'); if (c) c.textContent = (tf.body || '').length; }
     }
     else if (a === 'bc-hlink') { const v = el.value.trim(); const t = (waUI.templates || []).find(x => x.name === waUI.bc.template); waUI.bc.hdr = v ? { type: (t && t.header_format) || 'image', link: v, filename: 'Link' } : null; clearTimeout(waUI._hl); waUI._hl = setTimeout(waRender, 500); }
-    else if (a === 'bc-at') { waUI.bc.at = el.value; }
+    else if (a === 'bc-at') { waUI.bc.at = el.value; waBcAtSync(); }
     else if (a === 'draft') {
       const wasSlash = /^\/\S*$/.test(waUI.drafts[waUI.selected] || '');
       waUI.drafts[waUI.selected] = el.value;
