@@ -242,7 +242,7 @@ async function createMailer(mc) {
 async function getWaConfig(token, brandId) {
   const cfg = await loadSettings(token, brandId);
   if (!cfg || !cfg.wa_phone_number_id || !cfg.wa_token_enc) return null;
-  return { phoneId: cfg.wa_phone_number_id, token: decrypt(cfg.wa_token_enc), version: cfg.wa_api_version || process.env.WA_API_VERSION || 'v25.0' };
+  return { phoneId: cfg.wa_phone_number_id, token: decrypt(cfg.wa_token_enc), version: cfg.wa_api_version || process.env.WA_API_VERSION || 'v25.0', waba: cfg.wa_waba_id || null };
 }
 
 module.exports = {
