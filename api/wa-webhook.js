@@ -78,40 +78,6 @@ function describe(m) {
   return { body: '[Pesan ' + t + ' belum didukung]', media: null };
 }
 
-/**
- * Terapkan satu status pesan keluar ke tabel wa_messages.
- *  - naik saja: sent -> delivered -> read (tidak pernah turun); failed selalu menang
- *  - TIDAK bergantung pada status awal baris (apa pun nilainya, mis. 'queued' / 'accepted' / kosong)
- *  - kalau baris pesannya belum tersimpan (event Meta bisa datang lebih cepat dari penyimpanan), coba lagi sekali
- *  - kalau tetap tidak ketemu atau gagal update, tulis ke log (dulu: diam-diam hilang)
- */
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function applyStatus(brandId, s) {
-  const st = String(s.status || '');
-  if (!STATUS_RANK[st] || !s.id) return;
-  const e0 = s.errors && s.errors[0];
-  const err = e0 ? ((e0.code ? '(' + e0.code + ') ' : '') + String(e0.title || e0.message || '')).slice(0, 300) : null;
-  const base = `id=eq.${encodeURIComponent(s.id)}&brand_id=eq.${encodeURIComponent(brandId)}`;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const g = await fetch(`${SUPABASE_URL}/rest/v1/wa_messages?select=status&${base}`, { headers: svc() });
-    const rows = g.ok ? await g.json() : [];
-    if (rows && rows[0]) {
-      const cur = rows[0].status;
-      if (st === 'failed' ? cur === 'failed' : (STATUS_RANK[cur] || 0) >= STATUS_RANK[st]) return; // sudah sama / lebih tinggi
-      const p = await fetch(`${SUPABASE_URL}/rest/v1/wa_messages?${base}`, {
-        method: 'PATCH', headers: Object.assign(svc(), { Prefer: 'return=minimal' }),
-        body: JSON.stringify(Object.assign({ status: st }, err ? { error: err } : {})),
-      });
-      if (!p.ok) console.error('[wa-webhook] gagal update status', st, s.id, p.status, (await p.text()).slice(0, 200));
-      return;
-    }
-    if (!g.ok) console.error('[wa-webhook] gagal baca pesan untuk status', st, s.id, g.status);
-    if (attempt === 0) await sleep(1500);
-  }
-  console.warn('[wa-webhook] status', st, 'untuk', s.id, 'tidak menemukan pesan di wa_messages (brand', brandId + '). Cek: kolom id pesan keluar harus sama dengan wamid dari Meta.');
-}
-
 module.exports = async (req, res) => {
   if (req.method === 'GET') {
     const q = req.query || {};
@@ -171,10 +137,18 @@ module.exports = async (req, res) => {
           if (!r.ok) console.error('[wa-webhook] gagal simpan pesan', r.status, (await r.text()).slice(0, 200));
         }
 
-        // Status pesan keluar (sent / delivered / read / failed)
-        const sts = v.statuses || [];
-        if (sts.length || (v.messages || []).length) console.log('[wa-webhook] nomor', phoneId, '| pesan masuk:', (v.messages || []).length, '| status:', sts.map((x) => x.status).join(',') || '-');
-        await Promise.all(sts.map((x) => applyStatus(brandId, x).catch((e) => console.error('[wa-webhook] status', x && x.id, e && e.message || e))));
+        // Status pesan keluar (hanya naik: sent -> delivered -> read; failed selalu menang)
+        for (const s of v.statuses || []) {
+          const st = String(s.status || '');
+          if (!STATUS_RANK[st]) continue;
+          const lower = Object.keys(STATUS_RANK).filter((k) => STATUS_RANK[k] < STATUS_RANK[st]);
+          const err = s.errors && s.errors[0] ? String(s.errors[0].title || s.errors[0].message || s.errors[0].code) : null;
+          const filter = `id=eq.${encodeURIComponent(s.id)}&brand_id=eq.${encodeURIComponent(brandId)}` + (st === 'failed' ? '' : `&status=in.(${lower.join(',')})`);
+          await fetch(`${SUPABASE_URL}/rest/v1/wa_messages?${filter}`, {
+            method: 'PATCH', headers: Object.assign(svc(), { Prefer: 'return=minimal' }),
+            body: JSON.stringify(Object.assign({ status: st }, err ? { error: err.slice(0, 300) } : {})),
+          });
+        }
       }
     }
   } catch (e) {
