@@ -2377,6 +2377,7 @@
       cols: ['id','from_email','from_name','to_email','subject','body','snippet','lead_id','blast_id','status','starred','has_attachments','attachments','received_at','read_at','replied_at','brand_id'],
       get: () => state.inboxEmails, set: (r) => { state.inboxEmails = r; } },
   };
+  const CLOUD_TS = { created_at:1, last_contacted_at:1, transaction_date:1, due_at:1, completed_at:1, scheduled_at:1, sent_at:1, last_used:1, received_at:1, read_at:1, replied_at:1 };
   const CLOUD_NULLABLE = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, sent_at:1, last_used:1, audience_id:1, lead_id:1, blast_id:1, read_at:1, replied_at:1 };
 
   const cloud = { ready: false, brandId: null, known: {}, sent: {}, timers: {}, pullTimers: {}, chains: {}, rev: {}, dirty: {}, channel: null, errToast: 0, failed: {}, rtStatus: '-', lastError: '' };
@@ -2384,7 +2385,8 @@
   function cloudClean(spec, r) {
     const o = {};
     spec.cols.forEach(function (c) {
-      const v = (c === 'channel') ? spec.channel : r[c];
+      let v = (c === 'channel') ? spec.channel : r[c];
+      if (v === '' && CLOUD_TS[c]) v = null;   // string kosong bukan tanggal valid di Postgres
       if (v === undefined) return;
       if (v === null && !CLOUD_NULLABLE[c]) return;
       o[c] = v;
