@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
 
     const p = parseSendBody(body);
     if (p.error) return res.status(400).json({ error: p.error });
-    const ctx = Object.assign(p.ctx, { token: wc.token, phoneId: wc.phoneId, waba: wc.waba, version: wc.version });
+    const ctx = Object.assign(p.ctx, { token: wc.token, phoneId: wc.phoneId, version: wc.version });
 
     const recipients = Array.isArray(body.recipients) ? body.recipients : [];
     if (!recipients.length) return res.status(400).json({ error: 'Tidak ada penerima' });
