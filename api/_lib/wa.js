@@ -82,7 +82,7 @@ function buildPayload(ctx, r, to) {
   return payload;
 }
 
-/** Kirim satu pesan. ctx juga berisi { token, phoneId, waba, version }. */
+/** Kirim satu pesan. ctx juga berisi { token, phoneId, version }. */
 async function sendOne(ctx, r) {
   const to = normalizePhone(r && r.phone);
   if (!to) return { lead_id: r && r.lead_id, phone: String((r && r.phone) || ''), ok: false, error: 'Nomor tidak valid' };
