@@ -82,13 +82,16 @@ function buildPayload(ctx, r, to) {
   return payload;
 }
 
-/** Kirim satu pesan. ctx juga berisi { token, phoneId, version }. */
+/** Kirim satu pesan. ctx juga berisi { token, phoneId, waba, version }. */
 async function sendOne(ctx, r) {
   const to = normalizePhone(r && r.phone);
   if (!to) return { lead_id: r && r.lead_id, phone: String((r && r.phone) || ''), ok: false, error: 'Nomor tidak valid' };
   const payload = buildPayload(ctx, r || {}, to);
   try {
-    const resp = await fetch(`https://graph.facebook.com/${ctx.version}/${ctx.phoneId}/messages`, {
+    const url = ctx.waba
+      ? `https://graph.facebook.com/${ctx.version}/${ctx.waba}/phone_numbers/${ctx.phoneId}/messages`
+      : `https://graph.facebook.com/${ctx.version}/${ctx.phoneId}/messages`;
+    const resp = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${ctx.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
