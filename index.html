@@ -2378,14 +2378,21 @@
       get: () => state.inboxEmails, set: (r) => { state.inboxEmails = r; } },
   };
   const CLOUD_NULLABLE = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, sent_at:1, last_used:1, audience_id:1, lead_id:1, blast_id:1, read_at:1, replied_at:1 };
+  /* Kolom timestamptz/date di Postgres: string kosong '' atau 'Invalid Date' jadi null, bukan error. */
+  const CLOUD_TS = { transaction_date:1, last_contacted_at:1, completed_at:1, scheduled_at:1, sent_at:1, last_used:1, read_at:1, replied_at:1, created_at:1, due_at:1, received_at:1 };
 
   const cloud = { ready: false, brandId: null, known: {}, sent: {}, timers: {}, pullTimers: {}, chains: {}, rev: {}, dirty: {}, channel: null, errToast: 0, failed: {}, rtStatus: '-', lastError: '' };
 
   function cloudClean(spec, r) {
     const o = {};
     spec.cols.forEach(function (c) {
-      const v = (c === 'channel') ? spec.channel : r[c];
+      let v = (c === 'channel') ? spec.channel : r[c];
       if (v === undefined) return;
+      /* Postgres timestamptz gak bisa parse string kosong / 'Invalid Date' -> kirim null */
+      if (CLOUD_TS[c]) {
+        if (v === '' || v === null || v === 'Invalid Date') v = null;
+        else if (typeof v === 'number' && !isFinite(v)) v = null;
+      }
       if (v === null && !CLOUD_NULLABLE[c]) return;
       o[c] = v;
     });
@@ -6907,7 +6914,16 @@
       '</div>' +
       (isEmail ? '<label class="label">Subject</label><input data-draft-input="subject" data-draft-id="' + draft.id + '" class="input mb-3" value="' + escapeHTML(subject) + '" />' : '') +
       '<label class="label">' + (isEmail ? 'Message Body' : 'Message') + '</label>' +
-      '<textarea data-draft-input="' + (isEmail ? 'body' : 'message') + '" data-draft-id="' + draft.id + '" class="input" rows="10" placeholder="Tulis pesan...">' + escapeHTML(message) + '</textarea>' +
+      (isEmail
+        // Email body = HTML blocks (gambar/button/divider) — tampilkan sebagai preview, bukan kode HTML mentah.
+        ? '<div class="preview-canvas" data-draft-preview="' + draft.id + '" style="padding:14px;border:1px solid var(--border);border-radius:8px;background:#fff">' +
+            (subject ? '<div class="pv-subject">' + escapeHTML(subject) + '</div>' : '') +
+            '<div class="pv-body">' + (message || '<em style="color:#9ca3af">(empty message)</em>') + '</div>' +
+          '</div>' +
+          '<details style="margin-top:8px"><summary style="font-size:12px;color:var(--muted);cursor:pointer">✎ Edit HTML mentah</summary>' +
+            '<textarea data-draft-input="body" data-draft-id="' + draft.id + '" class="input" rows="10" placeholder="Tulis pesan..." style="margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:11px">' + escapeHTML(message) + '</textarea>' +
+          '</details>'
+        : '<textarea data-draft-input="message" data-draft-id="' + draft.id + '" class="input" rows="10" placeholder="Tulis pesan...">' + escapeHTML(message) + '</textarea>') +
       (attachments.length > 0 ? '<div style="margin-top:14px;padding:10px;background:#f5f3ff;border-radius:6px;font-size:12px;color:#4338ca"><strong>' + attachments.length + '</strong> attachment' + (attachments.length === 1 ? '' : 's') + ' (image/button/divider) akan ikut terkirim</div>' : '') +
       '<div class="flex flex-wrap justify-end gap-2 mt-4 pt-3" style="border-top:1px solid var(--border)">' +
         '<button class="btn btn-outline" data-blast-action="delete-draft-detail" data-id="' + draft.id + '" data-channel="' + channel + '" style="color:var(--danger);border-color:#fecaca">🗑 Delete</button>' +
@@ -9661,6 +9677,11 @@
     // ===== Draft editor: input binding (subtle — save only on click) =====
     document.querySelectorAll('[data-draft-input]').forEach(el => {
       // No auto-save to avoid clobbering. User clicks Save Changes button.
+      // Kalau yang diedit HTML mentah email, preview ikut diperbarui realtime.
+      if (el.getAttribute('data-draft-input') === 'body') {
+        const pv = document.querySelector('[data-draft-preview="' + el.getAttribute('data-draft-id') + '"] .pv-body');
+        if (pv) pv.innerHTML = el.value || '<em style="color:#9ca3af">(empty message)</em>';
+      }
     });
 
     // ===== Draft: Save Changes (update draft in place) =====
@@ -9824,8 +9845,8 @@
         : compose.message.trim();
       if (!hasContent) { toast('Nothing to save'); return; }
       const draft = channel === 'email'
-        ? { id:uid('D'), subject:compose.subject, body:compose.body, recipients:compose.recipients, blocks:compose.blocks||[], files:compose.files||[], sendMode:compose.sendMode, scheduled_at:compose.scheduled_at, created_at:new Date().toISOString() }
-        : { id:uid('D'), message:compose.message, media:compose.media, recipients:compose.recipients, sendMode:compose.sendMode, scheduled_at:compose.scheduled_at, created_at:new Date().toISOString() };
+        ? { id:uid('D'), subject:compose.subject, body:compose.body, recipients:compose.recipients, blocks:compose.blocks||[], files:compose.files||[], sendMode:compose.sendMode, scheduled_at:compose.scheduled_at || null, created_at:new Date().toISOString() }
+        : { id:uid('D'), message:compose.message, media:compose.media, recipients:compose.recipients, sendMode:compose.sendMode, scheduled_at:compose.scheduled_at || null, created_at:new Date().toISOString() };
       blastState.drafts = [draft, ...blastState.drafts];
       saveBlast(storageKey, state);
       if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
