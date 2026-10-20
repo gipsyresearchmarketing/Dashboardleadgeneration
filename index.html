@@ -6766,8 +6766,10 @@
               // Show existing recipients as removable chips
               compose.recipients.map(r => {
                 const lead = state.leads.find(l => l.id === r.lead_id);
-                return '<span class="ech-chip" data-chip-id="' + escapeHTML(r.lead_id) + '">' +
-                  escapeHTML(lead ? lead.name : r.lead_id) +
+                const rid = (r && (r.lead_id || r.id)) || '';
+                const label = lead ? (lead.name || lead.email || rid) : (rid || '(lead tidak ditemukan)');
+                return '<span class="ech-chip" data-chip-id="' + escapeHTML(rid) + '">' +
+                  escapeHTML(label) +
                   '<button type="button" class="ech-chip-x" data-ech-remove="' + escapeHTML(r.lead_id) + '" title="Remove">×</button>' +
                 '</span>';
               }).join('') +
@@ -6869,6 +6871,31 @@
     tmp.querySelectorAll('.eb-controls,.email-block-controls,.eb-resize-handle,.eb-remove,.email-block-label').forEach(n => n.remove());
     const t = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
     return t || '(pakai tombol/gambar)';
+  }
+
+  /* Buang markup .email-block dari body — blok itu sudah ada di compose.blocks,
+     kalau ikut di body akan tampil dobel saat draft di-load ke canvas. */
+  function stripBlockMarkup(html) {
+    if (!html) return '';
+    const tmp = document.createElement('div');
+    tmp.innerHTML = String(html);
+    tmp.querySelectorAll('.email-block').forEach(n => n.remove());
+    return tmp.innerHTML;
+  }
+
+  /* Samakan bentuk recipients jadi { lead_id } — draft lama bisa menyimpan string biasa / {id}. */
+  function normalizeRecipients(list) {
+    return (list || []).map(r => {
+      if (typeof r === 'string') return { lead_id: r };
+      if (!r || typeof r !== 'object') return null;
+      if (r.lead_id) return { lead_id: r.lead_id };
+      if (r.id) return { lead_id: r.id };
+      if (r.email) {
+        const hit = state.leads.find(l => (l.email || '').toLowerCase() === String(r.email).toLowerCase());
+        if (hit) return { lead_id: hit.id };
+      }
+      return null;
+    }).filter(Boolean);
   }
 
   /* Generic drafts list */
@@ -9752,14 +9779,14 @@
         if (!draft) return;
         // Copy draft into current compose, then send
         if (channel === 'email') {
-          emailBlast.compose.subject = draft.subject || '';
-          emailBlast.compose.body = draft.body || '';
+          emailBlast.compose.subject = plainSnippet(draft.subject);
+          emailBlast.compose.body = stripBlockMarkup(draft.body || '');
           emailBlast.compose.blocks = draft.blocks || draft.attachments || [];
-          emailBlast.compose.recipients = draft.recipients || [];
+          emailBlast.compose.recipients = normalizeRecipients(draft.recipients);
         } else {
           waBlast.compose.message = draft.message || '';
           waBlast.compose.media = draft.media || [];
-          waBlast.compose.recipients = draft.recipients || [];
+          waBlast.compose.recipients = normalizeRecipients(draft.recipients);
         }
         sendBlast(channel);
       });
@@ -9776,11 +9803,11 @@
           subject: h.subject || null,
           body: h.body || null,
           message: h.message || null,
-          recipients: (h.recipients || []).map(r => ({ lead_id: r.lead_id })),
+          recipients: normalizeRecipients(h.recipients),
           attachments: h.attachments || [],
           media: h.media || [],
           sendMode: 'now',
-          scheduled_at: '',
+          scheduled_at: null,
           created_at: new Date().toISOString(),
         };
         blastState.drafts = [newDraft, ...blastState.drafts];
@@ -9885,9 +9912,9 @@
       const draft = blastState.drafts.find(d => d.id === id);
       if (!draft) return;
       if (channel === 'email') {
-        emailBlast.compose = { subject:draft.subject||'', body:draft.body||'', recipients:draft.recipients||[], cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        emailBlast.compose = { subject:plainSnippet(draft.subject), body:stripBlockMarkup(draft.body||''), recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       } else {
-        waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:draft.recipients||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:normalizeRecipients(draft.recipients), sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       }
       blastState.activeTab = 'compose';
       if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
