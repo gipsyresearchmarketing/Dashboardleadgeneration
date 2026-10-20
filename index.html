@@ -6838,7 +6838,7 @@
     const blocks = blastState.compose.blocks || [];
     return '<div class="preview-canvas">' +
       '<div class="pv-meta">From: Your Business &lt;hello@business.com&gt; · To: ' + escapeHTML(sample.name) + ' &lt;' + escapeHTML(sample.email || 'no-email') + '&gt; · ' + recipientCount + ' recipient' + (recipientCount === 1 ? '' : 's') + '</div>' +
-      (channel === 'email' && subject ? '<div class="pv-subject">' + escapeHTML(subject) + '</div>' : '') +
+      (channel === 'email' && subject ? '<div class="pv-subject">' + escapeHTML(plainSnippet(subject)) + '</div>' : '') +
       '<div class="pv-body">' + (body || '<em style="color:#9ca3af">(empty message)</em>') + '</div>' +
       (blocks.length ? '<div style="margin-top:16px">' + blocks.map(b => {
         if (b.type === 'image') {
@@ -6865,7 +6865,8 @@
     if (!html) return '';
     const tmp = document.createElement('div');
     tmp.innerHTML = String(html);
-    tmp.querySelectorAll('input,style,script,textarea,select').forEach(n => n.remove());
+    tmp.querySelectorAll('input,style,script,textarea,select,button').forEach(n => n.remove());
+    tmp.querySelectorAll('.eb-controls,.email-block-controls,.eb-resize-handle,.eb-remove,.email-block-label').forEach(n => n.remove());
     const t = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
     return t || '(pakai tombol/gambar)';
   }
@@ -6886,7 +6887,7 @@
       '<div class="blast-list-col" style="width:320px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;max-height:600px">' +
         blastState.drafts.map(d => {
           const isSelected = d.id === blastState.selectedItemId;
-          const title = isEmail ? (d.subject || '(no subject)') : (d.message || '(no message)');
+          const title = isEmail ? (plainSnippet(d.subject) || '(no subject)') : (d.message || '(no message)');
           const snippet = isEmail ? plainSnippet(d.body) : (d.message || '');
           return '<div data-blast-select="' + d.id + '" data-item-type="draft" data-channel="' + channel + '" ' +
             'style="padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);border-left:3px solid ' + (isSelected ? 'var(--accent)' : 'transparent') + ';background:' + (isSelected ? '#eff6ff' : 'transparent') + '" ' +
@@ -6922,12 +6923,12 @@
         '</div>' +
         '<span class="text-xs text-gray-500">👥 ' + recipientsCount + ' recipient' + (recipientsCount === 1 ? '' : 's') + '</span>' +
       '</div>' +
-      (isEmail ? '<label class="label">Subject</label><input data-draft-input="subject" data-draft-id="' + draft.id + '" class="input mb-3" value="' + escapeHTML(subject) + '" />' : '') +
+      (isEmail ? '<label class="label">Subject</label><input data-draft-input="subject" data-draft-id="' + draft.id + '" class="input mb-3" value="' + escapeHTML(plainSnippet(subject)) + '" data-draft-subject-orig="' + escapeHTML(subject || '') + '" />' : '') +
       '<label class="label">' + (isEmail ? 'Message Body' : 'Message') + '</label>' +
       (isEmail
         // Email body = HTML blocks (gambar/button/divider) — tampilkan sebagai preview, bukan kode HTML mentah.
         ? '<div class="preview-canvas" data-draft-preview="' + draft.id + '" style="padding:14px;border:1px solid var(--border);border-radius:8px;background:#fff">' +
-            (subject ? '<div class="pv-subject">' + escapeHTML(subject) + '</div>' : '') +
+            (subject ? '<div class="pv-subject">' + escapeHTML(plainSnippet(subject)) + '</div>' : '') +
             '<div class="pv-body">' + (message || '<em style="color:#9ca3af">(empty message)</em>') + '</div>' +
           '<style>.preview-canvas .eb-controls,.preview-canvas .email-block-controls,.preview-canvas .eb-resize-handle,.preview-canvas .eb-remove{display:none!important}</style>' +
           '</div>' +
@@ -6961,7 +6962,7 @@
         blastState.history.map(h => {
           const isSelected = h.id === blastState.selectedItemId;
           const isScheduled = h.status === 'scheduled';
-          const title = isEmail ? (h.subject || '(no subject)') : (h.message || '(no message)');
+          const title = isEmail ? (plainSnippet(h.subject) || '(no subject)') : (h.message || '(no message)');
           const snippet = isEmail ? plainSnippet(h.body) : (h.message || '');
           const statusIcon = isScheduled ? '⏰' : '✓';
           return '<div data-blast-select="' + h.id + '" data-item-type="history" data-channel="' + channel + '" ' +
@@ -6999,7 +7000,7 @@
       '</div>' +
       '<div class="card" style="padding:14px;margin-bottom:12px">' +
         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);font-weight:600;margin-bottom:4px">' + (isEmail ? 'Subject' : 'Message') + '</div>' +
-        '<div style="font-size:14px;font-weight:600;color:var(--fg);margin-bottom:10px">' + escapeHTML(titleField || '(empty)') + '</div>' +
+        '<div style="font-size:14px;font-weight:600;color:var(--fg);margin-bottom:10px">' + escapeHTML(isEmail ? (plainSnippet(titleField) || '(empty)') : (titleField || '(empty)')) + '</div>' +
         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);font-weight:600;margin-bottom:4px">Body</div>' +
         (isEmail
           // Email body = HTML blocks (gambar/button/divider) — render, jangan escape.
@@ -9712,7 +9713,12 @@
         if (channel === 'email') {
           const subjEl = document.querySelector('[data-draft-input="subject"][data-draft-id="' + id + '"]');
           const bodyEl = document.querySelector('[data-draft-input="body"][data-draft-id="' + id + '"]');
-          if (subjEl) draft.subject = subjEl.value;
+          // Subject lama mungkin berisi HTML blocks. Kalau user tidak mengubahnya, jangan diratakan.
+          if (subjEl) {
+            const orig = subjEl.getAttribute('data-draft-subject-orig') || '';
+            const typed = subjEl.value.trim();
+            draft.subject = typed && typed !== plainSnippet(orig) ? subjEl.value : orig;
+          }
           if (bodyEl) draft.body = bodyEl.value;
         } else {
           const msgEl = document.querySelector('[data-draft-input="message"][data-draft-id="' + id + '"]');
