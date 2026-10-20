@@ -6873,29 +6873,56 @@
     return t || '(pakai tombol/gambar)';
   }
 
-  /* Buang markup .email-block dari body — blok itu sudah ada di compose.blocks,
-     kalau ikut di body akan tampil dobel saat draft di-load ke canvas. */
-  function stripBlockMarkup(html) {
+  /* Bersihkan body draft sebelum dimuat ke canvas.
+     - Kalau draft punya blocks[] -> buang markup .email-block dari body (biar tidak dobel).
+     - Kalau blocks[] kosong -> buka bloknya (pertahankan isi teksnya), jangan dihapus. */
+  function stripBlockMarkup(html, blocks) {
     if (!html) return '';
     const tmp = document.createElement('div');
     tmp.innerHTML = String(html);
-    tmp.querySelectorAll('.email-block').forEach(n => n.remove());
+    tmp.querySelectorAll('.eb-controls,.email-block-controls,.eb-resize-handle,.eb-remove,.email-block-label').forEach(n => n.remove());
+    // Body yang ter-escape (&lt;div...) — kembalikan jadi HTML sungguhan.
+    if (!tmp.children.length && /^\s*&lt;[a-z]/i.test(tmp.textContent || '')) {
+      const ta = document.createElement('textarea');
+      ta.innerHTML = tmp.innerHTML;
+      const decoded = ta.value;
+      if (/<[a-z][\s>]/i.test(decoded)) { tmp.innerHTML = decoded; }
+    }
+    const nodes = Array.from(tmp.querySelectorAll('.email-block'));
+    // Blok di body dibuang hanya kalau jumlahnya sama persis dengan blocks[] (berarti sudah terwakili).
+    // Kalau tidak cocok, buka bloknya supaya isi teks tidak hilang.
+    const dropAll = nodes.length > 0 && nodes.length === (blocks || []).length;
+    nodes.forEach(n => {
+      if (dropAll) { n.remove(); return; }
+      const frag = document.createDocumentFragment();
+      while (n.firstChild) frag.appendChild(n.firstChild);
+      n.replaceWith(frag);
+    });
     return tmp.innerHTML;
   }
 
-  /* Samakan bentuk recipients jadi { lead_id } — draft lama bisa menyimpan string biasa / {id}. */
+  /* Samakan bentuk recipients jadi { lead_id }. Draft lama bisa menyimpan:
+     objek, string biasa, atau string JSON (hasil serialisasi). */
   function normalizeRecipients(list) {
-    return (list || []).map(r => {
-      if (typeof r === 'string') return { lead_id: r };
-      if (!r || typeof r !== 'object') return null;
-      if (r.lead_id) return { lead_id: r.lead_id };
-      if (r.id) return { lead_id: r.id };
-      if (r.email) {
-        const hit = state.leads.find(l => (l.email || '').toLowerCase() === String(r.email).toLowerCase());
-        if (hit) return { lead_id: hit.id };
+    const out = [];
+    (Array.isArray(list) ? list : []).forEach(r => {
+      let o = r;
+      if (typeof r === 'string') {
+        const t = r.trim();
+        if (!t) return;
+        if (t.charAt(0) === '{' || t.charAt(0) === '[') {
+          try { o = JSON.parse(t); } catch (e) { o = { lead_id: t }; }
+        } else o = { lead_id: t };
       }
-      return null;
-    }).filter(Boolean);
+      if (!o || typeof o !== 'object') return;
+      const rid = o.lead_id || o.id || o.leadId || '';
+      if (rid) { out.push({ lead_id: rid }); return; }
+      if (o.email) {
+        const hit = state.leads.find(l => (l.email || '').toLowerCase() === String(o.email).toLowerCase());
+        if (hit) out.push({ lead_id: hit.id });
+      }
+    });
+    return out;
   }
 
   /* Generic drafts list */
@@ -9780,7 +9807,7 @@
         // Copy draft into current compose, then send
         if (channel === 'email') {
           emailBlast.compose.subject = plainSnippet(draft.subject);
-          emailBlast.compose.body = stripBlockMarkup(draft.body || '');
+          emailBlast.compose.body = stripBlockMarkup(draft.body || '', draft.blocks || draft.attachments || []);
           emailBlast.compose.blocks = draft.blocks || draft.attachments || [];
           emailBlast.compose.recipients = normalizeRecipients(draft.recipients);
         } else {
@@ -9912,7 +9939,7 @@
       const draft = blastState.drafts.find(d => d.id === id);
       if (!draft) return;
       if (channel === 'email') {
-        emailBlast.compose = { subject:plainSnippet(draft.subject), body:stripBlockMarkup(draft.body||''), recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        emailBlast.compose = { subject:plainSnippet(draft.subject), body:stripBlockMarkup(draft.body||'', draft.blocks||draft.attachments||[]), recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       } else {
         waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:normalizeRecipients(draft.recipients), sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       }
