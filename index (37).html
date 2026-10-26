@@ -2725,6 +2725,57 @@
     '</div>';
   }
 
+  /* Kompres gambar (maks 1000px lebar, JPEG 85%) supaya ringan disimpan di Supabase. */
+  function compressImageFile(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onerror = () => reject(new Error('Gagal membaca file'));
+      fr.onload = () => {
+        if (/gif$/i.test(file.type) && file.size < 500000) return resolve(fr.result);
+        const im = new Image();
+        im.onerror = () => reject(new Error('File bukan gambar yang valid'));
+        im.onload = () => {
+          const maxW = 1000;
+          const sc = Math.min(1, maxW / im.width);
+          const c = document.createElement('canvas');
+          c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc);
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+          ctx.drawImage(im, 0, 0, c.width, c.height);
+          resolve(c.toDataURL('image/jpeg', 0.85));
+        };
+        im.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  /* Pilih file gambar langsung dari laptop (file picker browser).
+     Dikompres dulu (maks 1000px, JPEG) supaya ringan disimpan di Supabase. */
+  function pickLocalImage() {
+    return new Promise(function (resolve) {
+      var fi = document.createElement('input');
+      fi.type = 'file';
+      fi.accept = 'image/*';
+      fi.style.display = 'none';
+      document.body.appendChild(fi);
+      fi.addEventListener('change', async function () {
+        var f = fi.files && fi.files[0];
+        if (fi.parentNode) fi.parentNode.removeChild(fi);
+        if (!f) return resolve(null);
+        if (f.size > 12 * 1024 * 1024) { alert('File terlalu besar (maks 12 MB).'); return resolve(null); }
+        try {
+          var dataUrl = await compressImageFile(f);
+          resolve({ name: f.name.replace(/\.[^.]+$/, ''), dataUrl: dataUrl, size: dataUrl.length });
+        } catch (e) {
+          alert('Gagal baca file: ' + (e && e.message ? e.message : e));
+          resolve(null);
+        }
+      });
+      fi.click();
+    });
+  }
+
   function openAssetModal() {
     const host = document.getElementById('modal-host');
     host.innerHTML = '<div class="modal-backdrop" id="asset-modal-backdrop">' +
@@ -2754,6 +2805,8 @@
           '<div>' +
             '<label class="label"><span data-asset-label>Image URL</span> <span style="color:var(--danger)">*</span></label>' +
             '<input name="url" class="input" placeholder="https://example.com/image.png" required />' +
+            '<button type="button" class="btn btn-outline" id="asset-pick-local" style="width:100%;margin-top:6px;font-size:12px">📁 Pilih file dari komputer…</button>' +
+            '<div id="asset-pick-info" style="font-size:11px;color:#16a34a;margin-top:5px;display:none"></div>' +
           '</div>' +
           '<div class="flex justify-end gap-2 pt-2">' +
             '<button type="button" class="btn btn-outline" id="asset-cancel">Cancel</button>' +
@@ -2775,6 +2828,24 @@
       }
     };
     host.querySelectorAll('input[name="asset_kind"]').forEach(r => r.addEventListener('change', updateLabel));
+    // Pilih file dari laptop -> isi name + url (data URL)
+    var pickBtn = document.getElementById('asset-pick-local');
+    if (pickBtn) pickBtn.addEventListener('click', async function () {
+      pickBtn.disabled = true;
+      pickBtn.textContent = 'Membaca file…';
+      var out = await pickLocalImage();
+      pickBtn.disabled = false;
+      pickBtn.textContent = '📁 Pilih file dari komputer…';
+      if (!out) return;
+      var nameEl = host.querySelector('input[name="name"]');
+      var urlEl = host.querySelector('input[name="url"]');
+      var kindEl = host.querySelector('input[name="asset_kind"][value="image"]');
+      if (kindEl) { kindEl.checked = true; updateLabel(); }
+      if (nameEl && !nameEl.value.trim()) nameEl.value = out.name;
+      if (urlEl) urlEl.value = out.dataUrl;
+      var info = document.getElementById('asset-pick-info');
+      if (info) { info.style.display = 'block'; info.textContent = '✓ ' + out.name + ' siap (' + Math.round(out.size / 1024) + ' KB) — klik "Save Asset".'; }
+    });
     document.getElementById('asset-modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'asset-modal-backdrop') host.innerHTML = ''; });
     document.getElementById('asset-cancel').addEventListener('click', () => host.innerHTML = '');
     document.getElementById('asset-form').addEventListener('submit', (e) => {
@@ -7616,10 +7687,17 @@
     } else if (type === 'spacer') {
       att = { id: uid('AT'), type: 'spacer', data: {} };
     } else if (type === 'library') {
-      if (assets.length === 0) { toast('Image Library kosong. Tambah asset dulu.'); return; }
-      // Open library picker
+      // Open library picker (bisa tetap buka walau library kosong — ada tombol upload dari laptop)
       const host = document.getElementById('modal-host');
-      host.innerHTML = '<div class="modal-backdrop" id="att-lib-bd"><div class="modal" style="max-width:600px"><div class="p-5 border-b"><h2 class="text-lg font-semibold">Pick from Image Library</h2></div><div class="p-5" style="max-height:400px;overflow-y:auto"><div class="asset-grid">' + assets.map(a => renderAssetCard(a)).join('') + '</div></div><div class="p-3 border-t" style="text-align:right"><button type="button" class="btn btn-outline" id="att-lib-close" style="padding:6px 14px;font-size:12px">Close</button></div></div></div>';
+      const emptyMsg = assets.length === 0
+        ? '<div style="text-align:center;padding:26px 12px;color:#6b7280;font-size:13px">Library kosong.<br>Pilih file dari komputer di bawah, atau tambah asset dulu di menu Image Library.</div>'
+        : '<div class="asset-grid">' + assets.map(a => renderAssetCard(a)).join('') + '</div>';
+      host.innerHTML = '<div class="modal-backdrop" id="att-lib-bd"><div class="modal" style="max-width:600px"><div class="p-5 border-b"><h2 class="text-lg font-semibold">Pick from Image Library</h2></div><div class="p-5" style="max-height:400px;overflow-y:auto">' + emptyMsg + '</div>'
+        + '<div class="p-3 border-t" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+        +   '<button type="button" class="btn btn-outline" id="att-lib-upload" style="padding:6px 12px;font-size:12px">📁 Upload dari komputer…</button>'
+        +   '<div style="flex:1"></div>'
+        +   '<button type="button" class="btn btn-outline" id="att-lib-close" style="padding:6px 14px;font-size:12px">Close</button>'
+        + '</div></div></div>';
       host.querySelectorAll('[data-asset-action="use"]').forEach(btn => btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
         const asset = assets.find(x => x.id === id);
@@ -7634,6 +7712,25 @@
         if (composerHost) renderEmailBlastView();
         toast('Attached: ' + asset.name);
       }));
+      // Upload dari laptop: simpan jadi asset baru, lalu langsung insert ke composer
+      const upBtn = document.getElementById('att-lib-upload');
+      if (upBtn) upBtn.addEventListener('click', async () => {
+        upBtn.disabled = true;
+        upBtn.textContent = 'Membaca file…';
+        const out = await pickLocalImage();
+        upBtn.disabled = false;
+        upBtn.textContent = '📁 Upload dari komputer…';
+        if (!out) return;
+        const asset = { id: uid('AS'), kind: 'image', name: out.name, url: out.dataUrl, created_at: new Date().toISOString(), brand_id: window.currentBrand ? window.currentBrand.id : null };
+        assets = [asset, ...assets];
+        saveAssets(assets);
+        const newAtt = { id: uid('AT'), type: 'image', data: { url: asset.url, alt: asset.name } };
+        emailBlast.compose.blocks.push(newAtt);
+        host.innerHTML = '';
+        const composerHost = document.getElementById('email-blast-host');
+        if (composerHost) renderEmailBlastView();
+        toast('Attached: ' + asset.name);
+      });
       document.getElementById('att-lib-bd')?.addEventListener('click', (e) => { if (e.target.id === 'att-lib-bd') host.innerHTML = ''; });
       document.getElementById('att-lib-close')?.addEventListener('click', () => host.innerHTML = '');
       return;
@@ -10030,29 +10127,6 @@
     }
 
     // Kompres gambar (maks 1000px lebar, JPEG) supaya ringan dikirim
-    function compressImageFile(file) {
-      return new Promise((resolve, reject) => {
-        const fr = new FileReader();
-        fr.onerror = () => reject(new Error('Gagal membaca file'));
-        fr.onload = () => {
-          if (/gif$/i.test(file.type) && file.size < 500000) return resolve(fr.result);
-          const im = new Image();
-          im.onerror = () => reject(new Error('File bukan gambar yang valid'));
-          im.onload = () => {
-            const maxW = 1000;
-            const sc = Math.min(1, maxW / im.width);
-            const c = document.createElement('canvas');
-            c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc);
-            const ctx = c.getContext('2d');
-            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
-            ctx.drawImage(im, 0, 0, c.width, c.height);
-            resolve(c.toDataURL('image/jpeg', 0.85));
-          };
-          im.src = fr.result;
-        };
-        fr.readAsDataURL(file);
-      });
-    }
 
     function syncBlockPreview(block) {
       if (block.dataset.block === 'image') {
