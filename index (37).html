@@ -2658,7 +2658,7 @@
             Image Library
             <span class="text-sm font-normal text-gray-500">— saved assets for email blasts</span>
           </h2>
-          <p class="text-sm text-gray-500">Simpan image URL / mock file sekali, pake berkali-kali di email blast.</p>
+          <p class="text-sm text-gray-500">Simpan gambar sekali (URL atau import), pakai berkali-kali di email blast.</p>
         </div>
         <button class="btn btn-primary" id="new-asset-btn" style="padding:8px 14px;font-size:13px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -2685,7 +2685,7 @@
         ${assets.length === 0 ? `
           <div class="card empty-state" style="padding:40px 16px">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 8px;display:block;opacity:0.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            Belum ada asset. Klik <strong>+ Add Asset</strong> untuk add image URL atau mock file.
+            Belum ada asset. Klik <strong>+ Add Asset</strong> untuk simpan gambar.
           </div>
         ` : '<div class="asset-grid">' + assets.map(a => renderAssetCard(a)).join('') + '</div>'}
       </div>
@@ -2711,7 +2711,7 @@
     const isImage = a.kind === 'image';
     const thumb = isImage
       ? '<div class="asset-thumb"><img src="' + escapeHTML(a.url) + '" alt="' + escapeHTML(a.name) + '" onerror="this.parentElement.innerHTML=\'<div style=color:var(--muted);font-size:11px>🖼️ Image failed to load</div>\'"></div>'
-      : '<div class="asset-thumb"><div style="text-align:center"><div style="font-size:28px;margin-bottom:4px">📎</div><div style="font-size:11px;color:var(--muted)">Mock file</div></div></div>';
+      : '<div class="asset-thumb"><div style="text-align:center"><div style="font-size:28px;margin-bottom:4px">📎</div><div style="font-size:11px;color:var(--muted)">File</div></div></div>';
     return '<div class="asset-card">' +
       thumb +
       '<div class="asset-info">' +
@@ -2782,7 +2782,7 @@
       '<div class="modal" style="max-width:480px">' +
         '<div class="p-5 border-b">' +
           '<h2 class="text-lg font-semibold">Add Asset</h2>' +
-          '<p class="text-sm text-gray-500 mt-1">Simpan image URL atau mock file reference.</p>' +
+          '<p class="text-sm text-gray-500 mt-1">Simpan gambar untuk dipakai di email blast.</p>' +
         '</div>' +
         '<form id="asset-form" class="p-5 space-y-4">' +
           '<div>' +
@@ -2794,7 +2794,7 @@
               '</label>' +
               '<label class="flex-1 cursor-pointer">' +
                 '<input type="radio" name="asset_kind" value="import" class="peer sr-only" />' +
-                '<div class="rounded-lg border-2 p-3 transition-all peer-checked:border-violet-400 peer-checked:bg-violet-50 flex items-center gap-2 hover:bg-gray-50"><span style="font-size:18px">📁</span><div class="text-sm font-medium">Import Komputer</div></div>' +
+                '<div class="rounded-lg border-2 p-3 transition-all peer-checked:border-violet-400 peer-checked:bg-violet-50 flex items-center gap-2 hover:bg-gray-50"><span style="font-size:18px">📁</span><div class="text-sm font-medium">Import</div></div>' +
               '</label>' +
             '</div>' +
           '</div>' +
@@ -2805,9 +2805,7 @@
           '<div>' +
             '<label class="label"><span data-asset-label>Image URL</span> <span style="color:var(--danger)">*</span></label>' +
             '<input name="url" class="input" id="asset-url-input" placeholder="https://example.com/image.png" required />' +
-            '<button type="button" class="btn btn-outline" id="asset-pick-local" style="width:100%;padding:14px;font-size:13px;display:none">' +
-              '📁 Pilih file dari komputer…<br><span style="font-size:11px;color:var(--muted);font-weight:400">Gambar disimpan di library brand — bisa dipakai semua orang</span>' +
-            '</button>' +
+            '<button type="button" class="btn btn-outline" id="asset-pick-local" style="width:100%;padding:11px;font-size:13px;display:none;white-space:normal;overflow:hidden">📁 Import</button>' +
             '<div id="asset-pick-info" style="font-size:11px;color:#16a34a;margin-top:5px;display:none"></div>' +
           '</div>' +
           '<div class="flex justify-end gap-2 pt-2">' +
@@ -2824,7 +2822,7 @@
       const pickBtn = host.querySelector('#asset-pick-local');
       const info = host.querySelector('#asset-pick-info');
       const isImport = kind === 'import';
-      label.textContent = isImport ? 'File dari komputer' : 'Image URL';
+      label.textContent = isImport ? 'File' : 'Image URL';
       input.style.display = isImport ? 'none' : '';
       input.required = !isImport;
       if (pickBtn) pickBtn.style.display = isImport ? '' : 'none';
@@ -2877,7 +2875,7 @@
     if (asset.kind === 'image') {
       html = '<div class="email-block" data-block="image" style="text-align:center"><img src="' + escapeHTML(asset.url) + '" alt="' + escapeHTML(asset.name) + '" style="max-width:100%;height:auto;border-radius:4px"></div>';
     } else {
-      html = '<div class="email-block" data-block="file" style="text-align:center"><span style="display:inline-flex;align-items:center;gap:6px;padding:14px 18px;background:#f3f4f6;border:1px dashed #d4d4d8;border-radius:8px;color:#525252;font-size:13px">📎 ' + escapeHTML(asset.name) + ' (mock attachment)</span></div>';
+      html = '<div class="email-block" data-block="file" style="text-align:center"><span style="display:inline-flex;align-items:center;gap:6px;padding:14px 18px;background:#f3f4f6;border:1px dashed #d4d4d8;border-radius:8px;color:#525252;font-size:13px">📎 ' + escapeHTML(asset.name) + ' (file)</span></div>';
     }
     const bodyEl = document.querySelector('[data-blast-input="body"], [data-blast-input="message"]');
     if (!bodyEl) { toast('Buka Email Blast atau WA Blast dulu'); return; }
@@ -7721,7 +7719,7 @@
         : '<div class="asset-grid">' + assets.map(a => renderAssetCard(a)).join('') + '</div>';
       host.innerHTML = '<div class="modal-backdrop" id="att-lib-bd"><div class="modal" style="max-width:600px"><div class="p-5 border-b"><h2 class="text-lg font-semibold">Pick from Image Library</h2></div><div class="p-5" style="max-height:400px;overflow-y:auto">' + emptyMsg + '</div>'
         + '<div class="p-3 border-t" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-        +   '<button type="button" class="btn btn-outline" id="att-lib-upload" style="padding:6px 12px;font-size:12px">📁 Upload dari komputer…</button>'
+        +   '<button type="button" class="btn btn-outline" id="att-lib-upload" style="padding:6px 12px;font-size:12px;white-space:nowrap">📁 Import</button>'
         +   '<div style="flex:1"></div>'
         +   '<button type="button" class="btn btn-outline" id="att-lib-close" style="padding:6px 14px;font-size:12px">Close</button>'
         + '</div></div></div>';
@@ -10312,19 +10310,24 @@
     }
     // Re-attach controls on initial load (for existing blocks in saved body)
     document.querySelectorAll('[data-blast-input="body"] .email-block').forEach(bl => attachBlockControls(bl));
-    document.querySelector('[data-editor-action="insert-image"]')?.addEventListener('click', (e) => {
+    document.querySelector('[data-editor-action="insert-image"]')?.addEventListener('click', async (e) => {
       e.preventDefault();
-      const choice = prompt('Insert image:\n1. Paste image URL\n2. Mock file (just shows icon)\n\nType "url" or "mock":', 'url');
+      const choice = prompt('Insert image:\n1. Image URL\n2. Import file dari komputer\n\nKetik "url" atau "import":', 'url');
       let html = '';
       if (choice && choice.toLowerCase().startsWith('url')) {
         const url = prompt('Image URL:', 'https://via.placeholder.com/400x200?text=Promo+Banner');
         if (url) {
           html = `<p style="text-align:center;margin:12px 0"><img src="${escapeHTML(url)}" alt="image" style="max-width:100%;height:auto;border-radius:4px"></p>`;
         }
-      } else if (choice && choice.toLowerCase().startsWith('mock')) {
-        const name = prompt('Mock file name:', 'promo-banner.png');
-        if (name) {
-          html = `<p style="text-align:center;margin:12px 0"><span style="display:inline-flex;align-items:center;gap:6px;padding:14px 18px;background:#f3f4f6;border:1px dashed #d4d4d8;border-radius:8px;color:#525252;font-size:13px">📎 ${escapeHTML(name)} (mock attachment)</span></p>`;
+      } else if (choice && choice.toLowerCase().startsWith('import')) {
+        const out = await pickLocalImage();
+        if (out) {
+          html = '<div class="email-block" data-block="image" contenteditable="false" style="text-align:center;cursor:default;padding:8px 0">'
+            + '<div class="eb-image-preview" style="min-height:0;background:transparent;border:0;display:block;text-align:center">'
+            + '<div class="eb-img-wrap" style="display:inline-block;line-height:0;width:100%">'
+            + '<img src="' + escapeHTML(out.dataUrl) + '" alt="' + escapeHTML(out.name) + '" style="width:100%;height:auto;display:block;border-radius:8px" />'
+            + '<span class="eb-resize-handle" data-eb-handle="1" contenteditable="false" title="Tarik untuk ubah ukuran gambar"></span>'
+            + '</div></div></div>';
         }
       }
       if (html) {
