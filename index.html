@@ -6639,6 +6639,18 @@
    * opts.mode: 'edit' | 'readonly' — readonly disables contenteditable + hides block controls (used by history detail)
    * opts.title, opts.subtitle — shown in the email card header on canvas
    */
+  /* Dropdown "load audience" untuk baris Cc / Bcc. */
+  function audSelectHtml(which, channel) {
+    if (channel !== 'email') return '';
+    const opts = (audiences || []).map(a => {
+      const st = audStats(a);
+      return '<option value="' + escapeHTML(a.id) + '">' + escapeHTML(a.name) + ' (' + st.withEmail + ' email)</option>';
+    }).join('');
+    return '<select data-blast-action="load-audience-' + which + '" class="input" title="Isi ' + which.toUpperCase() + ' dari audience tersimpan. Catatan: ' + which.toUpperCase() + ' hanya dilampirkan ke email blast PERTAMA (bukan ke semua penerima)." ' +
+      'style="font-size:11px;padding:4px 8px;width:auto;flex-shrink:0;max-width:190px">' +
+      '<option value="">📂 Dari audience…</option>' + opts + '</select>';
+  }
+
   function renderBlastCanvas(opts) {
     const channel = opts.channel;
     const mode = opts.mode || 'edit';
@@ -6784,12 +6796,14 @@
           // Cc row (hidden by default — toggled by Cc button)
           (compose.showCc ? '<div class="ech-row">' +
             '<span class="ech-label">Cc</span>' +
-            '<input type="text" class="ech-input-full" data-ech-cc placeholder="Add Cc recipients…" value="' + escapeHTML(compose.cc || '') + '" />' +
+            '<input type="text" class="ech-input-full" data-ech-cc placeholder="Add Cc recipients…" value="' + escapeHTML(compose.cc || '') + '" style="flex:1;min-width:0" />' +
+            audSelectHtml('cc', channel) +
           '</div>' : '') +
           // Bcc row (hidden by default — toggled by Bcc button)
           (compose.showBcc ? '<div class="ech-row">' +
             '<span class="ech-label">Bcc</span>' +
-            '<input type="text" class="ech-input-full" data-ech-bcc placeholder="Add Bcc recipients…" value="' + escapeHTML(compose.bcc || '') + '" />' +
+            '<input type="text" class="ech-input-full" data-ech-bcc placeholder="Add Bcc recipients…" value="' + escapeHTML(compose.bcc || '') + '" style="flex:1;min-width:0" />' +
+            audSelectHtml('bcc', channel) +
           '</div>' : '') +
           // Subject row (Gmail-style: subtle, single line, contenteditable)
           (isEmail
@@ -9266,6 +9280,33 @@
     });
 
     // ===== Email card: Cc / Bcc input =====
+    // ===== Cc / Bcc: isi dari audience tersimpan =====
+    document.querySelectorAll('[data-blast-action="load-audience-cc"], [data-blast-action="load-audience-bcc"]').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const id = e.target.value;
+        e.target.value = '';
+        if (!id) return;
+        const which = sel.getAttribute('data-blast-action') === 'load-audience-cc' ? 'cc' : 'bcc';
+        const a = (audiences || []).find(x => x.id === id);
+        if (!a) return;
+        const st = audStats(a);
+        const emails = Array.from(new Set(st.found
+          .map(l => String(l.email || '').trim())
+          .filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))));
+        if (!emails.length) { toast('Audience "' + a.name + '" tidak punya email yang valid'); return; }
+        const cur = String(blastState.compose[which] || '').split(',').map(s => s.trim()).filter(Boolean);
+        const merged = Array.from(new Set(cur.concat(emails)));
+        blastState.compose[which] = merged.join(', ');
+        if (which === 'cc') blastState.compose.showCc = true;
+        else blastState.compose.showBcc = true;
+        // Tandai audience terakhir dipakai
+        const idx = audiences.findIndex(x => x.id === id);
+        if (idx >= 0) { audiences[idx].last_used = new Date().toISOString(); saveAudiences(audiences); }
+        if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
+        const n = emails.length - (merged.length - cur.length);
+        toast('+' + n + ' email dari "' + a.name + '" masuk ' + which.toUpperCase() + ' (total ' + merged.length + ')');
+      });
+    });
     document.querySelectorAll('[data-ech-cc]').forEach(el => {
       el.addEventListener('input', () => { blastState.compose.cc = el.value; });
     });
