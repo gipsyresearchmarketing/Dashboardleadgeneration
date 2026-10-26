@@ -7125,7 +7125,17 @@
         '  img width         = ' + Array.from(el.querySelectorAll('img')).map(n => n.style.width || n.getAttribute('width') || '-').join(' | ') + '\n' +
         '  wrap width        = ' + Array.from(el.querySelectorAll('.eb-img-wrap')).map(n => n.style.width || '-').join(' | ') + '\n' +
         '  data-img-w        = ' + Array.from(el.querySelectorAll('.email-block')).map(n => n.getAttribute('data-img-w') || '-').join(' | ') + '\n' +
-        '  <pre>' + el.innerHTML.slice(0, 500).replace(/</g, '&lt;') + '</pre>';
+        '  -- daftar <img> --\n' +
+        Array.from(el.querySelectorAll('img')).map((n, i) =>
+          '   #' + i + ' inBlock=' + (n.closest('.email-block') ? 'Y' : 'N') +
+          ' len=' + (n.getAttribute('src') || '').length +
+          ' ' + (n.getAttribute('src') || '').slice(0, 40)).join('\n') +
+        '\n  -- blok --\n' +
+        Array.from(el.querySelectorAll('.email-block')).map((n, i) =>
+          '   #' + i + ' type=' + (n.getAttribute('data-block') || '?') +
+          ' ctrls=' + (n.querySelector('.eb-controls') ? 'Y' : 'N') +
+          ' img=' + (n.querySelector('img') ? 'Y' : 'N')).join('\n') +
+        '\n  <pre>' + el.innerHTML.slice(0, 300).replace(/</g, '&lt;') + '</pre>';
       var info = document.getElementById(id);
       if (!info) {
         info = document.createElement('div');
@@ -7164,6 +7174,31 @@
     }
   } catch (e) {}
 
+  /* Body draft korup bisa berisi gambar yang sama 2x: satu dari blok bener,
+     satu lagi dari HTML ter-escape yang di-decode. Sisakan yang pertama. */
+  function dedupeImageBlocks(root) {
+    if (!root) return;
+    const seen = {};
+    // 1) <img> di luar .email-block -> duplikat, buang (dan wrapper-nya)
+    Array.from(root.querySelectorAll('img')).forEach(img => {
+      if (img.closest('.email-block')) return;
+      const src = (img.getAttribute('src') || '').slice(0, 120);
+      if (!src) return;
+      const holder = document.createElement('div');
+      holder.appendChild(img);
+      if (holder.innerHTML) { /* biarkan */ }
+      img.remove();
+    });
+    // 2) .email-block image dengan src yang sama -> sisakan yang pertama
+    Array.from(root.querySelectorAll('.email-block[data-block="image"]')).forEach(b => {
+      const img = b.querySelector('img');
+      const src = (img ? (img.getAttribute('src') || '') : '').slice(0, 120);
+      if (!src) return;
+      if (!seen[src]) { seen[src] = 1; return; }
+      b.remove();
+    });
+  }
+
   /* Normalisasi body draft: decode HTML ter-escape + pasang ulang wrapper blok yang hilang. */
   function normalizeDraftBody(html) {
     if (!html) return '';
@@ -7171,6 +7206,7 @@
     tmp.innerHTML = String(html);
     decodeEscapedHtml(tmp);
     restoreOrphanBlocks(tmp);
+    dedupeImageBlocks(tmp);
     return tmp.innerHTML;
   }
 
@@ -7571,6 +7607,7 @@
     // -> normalkan dulu, kalau tidak blok gambar/button gak akan ikut terkirim.
     decodeEscapedHtml(root);
     restoreOrphanBlocks(root);
+    dedupeImageBlocks(root);
     const val = (el, sel) => { const n = el.querySelector(sel); return n ? (n.getAttribute('value') || n.value || '') : ''; };
     const px = (w, max) => Math.max(40, Math.min(EMAIL_CONTENT_W, Math.round((w / max) * EMAIL_CONTENT_W)));
     root.querySelectorAll('.email-block').forEach(b => {
