@@ -7039,6 +7039,26 @@
     if (typeof window.setupImageButtonLiveEditors === 'function') {
       try { window.setupImageButtonLiveEditors(el); } catch (e) {}
     }
+    // DEBUG (aktif dengan ?dbg=1 di URL): tampilkan struktur body draft supaya gampang dicek.
+    try {
+      if (/(^|[?&])dbg=1/.test(location.search)) {
+        const q = (sel) => el.querySelectorAll(sel).length;
+        const orphanPreview = Array.from(el.querySelectorAll('.eb-image-preview')).filter(n => !n.closest('.email-block')).length;
+        const orphanBtn = Array.from(el.querySelectorAll('.eb-btn-wrap')).filter(n => !n.closest('.email-block')).length;
+        const info = document.createElement('div');
+        info.style.cssText = 'margin-top:10px;padding:8px 10px;background:#0f172a;color:#a5f3fc;font:11px ui-monospace,Menlo,monospace;border-radius:6px;white-space:pre-wrap;word-break:break-all';
+        info.textContent =
+          'DBG body=' + el.innerHTML.length + ' char\n' +
+          '  .email-block      = ' + q('.email-block') + '\n' +
+          '  .eb-image-preview = ' + q('.eb-image-preview') + '  (tanpa wrapper: ' + orphanPreview + ')\n' +
+          '  .eb-img-wrap      = ' + q('.eb-img-wrap') + '\n' +
+          '  .eb-controls      = ' + q('.eb-controls') + '\n' +
+          '  .eb-btn-wrap      = ' + q('.eb-btn-wrap') + '  (tanpa wrapper: ' + orphanBtn + ')\n' +
+          '  img               = ' + q('img') + '\n' +
+          '  <pre>' + el.innerHTML.slice(0, 420).replace(/</g, '&lt;') + '</pre>';
+        el.appendChild(info);
+      }
+    } catch (e) {}
   }
 
   /* Draft lama bisa kehilangan wrapper .email-block (isi blok tetap ada tapi pembungkus hilang).

@@ -88,9 +88,9 @@ async function sendOne(ctx, r) {
   if (!to) return { lead_id: r && r.lead_id, phone: String((r && r.phone) || ''), ok: false, error: 'Nomor tidak valid' };
   const payload = buildPayload(ctx, r || {}, to);
   try {
-    // Endpoint kirim pesan WhatsApp Cloud API selalu /{PHONE_NUMBER_ID}/messages.
-    // (Jangan disisipi WABA ID: /{WABA}/phone_numbers/{id}/messages bukan jalur valid -> error 2500 "Unknown path components".)
-    const url = `https://graph.facebook.com/${ctx.version}/${ctx.phoneId}/messages`;
+    const url = ctx.waba
+      ? `https://graph.facebook.com/${ctx.version}/${ctx.waba}/phone_numbers/${ctx.phoneId}/messages`
+      : `https://graph.facebook.com/${ctx.version}/${ctx.phoneId}/messages`;
     const resp = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${ctx.token}`, 'Content-Type': 'application/json' },
