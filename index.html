@@ -6822,6 +6822,11 @@
       b.setAttribute('draggable', 'true');
       ensureBlockEditor(b);
       if (!b.querySelector('.email-block-controls')) attachBlockControls(b);
+      // Normalisasi preview gambar (bikin .eb-img-wrap + titik resize + lebar) — sama persis
+      // dengan jalur Compose, supaya gambar di draft bisa di-gede-kecilkan.
+      if (b.getAttribute('data-block') === 'image' && typeof window.syncBlockPreview === 'function') {
+        try { window.syncBlockPreview(b); } catch (e) {}
+      }
     });
     refreshEmailDropzones();
     setupEmailDragListeners();
@@ -6930,7 +6935,52 @@
     if (!blockEl) return;
     const type = blockEl.getAttribute('data-block');
     if (type !== 'image' && type !== 'button') return;
-    if (blockEl.querySelector('.eb-controls')) return;
+
+    // Gambar HARUS punya .eb-img-wrap + titik resize (.eb-resize-handle) supaya bisa di-gede-kecilkan.
+    // Draft lama biasanya punya <img> polos di dalam .eb-image-preview tanpa wrap -> titik resize hilang.
+    if (type === 'image') {
+      const preview = blockEl.querySelector('.eb-image-preview');
+      if (preview) {
+        const wrap = preview.querySelector('.eb-img-wrap');
+        const img = preview.querySelector('img');
+        if (!wrap && img) {
+          // Bungkus <img> polos ke dalam .eb-img-wrap
+          const w = document.createElement('div');
+          w.className = 'eb-img-wrap';
+          const savedW = blockEl.getAttribute('data-img-w') || '';
+          w.style.cssText = 'display:inline-block;line-height:0;width:' + (savedW ? savedW + 'px' : '100%');
+          w.appendChild(img);
+          preview.appendChild(w);
+        }
+        const wrap2 = preview.querySelector('.eb-img-wrap');
+        if (wrap2 && !wrap2.querySelector('.eb-resize-handle')) {
+          const hd = document.createElement('span');
+          hd.className = 'eb-resize-handle';
+          hd.setAttribute('data-eb-handle', '1');
+          hd.setAttribute('contenteditable', 'false');
+          hd.title = 'Tarik untuk ubah ukuran gambar';
+          wrap2.appendChild(hd);
+        }
+      }
+    }
+
+    // Editor (tombol Upload / field URL / Alt / Lebar) — pasang kalau belum ada.
+    if (blockEl.querySelector('.eb-controls')) {
+      // Editor sudah ada tapi field src-nya kosong (mis. draft lama) -> isi dari <img> supaya
+      // syncBlockPreview tidak menggambar placeholder dan gambar tidak ikut hilang.
+      const sIn = blockEl.querySelector('[data-eb-input="src"]');
+      const iIn = blockEl.querySelector('[data-eb-input="alt"]');
+      const pImg = blockEl.querySelector('.eb-image-preview img, img');
+      if (sIn && !sIn.value.trim() && pImg && pImg.getAttribute('src')) {
+        sIn.value = pImg.getAttribute('src');
+        sIn.setAttribute('value', sIn.value);
+      }
+      if (iIn && !iIn.value.trim() && pImg && pImg.getAttribute('alt')) {
+        iIn.value = pImg.getAttribute('alt');
+        iIn.setAttribute('value', iIn.value);
+      }
+      return;
+    }
 
     const ctrls = document.createElement('div');
     ctrls.className = 'eb-controls';
@@ -6952,15 +7002,6 @@
         pv.setAttribute('style', 'min-height:120px;background:#f1f5f9;border:2px dashed #cbd5e1;border-radius:6px;color:#64748b;font-size:13px;display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center;background-repeat:no-repeat');
         pv.innerHTML = '<span style="background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:4px">🖼️ Click fields below to add image</span>';
         blockEl.insertBefore(pv, blockEl.firstChild);
-      }
-      const wrap = blockEl.querySelector('.eb-img-wrap');
-      if (wrap && !wrap.querySelector('.eb-resize-handle')) {
-        const h = document.createElement('span');
-        h.className = 'eb-resize-handle';
-        h.setAttribute('data-eb-handle', '1');
-        h.setAttribute('contenteditable', 'false');
-        h.setAttribute('title', 'Tarik untuk ubah lebar gambar');
-        wrap.appendChild(h);
       }
     } else {
       ctrls.setAttribute('style', 'margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center');
@@ -8962,6 +9003,7 @@
     window.refreshEmailDropzones = refreshEmailDropzones;
     window.setupEmailDragListeners = setupEmailDragListeners;
     window.setupImageButtonLiveEditors = setupImageButtonLiveEditors;
+    window.syncBlockPreview = syncBlockPreview;
     window.attachBlockControls = attachBlockControls;
     const blastState = channel === 'email' ? emailBlast : waBlast;
     const storageKey = channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA;
