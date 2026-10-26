@@ -5389,7 +5389,7 @@
         email.email_header_config = hfCollect();
         var saved = await brandApi('save', { email: email });
         // Refresh cache header/footer supaya blast berikutnya langsung pakai config baru
-        emailHeaderCfg = null; emailHeaderPromise = null; emailHeaderLoaded = true; emailHeaderAt = 0;
+        emailHeaderCfg = null; emailHeaderPromise = null; emailHeaderLoaded = true; emailHeaderAt = 0; emailHeaderSig = '';
         try { await getEmailHeaderCfg(true); } catch (e) {}
         toast('Pengaturan email disimpan');
         renderSendSettings(host, saved);
@@ -7084,6 +7084,12 @@
         '<div ' + editableAttr + ' data-blast-input="body" class="email-card-body' + (readOnly ? ' readonly' : '') + '" data-placeholder="Click here and start typing your message…">' + (compose.body || compose.message || '') + '</div>' + (readOnly ? '' :
           '<div class="email-dropzone" data-blast-dropzone="end" style="padding:10px;text-align:center;font-size:11px;color:var(--muted);border:1px dashed var(--border);border-radius:6px;margin-top:6px">Drop module here ↓</div>'
         ) +
+        (channel === 'email' && buildEmailFooterHtml(emailHeaderCfg)
+          ? '<div style="border:1px dashed #c7d2fe;background:#f5f3ff;border-radius:8px;padding:10px 12px;margin-top:10px">'
+            + buildEmailFooterHtml(emailHeaderCfg)
+            + '<div style="font-size:10.5px;color:#6d28d9;margin-top:6px;text-transform:uppercase;letter-spacing:.04em;font-weight:600">↓ Footer email — otomatis di setiap blast, tidak ikut diedit di sini</div>'
+          + '</div>'
+          : '') +
         '<div class="email-card-footer">' +
           '<button type="button" class="btn btn-outline" data-blast-action="clear" data-channel="' + channel + '">Clear</button>' +
           '<button type="button" class="btn btn-outline" data-blast-action="save-draft" data-channel="' + channel + '">Save Draft</button>' +
@@ -7973,6 +7979,13 @@
   var emailHeaderPromise = null;
   var emailHeaderLoaded = false;      // config sudah pernah dimuat (hindari render loop)
   var emailHeaderAt = 0;              // kapan terakhir fetch (ms)
+  var emailHeaderSig = '';            // signature config terakhir (deteksi perubahan)
+  var emailHeaderRetry = null;        // timer retry fetch config
+  function emailHeaderSignature() {
+    var c = emailHeaderCfg || {};
+    var soc = (c.socials || []).map(function (s) { return (s.i || '') + '|' + (s.u || ''); }).join(',');
+    return (c.enabled ? '1' : '0') + '|' + (c.logo || '') + '|' + (c.name || '') + '|' + (c.tagline || '') + '|' + (c.footerEnabled ? '1' : '0') + '|' + soc;
+  }
 
   async function getEmailHeaderCfg(force) {
     // Kalau config-nya kosong (belum diset / fetchnya gagal), jangan dicache selamanya —
@@ -8525,6 +8538,39 @@
         });
       } catch (e) {}
     }
+    // Kalau config-nya berubah (baru ke-load / baru di-save) -> render ulang biar keliatan.
+    var sig = emailHeaderSignature();
+    if (sig !== emailHeaderSig) {
+      emailHeaderSig = sig;
+      setTimeout(function () { if (emailBlast.activeTab === 'compose') renderEmailBlastView(); }, 50);
+    }
+    // Kalau masih kosong (mis. brand belum siap saat fetch) -> coba lagi terus sampai dapet.
+    if (!emailHeaderCfg || !emailHeaderCfg.enabled) {
+      if (emailHeaderRetry) clearTimeout(emailHeaderRetry);
+      emailHeaderRetry = setTimeout(function () {
+        getEmailHeaderCfg(true).then(function () {
+          if (emailBlast.activeTab === 'compose') renderEmailBlastView();
+        }).catch(function () {});
+      }, 3000);
+      emailHeaderKeepRetry(1);
+    }
+  }
+
+  /* Retry config header/footer terus-menerus sampai ketemu (batas 10x biar gak request terus). */
+  function emailHeaderKeepRetry(n) {
+    try {
+      if (n > 10) return;
+      if (emailHeaderCfg && emailHeaderCfg.enabled) return;
+      setTimeout(function () {
+        getEmailHeaderCfg(true).then(function () {
+          if (emailHeaderCfg && emailHeaderCfg.enabled) {
+            if (emailBlast.activeTab === 'compose') renderEmailBlastView();
+          } else {
+            emailHeaderKeepRetry(n + 1);
+          }
+        }).catch(function () { emailHeaderKeepRetry(n + 1); });
+      }, 3000);
+    } catch (e) {}
   }
 
   /* ====================================================
