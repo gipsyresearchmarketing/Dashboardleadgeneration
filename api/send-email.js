@@ -2,12 +2,12 @@
  * Vercel Serverless Function — kirim email blast dari dashboard.
  *
  * Auth   : butuh header "Authorization: Bearer <Supabase access token>" (user harus login & member brand).
- * Provider (pilih salah satu lewat Environment Variables di Vercel):
- *   A) Resend : RESEND_API_KEY, EMAIL_FROM  (domain pengirim harus diverifikasi di Resend)
- *   B) SMTP   : SMTP_USER, SMTP_PASS  (+ opsional SMTP_HOST, SMTP_PORT, EMAIL_FROM, EMAIL_FROM_NAME)
- *               Default host smtp.gmail.com:465 -> pakai Gmail + App Password.
- * Opsional : REPLY_TO, SUPABASE_URL, SUPABASE_ANON_KEY
+ * Provider: Gmail API milik brand (lewat "Hubungkan Gmail" di Profile — Google OAuth, tanpa App Password).
+ *   Fallback kalau brand belum hubungkan Gmail: Resend (RESEND_API_KEY, EMAIL_FROM)
+ *   atau SMTP (SMTP_USER, SMTP_PASS + opsional SMTP_HOST/SMTP_PORT/EMAIL_FROM/EMAIL_FROM_NAME).
+ * Opsional : REPLY_TO, SUPABASE_URL, SUPABASE_ANON_KEY, SECRETS_KEY
  */
+const { getMailConfig, createMailer } = require('./_lib/brand');
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ugxrtiitmqrfrdpmcxka.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_JTxgxH__IgjcJhGkncaIkQ_erJNnZDG';
 const MAX_RECIPIENTS = 100;
@@ -142,8 +142,24 @@ module.exports = async (req, res) => {
     if (!recipients.length) return res.status(400).json({ error: 'Tidak ada penerima' });
     if (recipients.length > MAX_RECIPIENTS) return res.status(400).json({ error: `Maksimal ${MAX_RECIPIENTS} penerima per request` });
 
-    const send = getSender();
-    if (!send) return res.status(500).json({ error: 'Pengirim email belum dikonfigurasi di Vercel (isi RESEND_API_KEY, atau SMTP_USER + SMTP_PASS)' });
+    /* Pengirim: pakai Gmail API milik brand (dari "Hubungkan Gmail").
+       Fallback ke Resend/SMTP env kalau brand belum hubungkan Gmail. */
+    let send = null;
+    let mc = null;
+    try { mc = await getMailConfig(token, brandId); } catch (e) {}
+    if (mc) {
+      const mailer = await createMailer(mc);
+      const from = `"${mc.fromName}" <${mc.user}>`;
+      send = async (m) => {
+        await mailer.send({
+          from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo: mc.replyTo,
+          attachments: (m.attachments || []).map((x) => ({ filename: x.filename, content: x.content, encoding: 'base64', contentType: x.contentType, ...(x.cid ? { cid: x.cid, contentDisposition: 'inline' } : {}) })),
+        });
+      };
+    } else {
+      send = getSender();
+      if (!send) return res.status(400).json({ error: 'Gmail brand ini belum dihubungkan. Buka Profile -> Pengaturan Pengiriman -> klik "Hubungkan Gmail".' });
+    }
 
     const text = htmlToText(html);
     const cc = parseEmails(body.cc);
