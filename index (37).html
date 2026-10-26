@@ -4982,6 +4982,9 @@
    * Builder "Header & Footer email blast" di Profile
    * ==================================================== */
   function renderHeaderFooterBuilder(em, cur, isOwner) {
+    // Style input/label (didefinisikan sendiri — lbl/inp milik renderSendSettings bukan scope di sini)
+    var lbl = 'font-size:11px;font-weight:600;color:#6b7280;margin:10px 0 4px;display:block';
+    var inp = 'width:100%;font-size:13px;padding:7px 10px;border:1px solid #e5e7eb;border-radius:6px;box-sizing:border-box';
     var cfg = (em && em.email_header_config) || {};
     var on = !!(em && em.email_header_enabled);
     var socials = Array.isArray(cfg.socials) ? cfg.socials : [];
@@ -7272,6 +7275,31 @@
     });
   }
 
+
+  /* Body draft korup bisa berisi gambar yang sama 2x: satu dari blok bener,
+     satu lagi dari HTML ter-escape yang di-decode. Sisakan yang pertama. */
+  function dedupeImageBlocks(root) {
+    if (!root) return;
+    const seen = {};
+    // 1) <img> di luar .email-block -> duplikat, buang (dan wrapper-nya)
+    Array.from(root.querySelectorAll('img')).forEach(img => {
+      if (img.closest('.email-block')) return;
+      const src = (img.getAttribute('src') || '').slice(0, 120);
+      if (!src) return;
+      const holder = document.createElement('div');
+      holder.appendChild(img);
+      if (holder.innerHTML) { /* biarkan */ }
+      img.remove();
+    });
+    // 2) .email-block image dengan src yang sama -> sisakan yang pertama
+    Array.from(root.querySelectorAll('.email-block[data-block="image"]')).forEach(b => {
+      const img = b.querySelector('img');
+      const src = (img ? (img.getAttribute('src') || '') : '').slice(0, 120);
+      if (!src) return;
+      if (!seen[src]) { seen[src] = 1; return; }
+      b.remove();
+    });
+  }
 
   /* Normalisasi body draft: decode HTML ter-escape + pasang ulang wrapper blok yang hilang. */
   function normalizeDraftBody(html) {
