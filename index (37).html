@@ -4978,6 +4978,57 @@
     return data;
   }
 
+  /* ====================================================
+   * Builder "Header & Footer email blast" di Profile
+   * ==================================================== */
+  function renderHeaderFooterBuilder(em, cur, isOwner) {
+    var cfg = (em && em.email_header_config) || {};
+    var on = !!(em && em.email_header_enabled);
+    var socials = Array.isArray(cfg.socials) ? cfg.socials : [];
+    var dis = isOwner ? '' : ' disabled';
+    var rows = socials.map(function (s, i) {
+      return '<div data-hf-social="' + i + '" style="display:flex;gap:5px;align-items:center;margin-bottom:5px">'
+        + '<input data-hf="i" value="' + escHtml(s.i || '') + '" placeholder="🌐" style="width:44px;flex:none;text-align:center;padding:5px 4px;font-size:12px" ' + dis + ' />'
+        + '<input data-hf="l" value="' + escHtml(s.l || '') + '" placeholder="label (mis. gipsyresearch.id)" style="flex:1;min-width:0;padding:5px 7px;font-size:12px" ' + dis + ' />'
+        + '<input data-hf="u" value="' + escHtml(s.u || '') + '" placeholder="https://..." style="flex:1;min-width:0;padding:5px 7px;font-size:12px" ' + dis + ' />'
+        + '<button type="button" class="btn btn-ghost" data-hf-del="' + i + '" title="Hapus" ' + dis + ' style="padding:3px 7px;font-size:13px;color:#b91c1c;flex:none">×</button>'
+        + '</div>';
+    }).join('');
+    if (!rows) rows = '<div style="font-size:11.5px;color:#94a3b8;padding:2px 0 6px">Belum ada link. Klik "+ Tambah link".</div>';
+
+    return '<div style="margin-top:14px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#f8fafc">'
+      + '<div style="font-size:12px;font-weight:600;color:var(--fg);margin-bottom:10px">Header &amp; footer email blast</div>'
+      + '<div style="font-size:11.5px;color:#6b7280;line-height:1.5;margin-bottom:10px">Header ditambahkan di <b>atas</b> setiap email blast, footer (link sosmed) di <b>bawah</b>. Berlaku untuk semua blast brand ini.</div>'
+      // ── Header ──
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fg);margin-bottom:8px;cursor:pointer">'
+      +   '<input type="checkbox" id="ss-hdr-on" ' + (on ? 'checked' : '') + ' ' + dis + ' style="width:15px;height:15px;flex:none" />'
+      +   '<span>Header di atas (logo + nama)</span>'
+      + '</label>'
+      + '<div id="ss-hdr-fields" style="margin:0 0 12px 23px' + (on ? '' : ';display:none') + '">'
+      +   '<label style="' + lbl + '">URL logo</label>'
+      +   '<div style="display:flex;gap:6px;align-items:center">'
+      +     '<input id="ss-hdr-logo" value="' + escHtml(cfg.logo || '') + '" placeholder="https://.../logo.png" style="' + inp + '" ' + dis + ' />'
+      +     '<button type="button" class="btn btn-outline" id="ss-hdr-lib" style="font-size:11px;padding:5px 9px;white-space:nowrap" ' + dis + '>📚 Library</button>'
+      +   '</div>'
+      +   '<label style="' + lbl + '">Nama / brand</label><input id="ss-hdr-name" value="' + escHtml(cfg.name || '') + '" placeholder="' + escHtml(cur.name || 'Nama brand') + '" style="' + inp + '" ' + dis + ' />'
+      +   '<label style="' + lbl + '">Tagline (opsional)</label><input id="ss-hdr-tagline" value="' + escHtml(cfg.tagline || '') + '" placeholder="Bantu belajar & memahami riset" style="' + inp + '" ' + dis + ' />'
+      + '</div>'
+      // ── Footer ──
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fg);margin-bottom:8px;cursor:pointer">'
+      +   '<input type="checkbox" id="ss-ftr-on" ' + (cfg.footerEnabled ? 'checked' : '') + ' ' + dis + ' style="width:15px;height:15px;flex:none" />'
+      +   '<span>Footer di bawah (link sosmed)</span>'
+      + '</label>'
+      + '<div id="ss-ftr-fields" style="margin:0 0 12px 23px' + (cfg.footerEnabled ? '' : ';display:none') + '">'
+      +   '<div id="ss-hf-socials">' + rows + '</div>'
+      +   '<button type="button" class="btn btn-outline" id="ss-hf-add" style="font-size:11px;padding:4px 9px;margin-top:2px" ' + dis + '>+ Tambah link</button>'
+      +   '<label style="' + lbl + '">Teks footer (opsional)</label><input id="ss-hdr-ftext" value="' + escHtml(cfg.footerText || '') + '" placeholder="Email ini dikirim oleh Gipsy Research." style="' + inp + '" ' + dis + ' />'
+      + '</div>'
+      // ── Preview ──
+      + '<div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-top:4px;margin-bottom:6px">Preview</div>'
+      + '<div id="ss-hf-preview" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px"></div>'
+      + '</div>';
+  }
+
   /* ---------- Hubungkan Gmail (Google OAuth) ---------- */
   async function gmailOAuthApi(payload) {
     if (!window.sb) throw new Error('Belum login');
@@ -5078,6 +5129,7 @@
       +   '<div style="width:90px"><label style="' + lbl + '">Port</label><input id="ss-smtp-port" style="' + inp + '" placeholder="465" value="' + escHtml(String(em.smtp_port || '')) + '"' + dis + ' /></div></div>'
       +   (em.smtp_configured && isOwner ? '<button class="btn btn-outline" id="ss-clear-email" style="font-size:12px;margin-top:10px;color:#b91c1c;border-color:#fecaca">Hapus App Password</button>' : '')
       + '</details>'
+      + renderHeaderFooterBuilder(em, cur, isOwner)
       + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn btn-primary" id="ss-save-email" style="font-size:12px"' + dis + '>Simpan</button>'
       +   (em.configured ? '<button class="btn btn-outline" id="ss-verify-email" style="font-size:12px">Tes koneksi</button>' : '')
       +   (em.gmail_connected && isOwner ? '<button class="btn btn-outline" id="ss-gmail-connect" style="font-size:12px">Ganti akun Gmail</button>'
@@ -5126,12 +5178,115 @@
     };
     var bind = function (id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
 
+    /* ===== Header & footer email blast ===== */
+    function hfCollect() {
+      var socials = [];
+      document.querySelectorAll('[data-hf-social]').forEach(function (row) {
+        var g = function (k) { var el = row.querySelector('[data-hf="' + k + '"]'); return el ? el.value.trim() : ''; };
+        var s = { i: g('i'), l: g('l'), u: g('u') };
+        if (s.l || s.u) socials.push(s);
+      });
+      return {
+        logo: (document.getElementById('ss-hdr-logo') || {}).value || '',
+        name: (document.getElementById('ss-hdr-name') || {}).value || '',
+        tagline: (document.getElementById('ss-hdr-tagline') || {}).value || '',
+        footerEnabled: !!(document.getElementById('ss-ftr-on') || {}).checked,
+        socials: socials,
+        footerText: (document.getElementById('ss-hdr-ftext') || {}).value || '',
+      };
+    }
+    function hfPreview() {
+      var box = document.getElementById('ss-hf-preview');
+      if (!box) return;
+      var cfg = hfCollect();
+      cfg.enabled = !!(document.getElementById('ss-hdr-on') || {}).checked;
+      var h = buildEmailHeaderHtml(cfg), f = buildEmailFooterHtml(cfg);
+      box.innerHTML = (h || f) ? (h + '<div style="color:#94a3b8;font-size:12px;padding:6px 0">(isi email)</div>' + f)
+        : '<div style="color:#94a3b8;font-size:12px;padding:4px 0">Belum ada header/footer aktif.</div>';
+    }
+    var hfOn = document.getElementById('ss-hdr-on');
+    if (hfOn) {
+      hfOn.addEventListener('change', function () {
+        var f = document.getElementById('ss-hdr-fields'); if (f) f.style.display = hfOn.checked ? '' : 'none';
+        hfPreview();
+      });
+    }
+    var fOn = document.getElementById('ss-ftr-on');
+    if (fOn) {
+      fOn.addEventListener('change', function () {
+        var f = document.getElementById('ss-ftr-fields'); if (f) f.style.display = fOn.checked ? '' : 'none';
+        hfPreview();
+      });
+    }
+    ['ss-hdr-logo', 'ss-hdr-name', 'ss-hdr-tagline', 'ss-hdr-ftext'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', hfPreview);
+    });
+    document.querySelectorAll('[data-hf="i"],[data-hf="l"],[data-hf="u"]').forEach(function (el) {
+      el.addEventListener('input', hfPreview);
+    });
+    var hfAdd = document.getElementById('ss-hf-add');
+    if (hfAdd) hfAdd.addEventListener('click', function () {
+      var wrap = document.getElementById('ss-hf-socials');
+      if (!wrap) return;
+      var i = wrap.querySelectorAll('[data-hf-social]').length;
+      var div = document.createElement('div');
+      div.setAttribute('data-hf-social', i);
+      div.style.cssText = 'display:flex;gap:5px;align-items:center;margin-bottom:5px';
+      div.innerHTML = '<input data-hf="i" placeholder="🌐" style="width:44px;flex:none;text-align:center;padding:5px 4px;font-size:12px" />'
+        + '<input data-hf="l" placeholder="label (mis. gipsyresearch.id)" style="flex:1;min-width:0;padding:5px 7px;font-size:12px" />'
+        + '<input data-hf="u" placeholder="https://..." style="flex:1;min-width:0;padding:5px 7px;font-size:12px" />'
+        + '<button type="button" class="btn btn-ghost" data-hf-del="' + i + '" title="Hapus" style="padding:3px 7px;font-size:13px;color:#b91c1c;flex:none">×</button>';
+      wrap.appendChild(div);
+      div.querySelectorAll('[data-hf]').forEach(function (el) { el.addEventListener('input', hfPreview); });
+      div.querySelector('[data-hf-del]').addEventListener('click', function () { div.remove(); hfPreview(); });
+    });
+    document.querySelectorAll('[data-hf-del]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var row = btn.closest('[data-hf-social]');
+        if (row) row.remove();
+        hfPreview();
+      });
+    });
+    // Pilih logo dari Image Library
+    var hfLib = document.getElementById('ss-hdr-lib');
+    if (hfLib) hfLib.addEventListener('click', function () {
+      if (!assets.length) { toast('Library kosong. Buka Image Library dulu buat add asset.'); return; }
+      var mh = document.getElementById('modal-host');
+      mh.innerHTML = '<div class="modal-backdrop" id="hflib-backdrop"><div class="modal" style="max-width:600px">'
+        + '<div class="p-5 border-b"><h2 class="text-lg font-semibold">Pilih logo</h2>'
+        + '<p class="text-sm text-gray-500 mt-1">' + assets.length + ' asset(s) tersimpan.</p></div>'
+        + '<div class="p-5" style="max-height:400px;overflow-y:auto"><div class="asset-grid">'
+        + assets.map(function (a) { return renderAssetCard(a); }).join('') + '</div></div>'
+        + '<div class="p-3 border-t" style="text-align:right"><button type="button" class="btn btn-outline" id="hflib-close" style="padding:6px 14px;font-size:12px">Close</button></div>'
+        + '</div></div>';
+      mh.querySelectorAll('[data-asset-action="use"]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var id = b.getAttribute('data-id');
+          var asset = assets.find(function (x) { return x.id === id; });
+          if (!asset) return;
+          var inp = document.getElementById('ss-hdr-logo');
+          if (inp) { inp.value = asset.url; }
+          mh.innerHTML = '';
+          hfPreview();
+        });
+      });
+      document.getElementById('hflib-backdrop')?.addEventListener('click', function (e) { if (e.target.id === 'hflib-backdrop') mh.innerHTML = ''; });
+      document.getElementById('hflib-close')?.addEventListener('click', function () { mh.innerHTML = ''; });
+    });
+    hfPreview();
+
     bind('ss-save-email', async function () {
       var b = this; busy(b, 'Menyimpan…');
       try {
         var email = { smtp_user: v('ss-smtp-user'), from_name: v('ss-from-name'), reply_to: v('ss-reply-to'), smtp_host: v('ss-smtp-host'), smtp_port: v('ss-smtp-port') };
         var pw = document.getElementById('ss-smtp-pass').value; if (pw) email.smtp_pass = pw;
+        email.email_header_enabled = !!(document.getElementById('ss-hdr-on') || {}).checked;
+        email.email_header_config = hfCollect();
         var saved = await brandApi('save', { email: email });
+        // Refresh cache header/footer supaya blast berikutnya langsung pakai config baru
+        emailHeaderCfg = null; emailHeaderPromise = null;
+        try { await getEmailHeaderCfg(); } catch (e) {}
         toast('Pengaturan email disimpan');
         renderSendSettings(host, saved);
         try { await verify('email', 'ss-email-status'); } catch (e) { setStatus('ss-email-status', false, e.message); }
@@ -6862,7 +7017,9 @@
     return '<div class="preview-canvas">' +
       '<div class="pv-meta">From: Your Business &lt;hello@business.com&gt; · To: ' + escapeHTML(sample.name) + ' &lt;' + escapeHTML(sample.email || 'no-email') + '&gt; · ' + recipientCount + ' recipient' + (recipientCount === 1 ? '' : 's') + '</div>' +
       (channel === 'email' && subject ? '<div class="pv-subject">' + escapeHTML(plainSnippet(subject)) + '</div>' : '') +
+      (channel === 'email' ? buildEmailHeaderHtml(emailHeaderCfg) : '') +
       '<div class="pv-body">' + (body || '<em style="color:#9ca3af">(empty message)</em>') + '</div>' +
+      (channel === 'email' ? buildEmailFooterHtml(emailHeaderCfg) : '') +
       (blocks.length ? '<div style="margin-top:16px">' + blocks.map(b => {
         if (b.type === 'image') {
           const w = b.data?.size || '100%';
@@ -7282,7 +7439,7 @@
         // Body draft = canvas sungguhan: blok gambar/button bisa diedit (Upload, ganti URL, resize).
         ? '<div class="email-card-body draft-edit-body" data-draft-body="' + draft.id + '" contenteditable="true" ' +
             'style="border:1px solid var(--border);border-radius:8px;background:#fff;padding:14px;min-height:90px" ' +
-            'data-placeholder="Tulis pesan...">' + (normalizeDraftBody(message) || '<em style="color:#9ca3af">(empty message)</em>') + '</div>' +
+            'data-placeholder="Tulis pesan...">' + buildEmailHeaderHtml(emailHeaderCfg) + (normalizeDraftBody(message) || '<em style="color:#9ca3af">(empty message)</em>') + buildEmailFooterHtml(emailHeaderCfg) + '</div>' +
           '<div style="font-size:11px;color:var(--muted);margin-top:6px">💡 Hover blok gambar untuk Upload / ganti URL / ubah lebar. Klik <b>💾 Save Changes</b> untuk menyimpan.</div>'
         : '<textarea data-draft-input="message" data-draft-id="' + draft.id + '" class="input" rows="10" placeholder="Tulis pesan...">' + escapeHTML(message) + '</textarea>') +
       (attachments.length > 0 ? '<div style="margin-top:14px;padding:10px;background:#f5f3ff;border-radius:6px;font-size:12px;color:#4338ca"><strong>' + attachments.length + '</strong> attachment' + (attachments.length === 1 ? '' : 's') + ' (image/button/divider) akan ikut terkirim</div>' : '') +
@@ -7699,6 +7856,81 @@
     return root.innerHTML;
   }
 
+  /* ====================================================
+   * HEADER & FOOTER email blast (per brand)
+   * Header = logo + nama/tagline.  Footer = link sosmed + teks.
+   * Disimpan di brand_settings.email_header_config.
+   * ==================================================== */
+  var emailHeaderCfg = null;          // cache config terakhir
+  var emailHeaderPromise = null;
+
+  async function getEmailHeaderCfg() {
+    if (emailHeaderCfg) return emailHeaderCfg;
+    if (!emailHeaderPromise) {
+      emailHeaderPromise = brandApi('get').then(function (d) {
+        var em = (d && d.email) || {};
+        emailHeaderCfg = {
+          enabled: !!em.email_header_enabled,
+          logo: (em.email_header_config && em.email_header_config.logo) || '',
+          name: (em.email_header_config && em.email_header_config.name) || '',
+          tagline: (em.email_header_config && em.email_header_config.tagline) || '',
+          footerEnabled: !!(em.email_header_config && em.email_header_config.footerEnabled),
+          socials: (em.email_header_config && Array.isArray(em.email_header_config.socials)) ? em.email_header_config.socials : [],
+          footerText: (em.email_header_config && em.email_header_config.footerText) || '',
+        };
+        return emailHeaderCfg;
+      }).catch(function () {
+        emailHeaderCfg = { enabled: false, logo: '', name: '', tagline: '', footerEnabled: false, socials: [], footerText: '' };
+        return emailHeaderCfg;
+      });
+    }
+    return emailHeaderPromise;
+  }
+
+  /* Bangun HTML header (logo + nama + tagline). */
+  function buildEmailHeaderHtml(cfg) {
+    if (!cfg || !cfg.enabled) return '';
+    var logo = String(cfg.logo || '').trim();
+    var name = String(cfg.name || '').trim();
+    var tagline = String(cfg.tagline || '').trim();
+    if (!logo && !name && !tagline) return '';
+    var brand = '';
+    if (name) brand += '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:16px;font-weight:700;color:#0f172a;line-height:1.3">' + escapeHTML(name) + '</div>';
+    if (tagline) brand += '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:13px;color:#64748b;line-height:1.4;margin-top:3px">' + escapeHTML(tagline) + '</div>';
+    var logoCell = '';
+    if (logo) logoCell = '<td style="vertical-align:middle;padding-right:14px"><img src="' + escapeHTML(logo) + '" alt="' + escapeHTML(name || 'Logo') + '" style="max-height:44px;height:auto;max-width:200px;border:0;display:block" /></td>';
+    var textCell = brand ? '<td style="vertical-align:middle">' + brand + '</td>' : '';
+    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:1px solid #e2e8f0;padding-bottom:16px;margin-bottom:24px">'
+      + '<tr>' + logoCell + textCell + '</tr></table>';
+  }
+
+  /* Bangun HTML footer (link sosmed + teks). */
+  function buildEmailFooterHtml(cfg) {
+    if (!cfg || !cfg.footerEnabled) return '';
+    var socials = Array.isArray(cfg.socials) ? cfg.socials : [];
+    var rows = '';
+    if (socials.length) {
+      var cells = socials.map(function (s) {
+        var label = String(s.l || s.u || '').trim();
+        if (!label) return '';
+        var url = String(s.u || '').trim();
+        var icon = String(s.i || '').trim();
+        var inner = (icon ? escapeHTML(icon) + ' ' : '') + escapeHTML(label);
+        var content = url
+          ? '<a href="' + escapeHTML(url) + '" style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:13px;color:#475569;text-decoration:none">' + inner + '</a>'
+          : '<span style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:13px;color:#475569">' + inner + '</span>';
+        return '<td style="padding:0 10px 0 0">' + content + '</td>';
+      }).join('');
+      rows = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px"><tr>' + cells + '</tr></table>';
+    }
+    var text = String(cfg.footerText || '').trim();
+    var textRow = text
+      ? '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:12px;color:#94a3b8;line-height:1.5">' + escapeHTML(text) + '</div>'
+      : '';
+    if (!rows && !textRow) return '';
+    return '<div style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:28px">' + rows + textRow + '</div>';
+  }
+
   function buildEmailHtml(compose) {
     const blocks = (compose.blocks || []).map(b => {
       const d = b.data || {};
@@ -7725,7 +7957,9 @@
       + '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #e3e8ef;border-radius:14px;border-collapse:separate;overflow:hidden">'
       + '<tr><td height="5" style="height:5px;line-height:5px;font-size:0;background:' + EMAIL_ACCENT + '" bgcolor="' + EMAIL_ACCENT + '">&nbsp;</td></tr>'
       + '<tr><td class="em-pad" style="padding:36px 40px 32px;font-family:' + EMAIL_FONT + ';font-size:15px;line-height:1.7;color:#334155">'
+      + buildEmailHeaderHtml(emailHeaderCfg)
       + bodyToEmailHtml(compose.body || '') + blocks
+      + buildEmailFooterHtml(emailHeaderCfg)
       + '</td></tr></table></td></tr></table></body></html>';
   }
 
@@ -7898,6 +8132,8 @@
     if (!token) { alert('Sesi login habis. Sign in ulang dulu.'); return null; }
 
     toast('Mengirim ' + targets.length + ' email…');
+    // Ambil config header/footer brand (logo + sosmed) sebelum email dirakit
+    try { await getEmailHeaderCfg(); } catch (e) {}
     const html = buildEmailHtml(compose);
     const files = (compose.files || []).filter(f => f && f.dataUrl && String(f.dataUrl).indexOf(',') > 0)
       .map(f => ({ name: f.name, type: f.type || '', data: String(f.dataUrl).split(',')[1] }));
@@ -8146,6 +8382,8 @@
     wireBlastEvents('email');
     setupBlockInteractions();
     if (emailBlast.activeTab === 'drafts') mountDraftEditor();
+    // Muat config header/footer brand supaya preview langsung menampilkannya
+    try { getEmailHeaderCfg().then(function () { if (emailBlast.activeTab === 'compose') renderEmailBlastView(); }); } catch (e) {}
   }
 
   /* ====================================================

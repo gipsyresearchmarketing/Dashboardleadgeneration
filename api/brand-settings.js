@@ -27,6 +27,8 @@ function publicView(cfg) {
       smtp_user: c.smtp_user || '', has_password: !!c.smtp_pass_enc,
       smtp_host: c.smtp_host || '', smtp_port: c.smtp_port || '',
       from_name: c.from_name || '', reply_to: c.reply_to || '',
+      email_header_enabled: !!c.email_header_enabled,
+      email_header_config: c.email_header_config || null,
     },
     wa: {
       configured: !!(c.wa_phone_number_id && c.wa_token_enc),
@@ -116,6 +118,26 @@ module.exports = async (req, res) => {
           patch.smtp_port = e.smtp_port === '' ? null : p;
         }
         if (e.from_name !== undefined) patch.from_name = String(e.from_name || '').replace(/["\r\n<>]/g, '').trim().slice(0, 80) || null;
+        if (e.email_header_enabled !== undefined) patch.email_header_enabled = !!e.email_header_enabled;
+        if (e.email_header_config !== undefined) {
+          const hc = e.email_header_config;
+          if (hc === null || hc === '') { patch.email_header_config = null; }
+          else if (typeof hc === 'object') {
+            const socials = Array.isArray(hc.socials) ? hc.socials.slice(0, 8).map(s => ({
+              i: String(s.i || '').slice(0, 8),
+              l: String(s.l || '').replace(/["\r\n<>]/g, '').trim().slice(0, 60),
+              u: String(s.u || '').replace(/["\r\n<>]/g, '').trim().slice(0, 300),
+            })).filter(s => s.l || s.u) : [];
+            patch.email_header_config = {
+              logo: String(hc.logo || '').replace(/["\r\n<>]/g, '').trim().slice(0, 500),
+              name: String(hc.name || '').replace(/["\r\n<>]/g, '').trim().slice(0, 80),
+              tagline: String(hc.tagline || '').replace(/["\r\n<>]/g, '').trim().slice(0, 120),
+              footerEnabled: !!hc.footerEnabled,
+              socials: socials,
+              footerText: String(hc.footerText || '').replace(/["\r\n<>]/g, '').trim().slice(0, 200),
+            };
+          } else { return bad(res, 'Konfigurasi header/footer tidak valid'); }
+        }
         if (e.reply_to !== undefined) {
           const r = String(e.reply_to || '').trim();
           if (r && !EMAIL_RE.test(r)) return bad(res, 'Reply-To tidak valid');
