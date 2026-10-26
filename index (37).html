@@ -4985,6 +4985,8 @@
       try { saved = localStorage.getItem('leads-dashboard:last-brand'); } catch (e) {}
       window.currentBrand = window.userBrands.find(function (b) { return b.id === saved; }) || window.userBrands[0];
       document.title = 'Leads Dashboard — ' + window.currentBrand.name;
+      // Muat config header/footer email SEBELUM render apa pun — brand baru siap di titik ini.
+      try { await getEmailHeaderCfg(true); } catch (e) {}
       renderProfileView();
       // Tarik data dari Supabase + nyalain realtime
       await window.cloudStart();
@@ -5005,6 +5007,7 @@
     try { localStorage.setItem('leads-dashboard:last-brand', id); } catch (e) {}
     document.title = 'Leads Dashboard — ' + b.name;
     renderProfileView();
+    try { await getEmailHeaderCfg(true); } catch (e) {}
     await window.cloudStart();
     try { waEnsureLoaded(); } catch (e) {}
     toast('✓ Brand: ' + b.name);
@@ -8018,28 +8021,35 @@
     return emailHeaderPromise;
   }
 
-  /* Bangun HTML header (logo + nama + tagline). */
+  /* Bangun HTML header (logo + nama + tagline).
+     - logoSize 'full'  -> logo baris sendiri (lebar penuh) + nama/tagline di bawahnya, center
+     - selain itu        -> logo kiri, nama/tagline di sebelahnya, rata kiri */
   function buildEmailHeaderHtml(cfg) {
     if (!cfg || !cfg.enabled) return '';
     var logo = String(cfg.logo || '').trim();
     var name = String(cfg.name || '').trim();
     var tagline = String(cfg.tagline || '').trim();
     if (!logo && !name && !tagline) return '';
-    var brand = '';
-    if (name) brand += '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:16px;font-weight:700;color:#0f172a;line-height:1.3">' + escapeHTML(name) + '</div>';
-    if (tagline) brand += '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:13px;color:#64748b;line-height:1.4;margin-top:3px">' + escapeHTML(tagline) + '</div>';
     var sz = LOGO_SIZES[cfg.logoSize] || LOGO_SIZES.md;
-    var logoCell = '';
+    var FONT = 'font-family:Inter,Segoe UI,Arial,sans-serif;';
+
+    var nameHtml = name ? '<div style="' + FONT + 'font-size:16px;font-weight:700;color:#0f172a;line-height:1.3">' + escapeHTML(name) + '</div>' : '';
+    var tagHtml = tagline ? '<div style="' + FONT + 'font-size:13px;color:#64748b;line-height:1.4;margin-top:3px">' + escapeHTML(tagline) + '</div>' : '';
+
+    var rows = '';
     if (logo) {
       var imgStyle = sz.full
         ? 'width:100%;height:auto;max-width:100%;border:0;display:block'
         : 'max-height:' + sz.maxH + 'px;height:auto;max-width:' + sz.maxW + 'px;border:0;display:block';
-      logoCell = '<td style="vertical-align:middle;padding-right:14px" width="' + (sz.full ? '100%' : 'auto') + '">'
-        + '<img src="' + escapeHTML(logo) + '" alt="' + escapeHTML(name || 'Logo') + '" style="' + imgStyle + '" /></td>';
+      rows += '<tr><td style="text-align:center;padding:0 0 ' + (sz.full && (name || tagline) ? '12px' : '0') + '">'
+        + '<img src="' + escapeHTML(logo) + '" alt="' + escapeHTML(name || 'Logo') + '" style="' + imgStyle + '" />'
+        + '</td></tr>';
     }
-    var textCell = brand ? '<td style="vertical-align:middle">' + brand + '</td>' : '';
+    if (name || tagline) {
+      rows += '<tr><td style="text-align:center">' + nameHtml + tagHtml + '</td></tr>';
+    }
     return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:1px solid #e2e8f0;padding-bottom:16px;margin-bottom:24px">'
-      + '<tr>' + logoCell + textCell + '</tr></table>';
+      + rows + '</table>';
   }
 
   /* Bangun HTML footer (link sosmed + teks). */
@@ -8066,14 +8076,14 @@
           : '<span style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:13px;color:#475569">' + inner + '</span>';
         return '<td style="padding:0 10px 0 0">' + content + '</td>';
       }).join('');
-      rows = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px"><tr>' + cells + '</tr></table>';
+      rows = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 12px"><tr>' + cells + '</tr></table>';
     }
     var text = String(cfg.footerText || '').trim();
     var textRow = text
-      ? '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:12px;color:#94a3b8;line-height:1.5">' + escapeHTML(text) + '</div>'
+      ? '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:12px;color:#94a3b8;line-height:1.5;text-align:center">' + escapeHTML(text) + '</div>'
       : '';
     if (!rows && !textRow) return '';
-    return '<div style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:28px">' + rows + textRow + '</div>';
+    return '<div style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:28px;text-align:center">' + rows + textRow + '</div>';
   }
 
   function buildEmailHtml(compose) {
