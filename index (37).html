@@ -7090,14 +7090,13 @@
     try {
       if (!/(^|[?&])dbg=1/.test(location.search)) return;
       if (!el) return;
+      const id = '__dbg_' + String(label).replace(/[^a-z0-9]/gi, '_');
       const q = (sel) => el.querySelectorAll(sel).length;
       const orphanPrev = Array.from(el.querySelectorAll('.eb-image-preview')).filter(n => !n.closest('.email-block')).length;
       const orphanBtn = Array.from(el.querySelectorAll('.eb-btn-wrap')).filter(n => !n.closest('.email-block')).length;
       const orphanCtr = Array.from(el.querySelectorAll('.eb-controls')).filter(n => !n.closest('.email-block')).length;
       const blockTypes = Array.from(el.querySelectorAll('.email-block')).map(n => n.getAttribute('data-block') || '?').join(',');
-      const info = document.createElement('div');
-      info.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;max-width:46vw;max-height:70vh;overflow:auto;padding:10px 12px;background:#0f172a;color:#a5f3fc;font:11px ui-monospace,Menlo,monospace;border-radius:8px;white-space:pre-wrap;word-break:break-all;box-shadow:0 8px 30px rgba(0,0,0,.5)';
-      info.textContent =
+      const txt =
         'DBG ' + label + ' = ' + el.innerHTML.length + ' char\n' +
         '  .email-block      = ' + q('.email-block') + '  [' + blockTypes + ']\n' +
         '  .eb-image-preview = ' + q('.eb-image-preview') + '  (yatim: ' + orphanPrev + ')\n' +
@@ -7109,12 +7108,43 @@
         '  wrap width        = ' + Array.from(el.querySelectorAll('.eb-img-wrap')).map(n => n.style.width || '-').join(' | ') + '\n' +
         '  data-img-w        = ' + Array.from(el.querySelectorAll('.email-block')).map(n => n.getAttribute('data-img-w') || '-').join(' | ') + '\n' +
         '  <pre>' + el.innerHTML.slice(0, 500).replace(/</g, '&lt;') + '</pre>';
-      var oldp = document.getElementById('__dbg_panel');
-      if (oldp) oldp.remove();
-      info.id = '__dbg_panel';
-      document.body.appendChild(info);
+      var info = document.getElementById(id);
+      if (!info) {
+        info = document.createElement('div');
+        info.id = id;
+        info.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;max-width:46vw;max-height:70vh;overflow:auto;padding:10px 12px;background:#0f172a;color:#a5f3fc;font:11px ui-monospace,Menlo,monospace;border-radius:8px;white-space:pre-wrap;word-break:break-all;box-shadow:0 8px 30px rgba(0,0,0,.5)';
+        document.body.appendChild(info);
+      }
+      info.textContent = txt;
+    } catch (e) {
+      try {
+        var e2 = document.getElementById('__dbg_err');
+        if (!e2) { e2 = document.createElement('div'); e2.id = '__dbg_err'; e2.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;padding:10px;background:#7f1d1d;color:#fecaca;font:12px monospace;border-radius:8px'; document.body.appendChild(e2); }
+        e2.textContent = 'DBG ERROR: ' + (e && e.message ? e.message : e);
+      } catch (e2) {}
+    }
+  }
+
+
+  /* DEBUG: refresh panel berkala (biar selalu sinkron dengan DOM terbaru). */
+  function dbgRefreshLoop() {
+    try {
+      if (!/(^|[?&])dbg=1/.test(location.search)) return;
+      var h = document.querySelector('[data-draft-body]');
+      if (h) showDbgPanel(h, 'DRAFT BODY');
+      var c = document.querySelector('[data-blast-input="body"]');
+      if (c) showDbgPanel(c, 'COMPOSE BODY');
     } catch (e) {}
   }
+  try {
+    if (/(^|[?&])dbg=1/.test(location.search)) {
+      setTimeout(dbgRefreshLoop, 400);
+      setTimeout(dbgRefreshLoop, 1200);
+      setTimeout(dbgRefreshLoop, 2500);
+      setTimeout(dbgRefreshLoop, 5000);
+      setInterval(dbgRefreshLoop, 3000);
+    }
+  } catch (e) {}
 
   /* Generic drafts list */
   function renderBlastDrafts(blastState, channel) {
