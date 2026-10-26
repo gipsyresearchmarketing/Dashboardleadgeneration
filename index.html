@@ -6828,6 +6828,7 @@
         try { window.syncBlockPreview(b); } catch (e) {}
       }
     });
+    showDbgPanel(host, 'COMPOSE BODY');
     refreshEmailDropzones();
     setupEmailDragListeners();
     setupImageButtonLiveEditors(host);
@@ -7039,28 +7040,7 @@
     if (typeof window.setupImageButtonLiveEditors === 'function') {
       try { window.setupImageButtonLiveEditors(el); } catch (e) {}
     }
-    // DEBUG (aktif dengan ?dbg=1 di URL): tampilkan struktur body draft supaya gampang dicek.
-    try {
-      if (/(^|[?&])dbg=1/.test(location.search)) {
-        const q = (sel) => el.querySelectorAll(sel).length;
-        const orphanPreview = Array.from(el.querySelectorAll('.eb-image-preview')).filter(n => !n.closest('.email-block')).length;
-        const orphanBtn = Array.from(el.querySelectorAll('.eb-btn-wrap')).filter(n => !n.closest('.email-block')).length;
-        const info = document.createElement('div');
-        info.style.cssText = 'margin-top:10px;padding:8px 10px;background:#0f172a;color:#a5f3fc;font:11px ui-monospace,Menlo,monospace;border-radius:6px;white-space:pre-wrap;word-break:break-all';
-        info.textContent =
-          'DBG body=' + el.innerHTML.length + ' char\n' +
-          '  .email-block      = ' + q('.email-block') + '\n' +
-          '  .eb-image-preview = ' + q('.eb-image-preview') + '  (tanpa wrapper: ' + orphanPreview + ')\n' +
-          '  .eb-img-wrap      = ' + q('.eb-img-wrap') + '\n' +
-          '  .eb-controls      = ' + q('.eb-controls') + '\n' +
-          '  .eb-btn-wrap      = ' + q('.eb-btn-wrap') + '  (tanpa wrapper: ' + orphanBtn + ')\n' +
-          '  img               = ' + q('img') + '\n' +
-          '  img style.width   = ' + Array.from(el.querySelectorAll('img')).map(n => n.style.width || n.getAttribute('width') || '-').join(', ') + '\n' +
-          '  eb-img-wrap style = ' + Array.from(el.querySelectorAll('.eb-img-wrap')).map(n => n.style.width || '-').join(', ') + '\n' +
-          '  <pre>' + el.innerHTML.slice(0, 420).replace(/</g, '&lt;') + '</pre>';
-        el.appendChild(info);
-      }
-    } catch (e) {}
+    showDbgPanel(el, 'DRAFT BODY');
   }
 
   /* Draft lama bisa kehilangan wrapper .email-block (isi blok tetap ada tapi pembungkus hilang).
@@ -7103,6 +7083,37 @@
       group.forEach(g => block.appendChild(g));
       parent.insertBefore(block, anchor);
     });
+  }
+
+  /* DEBUG (?dbg=1): panel fixed yang menampilkan struktur body — muncul di tab apa pun. */
+  function showDbgPanel(el, label) {
+    try {
+      if (!/(^|[?&])dbg=1/.test(location.search)) return;
+      if (!el) return;
+      const q = (sel) => el.querySelectorAll(sel).length;
+      const orphanPrev = Array.from(el.querySelectorAll('.eb-image-preview')).filter(n => !n.closest('.email-block')).length;
+      const orphanBtn = Array.from(el.querySelectorAll('.eb-btn-wrap')).filter(n => !n.closest('.email-block')).length;
+      const orphanCtr = Array.from(el.querySelectorAll('.eb-controls')).filter(n => !n.closest('.email-block')).length;
+      const blockTypes = Array.from(el.querySelectorAll('.email-block')).map(n => n.getAttribute('data-block') || '?').join(',');
+      const info = document.createElement('div');
+      info.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;max-width:46vw;max-height:70vh;overflow:auto;padding:10px 12px;background:#0f172a;color:#a5f3fc;font:11px ui-monospace,Menlo,monospace;border-radius:8px;white-space:pre-wrap;word-break:break-all;box-shadow:0 8px 30px rgba(0,0,0,.5)';
+      info.textContent =
+        'DBG ' + label + ' = ' + el.innerHTML.length + ' char\n' +
+        '  .email-block      = ' + q('.email-block') + '  [' + blockTypes + ']\n' +
+        '  .eb-image-preview = ' + q('.eb-image-preview') + '  (yatim: ' + orphanPrev + ')\n' +
+        '  .eb-img-wrap      = ' + q('.eb-img-wrap') + '\n' +
+        '  .eb-btn-wrap      = ' + q('.eb-btn-wrap') + '  (yatim: ' + orphanBtn + ')\n' +
+        '  .eb-controls      = ' + q('.eb-controls') + '  (yatim: ' + orphanCtr + ')\n' +
+        '  img               = ' + q('img') + '\n' +
+        '  img width         = ' + Array.from(el.querySelectorAll('img')).map(n => n.style.width || n.getAttribute('width') || '-').join(' | ') + '\n' +
+        '  wrap width        = ' + Array.from(el.querySelectorAll('.eb-img-wrap')).map(n => n.style.width || '-').join(' | ') + '\n' +
+        '  data-img-w        = ' + Array.from(el.querySelectorAll('.email-block')).map(n => n.getAttribute('data-img-w') || '-').join(' | ') + '\n' +
+        '  <pre>' + el.innerHTML.slice(0, 500).replace(/</g, '&lt;') + '</pre>';
+      var oldp = document.getElementById('__dbg_panel');
+      if (oldp) oldp.remove();
+      info.id = '__dbg_panel';
+      document.body.appendChild(info);
+    } catch (e) {}
   }
 
   /* Generic drafts list */
