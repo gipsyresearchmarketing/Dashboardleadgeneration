@@ -7024,6 +7024,8 @@
   function mountDraftEditor() {
     const el = document.querySelector('[data-draft-body]');
     if (!el) return;
+    // Pasang ulang wrapper .email-block yang hilang (draft dari versi lama).
+    restoreOrphanBlocks(el);
     el.querySelectorAll('.email-block').forEach(b => {
       b.setAttribute('draggable', 'true');
       ensureBlockEditor(b);
@@ -7037,6 +7039,43 @@
     if (typeof window.setupImageButtonLiveEditors === 'function') {
       try { window.setupImageButtonLiveEditors(el); } catch (e) {}
     }
+  }
+
+  /* Draft lama bisa kehilangan wrapper .email-block (isi blok tetap ada tapi pembungkus hilang).
+     Pasang ulang wrapper + data-block supaya blok gambar/button bisa diedit lagi. */
+  function restoreOrphanBlocks(root) {
+    if (!root) return;
+    const orphans = [];
+    root.querySelectorAll('.eb-image-preview, .eb-btn-wrap').forEach(node => {
+      if (node.closest('.email-block')) return;  // sudah punya wrapper — tidak perlu
+      orphans.push(node);
+    });
+    orphans.forEach(node => {
+      const isImg = node.classList.contains('eb-image-preview');
+      const parent = node.parentNode;
+      if (!parent) return;
+      // Kumpulkan kontrol yang menyertainya (adikcessor .eb-controls)
+      const group = [node];
+      let sib = node.nextElementSibling;
+      while (sib && sib.classList.contains('eb-controls')) { group.push(sib); sib = sib.nextElementSibling; }
+      // Anchor = elemen SESUDAH group (belum dipindah) — aman untuk insertBefore.
+      const anchor = sib;
+      const block = document.createElement('div');
+      block.className = 'email-block';
+      block.setAttribute('data-block', isImg ? 'image' : 'button');
+      block.setAttribute('contenteditable', 'false');
+      block.setAttribute('style', isImg
+        ? 'text-align:center;cursor:default;padding:8px 0'
+        : 'text-align:center;padding:8px 0');
+      // Lebar gambar ikut hilang bareng wrapper-nya -> simpan lagi dari style .eb-img-wrap
+      if (isImg) {
+        const wrap = node.querySelector('.eb-img-wrap');
+        const w = wrap && wrap.style ? parseInt(wrap.style.width, 10) : 0;
+        if (w) block.setAttribute('data-img-w', w);
+      }
+      group.forEach(g => block.appendChild(g));
+      parent.insertBefore(block, anchor);
+    });
   }
 
   /* Generic drafts list */
@@ -7432,6 +7471,9 @@
     const doc = new DOMParser().parseFromString('<div id="r">' + bodyHtml + '</div>', 'text/html');
     const root = doc.getElementById('r');
     if (!root) return bodyHtml;
+    // Body dari draft lama bisa kehilangan wrapper .email-block -> pasang ulang dulu,
+    // kalau tidak blok gambar/button gak akan ikut terkirim.
+    restoreOrphanBlocks(root);
     const val = (el, sel) => { const n = el.querySelector(sel); return n ? (n.getAttribute('value') || n.value || '') : ''; };
     const px = (w, max) => Math.max(40, Math.min(EMAIL_CONTENT_W, Math.round((w / max) * EMAIL_CONTENT_W)));
     root.querySelectorAll('.email-block').forEach(b => {
@@ -10054,7 +10096,11 @@
       const draft = blastState.drafts.find(d => d.id === id);
       if (!draft) return;
       if (channel === 'email') {
-        emailBlast.compose = { subject:plainSnippet(draft.subject), body:stripBlockMarkup(draft.body||''), recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        const draftBody = stripBlockMarkup(draft.body || '');
+        const tmpBody = document.createElement('div');
+        tmpBody.innerHTML = draftBody;
+        restoreOrphanBlocks(tmpBody);
+        emailBlast.compose = { subject:plainSnippet(draft.subject), body:tmpBody.innerHTML, recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       } else {
         waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:normalizeRecipients(draft.recipients), sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       }
