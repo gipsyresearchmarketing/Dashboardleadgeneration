@@ -6815,8 +6815,8 @@
   }
 
   // Wire all block interactions after canvas mount + on every change
-  function setupBlockInteractions() {
-    const host = document.querySelector('[data-blast-input="body"]');
+  function setupBlockInteractions(hostEl) {
+    const host = hostEl || document.querySelector('[data-blast-input="body"]');
     if (!host) return;
     host.querySelectorAll('.email-block').forEach(b => {
       b.setAttribute('draggable', 'true');
@@ -6830,7 +6830,7 @@
     });
     refreshEmailDropzones();
     setupEmailDragListeners();
-    setupImageButtonLiveEditors();
+    setupImageButtonLiveEditors(host);
   }
 
   function renderBlastPreview(blastState, sample, channel) {
@@ -7020,6 +7020,25 @@
     }
   }
 
+  /* Pasang editor blok (gambar/button) pada body draft yang aktif di panel Drafts. */
+  function mountDraftEditor() {
+    const el = document.querySelector('[data-draft-body]');
+    if (!el) return;
+    el.querySelectorAll('.email-block').forEach(b => {
+      b.setAttribute('draggable', 'true');
+      ensureBlockEditor(b);
+      if (!b.querySelector('.email-block-controls') && typeof window.attachBlockControls === 'function') {
+        window.attachBlockControls(b);
+      }
+      if (b.getAttribute('data-block') === 'image' && typeof window.syncBlockPreview === 'function') {
+        try { window.syncBlockPreview(b); } catch (e) {}
+      }
+    });
+    if (typeof window.setupImageButtonLiveEditors === 'function') {
+      try { window.setupImageButtonLiveEditors(el); } catch (e) {}
+    }
+  }
+
   /* Generic drafts list */
   function renderBlastDrafts(blastState, channel) {
     if (blastState.drafts.length === 0) {
@@ -7075,15 +7094,11 @@
       (isEmail ? '<label class="label">Subject</label><input data-draft-input="subject" data-draft-id="' + draft.id + '" class="input mb-3" value="' + escapeHTML(plainSnippet(subject)) + '" data-draft-subject-orig="' + escapeHTML(subject || '') + '" />' : '') +
       '<label class="label">' + (isEmail ? 'Message Body' : 'Message') + '</label>' +
       (isEmail
-        // Email body = HTML blocks (gambar/button/divider) — tampilkan sebagai preview, bukan kode HTML mentah.
-        ? '<div class="preview-canvas" data-draft-preview="' + draft.id + '" style="padding:14px;border:1px solid var(--border);border-radius:8px;background:#fff">' +
-            (subject ? '<div class="pv-subject">' + escapeHTML(plainSnippet(subject)) + '</div>' : '') +
-            '<div class="pv-body">' + (message || '<em style="color:#9ca3af">(empty message)</em>') + '</div>' +
-          '<style>.preview-canvas .eb-controls,.preview-canvas .email-block-controls,.preview-canvas .eb-resize-handle,.preview-canvas .eb-remove{display:none!important}</style>' +
-          '</div>' +
-          '<details style="margin-top:8px"><summary style="font-size:12px;color:var(--muted);cursor:pointer">✎ Edit HTML mentah</summary>' +
-            '<textarea data-draft-input="body" data-draft-id="' + draft.id + '" class="input" rows="10" placeholder="Tulis pesan..." style="margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:11px">' + escapeHTML(message) + '</textarea>' +
-          '</details>'
+        // Body draft = canvas sungguhan: blok gambar/button bisa diedit (Upload, ganti URL, resize).
+        ? '<div class="email-card-body draft-edit-body" data-draft-body="' + draft.id + '" contenteditable="true" ' +
+            'style="border:1px solid var(--border);border-radius:8px;background:#fff;padding:14px;min-height:90px" ' +
+            'data-placeholder="Tulis pesan...">' + (message || '<em style="color:#9ca3af">(empty message)</em>') + '</div>' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:6px">💡 Hover blok gambar untuk Upload / ganti URL / ubah lebar. Klik <b>💾 Save Changes</b> untuk menyimpan.</div>'
         : '<textarea data-draft-input="message" data-draft-id="' + draft.id + '" class="input" rows="10" placeholder="Tulis pesan...">' + escapeHTML(message) + '</textarea>') +
       (attachments.length > 0 ? '<div style="margin-top:14px;padding:10px;background:#f5f3ff;border-radius:6px;font-size:12px;color:#4338ca"><strong>' + attachments.length + '</strong> attachment' + (attachments.length === 1 ? '' : 's') + ' (image/button/divider) akan ikut terkirim</div>' : '') +
       '<div class="flex flex-wrap justify-end gap-2 mt-4 pt-3" style="border-top:1px solid var(--border)">' +
@@ -7940,6 +7955,7 @@
     }
     wireBlastEvents('email');
     setupBlockInteractions();
+    if (emailBlast.activeTab === 'drafts') mountDraftEditor();
   }
 
   /* ====================================================
@@ -9496,8 +9512,8 @@
 
     // Live-updating editors for image & button blocks.
     // Watches inputs inside .email-block[data-block="image"|"button"] and updates preview.
-    function setupImageButtonLiveEditors() {
-      const bodyHost = document.querySelector('[data-blast-input="body"]');
+    function setupImageButtonLiveEditors(hostEl) {
+      const bodyHost = hostEl || document.querySelector('[data-blast-input="body"]');
       if (bodyHost && bodyHost.dataset.ebUploadBound !== '1') {
         bodyHost.dataset.ebUploadBound = '1';
         // Toggle tombol full width
@@ -9584,7 +9600,7 @@
           fi.click();
         });
       }
-      document.querySelectorAll('[data-blast-input="body"] [data-eb-input]').forEach(inp => {
+      (bodyHost ? bodyHost.querySelectorAll('[data-eb-input]') : []).forEach(inp => {
         if (inp.dataset.ebLiveBound === '1') return;
         inp.dataset.ebLiveBound = '1';
         inp.addEventListener('input', () => {
@@ -9869,7 +9885,10 @@
             const typed = subjEl.value.trim();
             draft.subject = typed && typed !== plainSnippet(orig) ? subjEl.value : orig;
           }
-          if (bodyEl) draft.body = bodyEl.value;
+          // Body draft sekarang hidup di DOM (canvas editable) — baca dari situ.
+          const liveBody = document.querySelector('[data-draft-body="' + id + '"]');
+          if (liveBody) draft.body = liveBody.innerHTML;
+          else if (bodyEl) draft.body = bodyEl.value;
         } else {
           const msgEl = document.querySelector('[data-draft-input="message"][data-draft-id="' + id + '"]');
           if (msgEl) draft.message = msgEl.value;
