@@ -6896,14 +6896,31 @@
     //   .eb-controls       -> editor gambar & button (Upload, URL, Alt, Lebar).
     //   .email-block-label -> badge jenis blok (TEXT / SUBHEADING).
     tmp.querySelectorAll('.email-block-controls,.eb-remove').forEach(n => n.remove());
-    // Body yang ter-escape (&lt;div...) — kembalikan jadi HTML sungguhan.
-    if (!tmp.children.length && /^\s*&lt;[a-z]/i.test(tmp.textContent || '')) {
-      const ta = document.createElement('textarea');
-      ta.innerHTML = tmp.innerHTML;
-      const decoded = ta.value;
-      if (/<[a-z][\s>]/i.test(decoded)) { tmp.innerHTML = decoded; }
-    }
+    decodeEscapedHtml(tmp);
     return tmp.innerHTML;
+  }
+
+  /* Body draft bisa campur: sebagian blok kesimpen sebagai HTML ter-escape (&lt;h3...&gt;)
+     sementara sisanya elemen asli. Decode text node yang ter-escape jadi elemen sungguhan,
+     tanpa menyentuh elemen yang sudah benar. */
+  function decodeEscapedHtml(root) {
+    if (!root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(t => {
+      const v = t.nodeValue || '';
+      if (!/&lt;[a-z][\s>]/i.test(v)) return;
+      const ta = document.createElement('textarea');
+      ta.innerHTML = v;
+      const dec = ta.value;
+      if (!/<[a-z][\s>]/i.test(dec)) return;
+      const holder = document.createElement('div');
+      holder.innerHTML = dec;
+      const frag = document.createDocumentFragment();
+      while (holder.firstChild) frag.appendChild(holder.firstChild);
+      if (t.parentNode) t.parentNode.replaceChild(frag, t);
+    });
   }
 
   /* Samakan bentuk recipients jadi { lead_id }. Draft lama bisa menyimpan:
@@ -7075,8 +7092,9 @@
         const wrap = node.querySelector('.eb-img-wrap');
         const img = node.querySelector('img');
         let w = 0;
-        if (wrap && wrap.style) w = parseInt(wrap.style.width, 10) || 0;
-        if (!w && img && img.style) w = parseInt(img.style.width, 10) || 0;
+        const pxOnly = (v) => (v && /px$/.test(v.trim())) ? parseInt(v, 10) || 0 : 0;  // "100%" = full, bukan 100px
+        if (wrap && wrap.style) w = pxOnly(wrap.style.width);
+        if (!w && img && img.style) w = pxOnly(img.style.width);
         if (!w && img) w = parseInt(img.getAttribute('width'), 10) || 0;
         if (w) { block.setAttribute('data-img-w', w); block.setAttribute('data-img-max', 542); }
       }
@@ -7146,6 +7164,16 @@
     }
   } catch (e) {}
 
+  /* Normalisasi body draft: decode HTML ter-escape + pasang ulang wrapper blok yang hilang. */
+  function normalizeDraftBody(html) {
+    if (!html) return '';
+    const tmp = document.createElement('div');
+    tmp.innerHTML = String(html);
+    decodeEscapedHtml(tmp);
+    restoreOrphanBlocks(tmp);
+    return tmp.innerHTML;
+  }
+
   /* Generic drafts list */
   function renderBlastDrafts(blastState, channel) {
     if (blastState.drafts.length === 0) {
@@ -7204,7 +7232,7 @@
         // Body draft = canvas sungguhan: blok gambar/button bisa diedit (Upload, ganti URL, resize).
         ? '<div class="email-card-body draft-edit-body" data-draft-body="' + draft.id + '" contenteditable="true" ' +
             'style="border:1px solid var(--border);border-radius:8px;background:#fff;padding:14px;min-height:90px" ' +
-            'data-placeholder="Tulis pesan...">' + (message || '<em style="color:#9ca3af">(empty message)</em>') + '</div>' +
+            'data-placeholder="Tulis pesan...">' + (normalizeDraftBody(message) || '<em style="color:#9ca3af">(empty message)</em>') + '</div>' +
           '<div style="font-size:11px;color:var(--muted);margin-top:6px">💡 Hover blok gambar untuk Upload / ganti URL / ubah lebar. Klik <b>💾 Save Changes</b> untuk menyimpan.</div>'
         : '<textarea data-draft-input="message" data-draft-id="' + draft.id + '" class="input" rows="10" placeholder="Tulis pesan...">' + escapeHTML(message) + '</textarea>') +
       (attachments.length > 0 ? '<div style="margin-top:14px;padding:10px;background:#f5f3ff;border-radius:6px;font-size:12px;color:#4338ca"><strong>' + attachments.length + '</strong> attachment' + (attachments.length === 1 ? '' : 's') + ' (image/button/divider) akan ikut terkirim</div>' : '') +
@@ -7539,8 +7567,9 @@
     const doc = new DOMParser().parseFromString('<div id="r">' + bodyHtml + '</div>', 'text/html');
     const root = doc.getElementById('r');
     if (!root) return bodyHtml;
-    // Body dari draft lama bisa kehilangan wrapper .email-block -> pasang ulang dulu,
-    // kalau tidak blok gambar/button gak akan ikut terkirim.
+    // Body dari draft lama bisa kehilangan wrapper .email-block / contain HTML ter-escape
+    // -> normalkan dulu, kalau tidak blok gambar/button gak akan ikut terkirim.
+    decodeEscapedHtml(root);
     restoreOrphanBlocks(root);
     const val = (el, sel) => { const n = el.querySelector(sel); return n ? (n.getAttribute('value') || n.value || '') : ''; };
     const px = (w, max) => Math.max(40, Math.min(EMAIL_CONTENT_W, Math.round((w / max) * EMAIL_CONTENT_W)));
@@ -10164,11 +10193,8 @@
       const draft = blastState.drafts.find(d => d.id === id);
       if (!draft) return;
       if (channel === 'email') {
-        const draftBody = stripBlockMarkup(draft.body || '');
-        const tmpBody = document.createElement('div');
-        tmpBody.innerHTML = draftBody;
-        restoreOrphanBlocks(tmpBody);
-        emailBlast.compose = { subject:plainSnippet(draft.subject), body:tmpBody.innerHTML, recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        const draftBody = normalizeDraftBody(draft.body || '');
+        emailBlast.compose = { subject:plainSnippet(draft.subject), body:draftBody, recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       } else {
         waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:normalizeRecipients(draft.recipients), sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       }
