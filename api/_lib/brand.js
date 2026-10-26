@@ -117,6 +117,7 @@ async function saveSettings(token, brandId, patch) {
     let msg = ''; try { msg = (await r.json()).message || ''; } catch (e) {}
     if (r.status === 401 || r.status === 403 || /row-level security/i.test(msg)) { const e = new Error('Hanya owner brand yang boleh mengubah pengaturan pengiriman.'); e.status = 403; throw e; }
     if (/gmail_/i.test(msg) && /column/i.test(msg)) { const e = new Error('Kolom Gmail belum ada di tabel brand_settings — jalankan file supabase-gmail-oauth.sql di Supabase SQL Editor.'); e.status = 500; throw e; }
+    if (/email_header_/i.test(msg) && /column/i.test(msg)) { const e = new Error('Kolom header/footer email belum ada di tabel brand_settings — jalankan: ALTER TABLE brand_settings ADD COLUMN IF NOT EXISTS email_header_enabled boolean NOT NULL DEFAULT false; ALTER TABLE brand_settings ADD COLUMN IF NOT EXISTS email_header_config jsonb;'); e.status = 500; throw e; }
     const e = new Error(/relation .* does not exist|schema cache/i.test(msg) ? 'Tabel brand_settings belum dibuat di Supabase (jalankan file supabase-brand-settings.sql).' : 'Gagal menyimpan (' + r.status + ') ' + msg.slice(0, 120));
     e.status = 500; throw e;
   }
