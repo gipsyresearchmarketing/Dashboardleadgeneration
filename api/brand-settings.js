@@ -124,9 +124,10 @@ module.exports = async (req, res) => {
           if (hc === null || hc === '') { patch.email_header_config = null; }
           else if (typeof hc === 'object') {
             const socials = Array.isArray(hc.socials) ? hc.socials.slice(0, 8).map(s => ({
-              i: String(s.i || '').slice(0, 8),
+              i: String(s.i || '').replace(/["\r\n<>]/g, '').trim().slice(0, 500),
               l: String(s.l || '').replace(/["\r\n<>]/g, '').trim().slice(0, 60),
               u: String(s.u || '').replace(/["\r\n<>]/g, '').trim().slice(0, 300),
+              p: String(s.p || '').replace(/[^a-z0-9]/gi, '').slice(0, 20),
             })).filter(s => s.l || s.u) : [];
             patch.email_header_config = {
               logo: String(hc.logo || '').replace(/["\r\n<>]/g, '').trim().slice(0, 500),
