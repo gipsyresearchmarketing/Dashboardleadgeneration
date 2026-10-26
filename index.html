@@ -6913,6 +6913,29 @@
       '<option value="">📂 Dari audience…</option>' + opts + '</select>';
   }
 
+  /* Chip Cc/Bcc: ketik email + Enter -> jadi chip, bisa nambah berkali-kali. */
+  function ccChipHtml(email, kind) {
+    return '<span class="ech-chip" data-' + kind + '-chip="' + escapeHTML(email) + '" style="background:#eef2ff;color:#4338ca">'
+      + escapeHTML(email)
+      + '<button type="button" class="ech-chip-x" data-' + kind + '-remove="' + escapeHTML(email) + '" title="Hapus" style="background:transparent;border:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px">&times;</button>'
+      + '</span>';
+  }
+  /* Baris Cc / Bcc di composer: label + container chip + input baru + dropdown audience. */
+  function ccBccRowHtml(kind, compose) {
+    var list = String(compose[kind] || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    var chips = list.map(function (em) { return ccChipHtml(em, kind); }).join('');
+    var label = kind === 'cc' ? 'Cc' : 'Bcc';
+    var ph = kind === 'cc' ? 'tambah email cc…' : 'tambah email bcc…';
+    return '<div class="ech-row">'
+      + '<span class="ech-label">' + label + '</span>'
+      + '<div class="ech-to-input" data-ech-ccbox="' + kind + '" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center">'
+      +   chips
+      +   '<input type="text" class="ech-input-inline" data-ech-' + kind + '-add placeholder="' + ph + '" style="border:none;outline:none;flex:1;min-width:130px;padding:3px 4px;font-size:13px" autocomplete="off" />'
+      + '</div>'
+      + audSelectHtml(kind, 'email')
+      + '</div>';
+  }
+
   function renderBlastCanvas(opts) {
     const channel = opts.channel;
     const mode = opts.mode || 'edit';
@@ -7056,17 +7079,9 @@
             '</span>' +
           '</div>' +
           // Cc row (hidden by default — toggled by Cc button)
-          (compose.showCc ? '<div class="ech-row">' +
-            '<span class="ech-label">Cc</span>' +
-            '<input type="text" class="ech-input-full" data-ech-cc placeholder="Add Cc recipients…" value="' + escapeHTML(compose.cc || '') + '" style="flex:1;min-width:0" />' +
-            audSelectHtml('cc', channel) +
-          '</div>' : '') +
+          (compose.showCc ? ccBccRowHtml('cc', compose) : '') +
           // Bcc row (hidden by default — toggled by Bcc button)
-          (compose.showBcc ? '<div class="ech-row">' +
-            '<span class="ech-label">Bcc</span>' +
-            '<input type="text" class="ech-input-full" data-ech-bcc placeholder="Add Bcc recipients…" value="' + escapeHTML(compose.bcc || '') + '" style="flex:1;min-width:0" />' +
-            audSelectHtml('bcc', channel) +
-          '</div>' : '') +
+          (compose.showBcc ? ccBccRowHtml('bcc', compose) : '') +
           // Subject row (Gmail-style: subtle, single line, contenteditable)
           (isEmail
             ? '<div class="ech-row ech-subject-row">' +
@@ -9742,8 +9757,77 @@
         toast('+' + n + ' email dari "' + a.name + '" masuk ' + which.toUpperCase() + ' (total ' + merged.length + ')');
       });
     });
+    /* Input Cc/Bcc polos (shell lama) — tetap sinkron ke compose. */
     document.querySelectorAll('[data-ech-cc]').forEach(el => {
       el.addEventListener('input', () => { blastState.compose.cc = el.value; });
+    });
+    document.querySelectorAll('[data-ech-bcc]').forEach(el => {
+      el.addEventListener('input', () => { blastState.compose.bcc = el.value; });
+    });
+    /* ===== Cc / Bcc: chip (Enter = tambah, Backspace = hapus yg terakhir) ===== */
+    ['cc', 'bcc'].forEach(function (kind) {
+      var addEl = document.querySelector('[data-ech-' + kind + '-add]');
+      if (!addEl) return;
+      var box = addEl.parentElement;
+      var curList = function () {
+        return String(blastState.compose[kind] || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+      };
+      var saveList = function (list) { blastState.compose[kind] = list.join(', '); };
+      addEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          var raw = addEl.value.split(/[,;\s]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+          var list = curList();
+          var added = [];
+          raw.forEach(function (em) {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { toast('Email tidak valid: ' + em); return; }
+            if (list.indexOf(em) >= 0) return;
+            list.push(em); added.push(em);
+          });
+          addEl.value = '';
+          if (!added.length) return;
+          saveList(list);
+          added.forEach(function (em) { box.insertBefore(ccChipHtml(em, kind), addEl); });
+          toast(added.length + ' email masuk ' + kind.toUpperCase());
+          return;
+        }
+        if (e.key === 'Backspace' && !addEl.value) {
+          var l2 = curList();
+          if (!l2.length) return;
+          var last = l2.pop();
+          saveList(l2);
+          var chip = box.querySelector('[data-' + kind + '-chip]');
+          if (chip) chip.remove();
+        }
+      });
+      // Paste beberapa email sekaligus
+      addEl.addEventListener('paste', function (e) {
+        var txt = (e.clipboardData || window.clipboardData).getData('text') || '';
+        if (!/[,;\s]/.test(txt.trim())) return;
+        e.preventDefault();
+        var list = curList();
+        var added = [];
+        txt.split(/[,;\s]+/).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (em) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { toast('Email tidak valid: ' + em); return; }
+          if (list.indexOf(em) >= 0) return;
+          list.push(em); added.push(em);
+        });
+        if (!added.length) return;
+        saveList(list);
+        added.forEach(function (em) { box.insertBefore(ccChipHtml(em, kind), addEl); });
+        toast(added.length + ' email masuk ' + kind.toUpperCase());
+      });
+      // Hapus chip
+      box.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('[data-' + kind + '-remove]');
+        if (!btn) return;
+        e.preventDefault();
+        var em = btn.getAttribute('data-' + kind + '-remove');
+        var list = curList().filter(function (x) { return x !== em; });
+        saveList(list);
+        var chip = box.querySelector('[data-' + kind + '-chip="' + em.replace(/"/g, '\\"') + '"]');
+        if (chip) chip.remove();
+      });
     });
     document.querySelectorAll('[data-ech-bcc]').forEach(el => {
       el.addEventListener('input', () => { blastState.compose.bcc = el.value; });
