@@ -6877,13 +6877,19 @@
   /* Bersihkan body draft sebelum dimuat ke canvas.
      - Kalau draft punya blocks[] -> buang markup .email-block dari body (biar tidak dobel).
      - Kalau blocks[] kosong -> buka bloknya (pertahankan isi teksnya), jangan dihapus. */
-  function stripBlockMarkup(html, blocks) {
-    // PENTING: .eb-controls (tombol Upload / field URL / field lebar) TIDAK boleh dibuang di sini —
-    // itu editor gambar & button. Kalau dibuang, gambar di draft jadi tidak bisa diedit lagi.
+  function stripBlockMarkup(html) {
     if (!html) return '';
     const tmp = document.createElement('div');
     tmp.innerHTML = String(html);
-    tmp.querySelectorAll('.email-block-controls,.eb-remove,.email-block-label').forEach(n => n.remove());
+    // Hanya 5 tombol blok (.email-block-controls) yang dibuang — listener-nya sudah mati setelah
+    // HTML di-parse ulang, jadi harus di-attach ulang oleh attachBlockControls().
+    //
+    // YANG TIDAK BOLEH DIBUANG:
+    //   .email-block       -> wrapper blok; kalau hilang, data-block ikut hilang,
+    //                         blok jadi tak dikenali (gak ada tombol edit / upload gambar).
+    //   .eb-controls       -> editor gambar & button (Upload, URL, Alt, Lebar).
+    //   .email-block-label -> badge jenis blok (TEXT / SUBHEADING).
+    tmp.querySelectorAll('.email-block-controls,.eb-remove').forEach(n => n.remove());
     // Body yang ter-escape (&lt;div...) — kembalikan jadi HTML sungguhan.
     if (!tmp.children.length && /^\s*&lt;[a-z]/i.test(tmp.textContent || '')) {
       const ta = document.createElement('textarea');
@@ -6891,16 +6897,6 @@
       const decoded = ta.value;
       if (/<[a-z][\s>]/i.test(decoded)) { tmp.innerHTML = decoded; }
     }
-    const nodes = Array.from(tmp.querySelectorAll('.email-block'));
-    // Blok di body dibuang hanya kalau jumlahnya sama persis dengan blocks[] (berarti sudah terwakili).
-    // Kalau tidak cocok, buka bloknya supaya isi teks tidak hilang.
-    const dropAll = nodes.length > 0 && nodes.length === (blocks || []).length;
-    nodes.forEach(n => {
-      if (dropAll) { n.remove(); return; }
-      const frag = document.createDocumentFragment();
-      while (n.firstChild) frag.appendChild(n.firstChild);
-      n.replaceWith(frag);
-    });
     return tmp.innerHTML;
   }
 
@@ -9865,7 +9861,7 @@
         // Copy draft into current compose, then send
         if (channel === 'email') {
           emailBlast.compose.subject = plainSnippet(draft.subject);
-          emailBlast.compose.body = stripBlockMarkup(draft.body || '', draft.blocks || draft.attachments || []);
+          emailBlast.compose.body = stripBlockMarkup(draft.body || '');
           emailBlast.compose.blocks = draft.blocks || draft.attachments || [];
           emailBlast.compose.recipients = normalizeRecipients(draft.recipients);
         } else {
@@ -9997,7 +9993,7 @@
       const draft = blastState.drafts.find(d => d.id === id);
       if (!draft) return;
       if (channel === 'email') {
-        emailBlast.compose = { subject:plainSnippet(draft.subject), body:stripBlockMarkup(draft.body||'', draft.blocks||draft.attachments||[]), recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        emailBlast.compose = { subject:plainSnippet(draft.subject), body:stripBlockMarkup(draft.body||''), recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       } else {
         waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:normalizeRecipients(draft.recipients), sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       }
