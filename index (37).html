@@ -5384,8 +5384,8 @@
         email.email_header_config = hfCollect();
         var saved = await brandApi('save', { email: email });
         // Refresh cache header/footer supaya blast berikutnya langsung pakai config baru
-        emailHeaderCfg = null; emailHeaderPromise = null; emailHeaderLoaded = true;
-        try { await getEmailHeaderCfg(); } catch (e) {}
+        emailHeaderCfg = null; emailHeaderPromise = null; emailHeaderLoaded = true; emailHeaderAt = 0;
+        try { await getEmailHeaderCfg(true); } catch (e) {}
         toast('Pengaturan email disimpan');
         renderSendSettings(host, saved);
         try { await verify('email', 'ss-email-status'); } catch (e) { setStatus('ss-email-status', false, e.message); }
@@ -7952,12 +7952,19 @@
   var emailHeaderCfg = null;          // cache config terakhir
   var emailHeaderPromise = null;
   var emailHeaderLoaded = false;      // config sudah pernah dimuat (hindari render loop)
+  var emailHeaderAt = 0;              // kapan terakhir fetch (ms)
 
-  async function getEmailHeaderCfg() {
-    if (emailHeaderCfg) return emailHeaderCfg;
-    if (!emailHeaderPromise) {
+  async function getEmailHeaderCfg(force) {
+    // Kalau config-nya kosong (belum diset / fetchnya gagal), jangan dicache selamanya —
+    // coba lagi setelah jeda supaya otomatis nyambung begitu diset di Profile.
+    if (emailHeaderCfg && !force) {
+      if (emailHeaderCfg.enabled) return emailHeaderCfg;
+      if (Date.now() - emailHeaderAt < 15000) return emailHeaderCfg;
+    }
+    if (!emailHeaderPromise || force) {
       emailHeaderPromise = brandApi('get').then(function (d) {
         var em = (d && d.email) || {};
+        emailHeaderAt = Date.now();
         emailHeaderCfg = {
           enabled: !!em.email_header_enabled,
           logo: (em.email_header_config && em.email_header_config.logo) || '',
@@ -7969,6 +7976,7 @@
         };
         return emailHeaderCfg;
       }).catch(function () {
+        emailHeaderAt = Date.now();
         emailHeaderCfg = { enabled: false, logo: '', name: '', tagline: '', footerEnabled: false, socials: [], footerText: '' };
         return emailHeaderCfg;
       });
