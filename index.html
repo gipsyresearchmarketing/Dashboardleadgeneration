@@ -5090,6 +5090,8 @@
       +     '<input id="ss-hdr-logo" value="' + escHtml(cfg.logo || '') + '" placeholder="https://.../logo.png" style="' + inp + '" ' + dis + ' />'
       +     '<button type="button" class="btn btn-outline" id="ss-hdr-lib" style="font-size:11px;padding:5px 9px;white-space:nowrap" ' + dis + '>📚 Library</button>'
       +   '</div>'
+      +   '<label style="' + lbl + '">Ukuran logo</label>'
+      +   '<select id="ss-hdr-size" class="input" style="font-size:12px;padding:6px 8px" ' + dis + '>' + logoSizeOptions(cfg.logoSize) + '</select>'
       +   '<label style="' + lbl + '">Nama / brand</label><input id="ss-hdr-name" value="' + escHtml(cfg.name || '') + '" placeholder="' + escHtml(cur.name || 'Nama brand') + '" style="' + inp + '" ' + dis + ' />'
       +   '<label style="' + lbl + '">Tagline (opsional)</label><input id="ss-hdr-tagline" value="' + escHtml(cfg.tagline || '') + '" placeholder="Bantu belajar & memahami riset" style="' + inp + '" ' + dis + ' />'
       + '</div>'
@@ -5280,6 +5282,7 @@
       });
       return {
         logo: (document.getElementById('ss-hdr-logo') || {}).value || '',
+        logoSize: ((document.getElementById('ss-hdr-size') || {}).value || 'md'),
         name: (document.getElementById('ss-hdr-name') || {}).value || '',
         tagline: (document.getElementById('ss-hdr-tagline') || {}).value || '',
         footerEnabled: !!(document.getElementById('ss-ftr-on') || {}).checked,
@@ -5310,6 +5313,8 @@
         hfPreview();
       });
     }
+    var szEl = document.getElementById('ss-hdr-size');
+    if (szEl) szEl.addEventListener('change', hfPreview);
     ['ss-hdr-logo', 'ss-hdr-name', 'ss-hdr-tagline', 'ss-hdr-ftext'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener('input', hfPreview);
@@ -7919,6 +7924,21 @@
     return root.innerHTML;
   }
 
+  /* Ukuran logo header email. */
+  var LOGO_SIZES = {
+    sm:   { label: 'Kecil (32px)',   maxH: 32,  maxW: 120 },
+    md:   { label: 'Sedang (64px)',  maxH: 64,  maxW: 220 },
+    lg:   { label: 'Besar (120px)',  maxH: 120, maxW: 360 },
+    full: { label: 'Lebar penuh',     maxH: 999, maxW: 999, full: true },
+  };
+  function logoSizeOptions(selected) {
+    var sel = String(selected || 'md');
+    return '<option value="">— ukuran logo —</option>'
+      + Object.keys(LOGO_SIZES).map(function (k) {
+          return '<option value="' + k + '"' + (sel === k ? ' selected' : '') + '>' + LOGO_SIZES[k].label + '</option>';
+        }).join('');
+  }
+
   /* URL publik untuk gambar di email (Gmail memblokir data: URL). */
   function publicImgUrl(platform) { return location.origin + '/api/img?p=' + encodeURIComponent(platform); }
   function publicAssetUrl(assetId) { return location.origin + '/api/img?asset=' + encodeURIComponent(assetId); }
@@ -7968,6 +7988,7 @@
         emailHeaderCfg = {
           enabled: !!em.email_header_enabled,
           logo: (em.email_header_config && em.email_header_config.logo) || '',
+          logoSize: (em.email_header_config && em.email_header_config.logoSize) || 'md',
           name: (em.email_header_config && em.email_header_config.name) || '',
           tagline: (em.email_header_config && em.email_header_config.tagline) || '',
           footerEnabled: !!(em.email_header_config && em.email_header_config.footerEnabled),
@@ -7994,8 +8015,15 @@
     var brand = '';
     if (name) brand += '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:16px;font-weight:700;color:#0f172a;line-height:1.3">' + escapeHTML(name) + '</div>';
     if (tagline) brand += '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:13px;color:#64748b;line-height:1.4;margin-top:3px">' + escapeHTML(tagline) + '</div>';
+    var sz = LOGO_SIZES[cfg.logoSize] || LOGO_SIZES.md;
     var logoCell = '';
-    if (logo) logoCell = '<td style="vertical-align:middle;padding-right:14px"><img src="' + escapeHTML(logo) + '" alt="' + escapeHTML(name || 'Logo') + '" style="max-height:44px;height:auto;max-width:200px;border:0;display:block" /></td>';
+    if (logo) {
+      var imgStyle = sz.full
+        ? 'width:100%;height:auto;max-width:100%;border:0;display:block'
+        : 'max-height:' + sz.maxH + 'px;height:auto;max-width:' + sz.maxW + 'px;border:0;display:block';
+      logoCell = '<td style="vertical-align:middle;padding-right:14px" width="' + (sz.full ? '100%' : 'auto') + '">'
+        + '<img src="' + escapeHTML(logo) + '" alt="' + escapeHTML(name || 'Logo') + '" style="' + imgStyle + '" /></td>';
+    }
     var textCell = brand ? '<td style="vertical-align:middle">' + brand + '</td>' : '';
     return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:1px solid #e2e8f0;padding-bottom:16px;margin-bottom:24px">'
       + '<tr>' + logoCell + textCell + '</tr></table>';

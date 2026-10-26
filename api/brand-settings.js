@@ -131,6 +131,7 @@ module.exports = async (req, res) => {
             })).filter(s => s.l || s.u) : [];
             patch.email_header_config = {
               logo: String(hc.logo || '').replace(/["\r\n<>]/g, '').trim().slice(0, 500),
+              logoSize: ['sm', 'md', 'lg', 'full'].indexOf(String(hc.logoSize || '')) >= 0 ? String(hc.logoSize) : 'md',
               name: String(hc.name || '').replace(/["\r\n<>]/g, '').trim().slice(0, 80),
               tagline: String(hc.tagline || '').replace(/["\r\n<>]/g, '').trim().slice(0, 120),
               footerEnabled: !!hc.footerEnabled,
