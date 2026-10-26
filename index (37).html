@@ -7055,6 +7055,8 @@
           '  .eb-controls      = ' + q('.eb-controls') + '\n' +
           '  .eb-btn-wrap      = ' + q('.eb-btn-wrap') + '  (tanpa wrapper: ' + orphanBtn + ')\n' +
           '  img               = ' + q('img') + '\n' +
+          '  img style.width   = ' + Array.from(el.querySelectorAll('img')).map(n => n.style.width || n.getAttribute('width') || '-').join(', ') + '\n' +
+          '  eb-img-wrap style = ' + Array.from(el.querySelectorAll('.eb-img-wrap')).map(n => n.style.width || '-').join(', ') + '\n' +
           '  <pre>' + el.innerHTML.slice(0, 420).replace(/</g, '&lt;') + '</pre>';
         el.appendChild(info);
       }
@@ -7087,11 +7089,16 @@
       block.setAttribute('style', isImg
         ? 'text-align:center;cursor:default;padding:8px 0'
         : 'text-align:center;padding:8px 0');
-      // Lebar gambar ikut hilang bareng wrapper-nya -> simpan lagi dari style .eb-img-wrap
+      // Lebar gambar ikut hilang bareng wrapper-nya -> simpan lagi dari beberapa sumber:
+      // style .eb-img-wrap, style <img>, atau atribut width.
       if (isImg) {
         const wrap = node.querySelector('.eb-img-wrap');
-        const w = wrap && wrap.style ? parseInt(wrap.style.width, 10) : 0;
-        if (w) block.setAttribute('data-img-w', w);
+        const img = node.querySelector('img');
+        let w = 0;
+        if (wrap && wrap.style) w = parseInt(wrap.style.width, 10) || 0;
+        if (!w && img && img.style) w = parseInt(img.style.width, 10) || 0;
+        if (!w && img) w = parseInt(img.getAttribute('width'), 10) || 0;
+        if (w) { block.setAttribute('data-img-w', w); block.setAttribute('data-img-max', 542); }
       }
       group.forEach(g => block.appendChild(g));
       parent.insertBefore(block, anchor);
