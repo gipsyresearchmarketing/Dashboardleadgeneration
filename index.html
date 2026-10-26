@@ -6820,6 +6820,7 @@
     if (!host) return;
     host.querySelectorAll('.email-block').forEach(b => {
       b.setAttribute('draggable', 'true');
+      ensureBlockEditor(b);
       if (!b.querySelector('.email-block-controls')) attachBlockControls(b);
     });
     refreshEmailDropzones();
@@ -6877,10 +6878,12 @@
      - Kalau draft punya blocks[] -> buang markup .email-block dari body (biar tidak dobel).
      - Kalau blocks[] kosong -> buka bloknya (pertahankan isi teksnya), jangan dihapus. */
   function stripBlockMarkup(html, blocks) {
+    // PENTING: .eb-controls (tombol Upload / field URL / field lebar) TIDAK boleh dibuang di sini —
+    // itu editor gambar & button. Kalau dibuang, gambar di draft jadi tidak bisa diedit lagi.
     if (!html) return '';
     const tmp = document.createElement('div');
     tmp.innerHTML = String(html);
-    tmp.querySelectorAll('.eb-controls,.email-block-controls,.eb-resize-handle,.eb-remove,.email-block-label').forEach(n => n.remove());
+    tmp.querySelectorAll('.email-block-controls,.eb-remove,.email-block-label').forEach(n => n.remove());
     // Body yang ter-escape (&lt;div...) — kembalikan jadi HTML sungguhan.
     if (!tmp.children.length && /^\s*&lt;[a-z]/i.test(tmp.textContent || '')) {
       const ta = document.createElement('textarea');
@@ -6923,6 +6926,61 @@
       }
     });
     return out;
+  }
+
+  /* Blok gambar/button dari draft lama bisa kehilangan .eb-controls (editor upload/URL/lebar).
+     Pasang ulang supaya blok itu masih bisa diedit. */
+  function ensureBlockEditor(blockEl) {
+    if (!blockEl) return;
+    const type = blockEl.getAttribute('data-block');
+    if (type !== 'image' && type !== 'button') return;
+    if (blockEl.querySelector('.eb-controls')) return;
+
+    const ctrls = document.createElement('div');
+    ctrls.className = 'eb-controls';
+    if (type === 'image') {
+      // Pulihkan nilai gambar yang tersimpan di blok (kalau editor-nya hilang, nilainya ikut hilang)
+      const pimg = blockEl.querySelector('.eb-image-preview img, img');
+      const savedSrc = (pimg && pimg.getAttribute('src')) || '';
+      const savedAlt = (pimg && pimg.getAttribute('alt')) || '';
+      const savedW = blockEl.getAttribute('data-img-w') || '';
+      ctrls.setAttribute('style', 'margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center');
+      ctrls.innerHTML =
+        '<button type="button" data-eb-upload="1" style="font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600">⬆ Upload</button>' +
+        '<input data-eb-input="src" data-eb-placeholder="https://..." style="width:40%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Image URL..." />' +
+        '<input data-eb-input="alt" style="width:25%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Alt text" />' +
+        '<input data-eb-input="width" type="number" min="40" step="1" title="Lebar gambar (px). Kosongkan = penuh. Atau tarik titik biru di pojok gambar." style="width:84px;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Lebar px" />';
+      if (!blockEl.querySelector('.eb-image-preview')) {
+        const pv = document.createElement('div');
+        pv.className = 'eb-image-preview';
+        pv.setAttribute('style', 'min-height:120px;background:#f1f5f9;border:2px dashed #cbd5e1;border-radius:6px;color:#64748b;font-size:13px;display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center;background-repeat:no-repeat');
+        pv.innerHTML = '<span style="background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:4px">🖼️ Click fields below to add image</span>';
+        blockEl.insertBefore(pv, blockEl.firstChild);
+      }
+      const wrap = blockEl.querySelector('.eb-img-wrap');
+      if (wrap && !wrap.querySelector('.eb-resize-handle')) {
+        const h = document.createElement('span');
+        h.className = 'eb-resize-handle';
+        h.setAttribute('data-eb-handle', '1');
+        h.setAttribute('contenteditable', 'false');
+        h.setAttribute('title', 'Tarik untuk ubah lebar gambar');
+        wrap.appendChild(h);
+      }
+    } else {
+      ctrls.setAttribute('style', 'margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center');
+      ctrls.innerHTML =
+        '<input data-eb-input="href" style="width:62%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Button link URL (https://...)" />' +
+        '<button type="button" data-eb-btnfull="1" style="font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600">↔ Full width</button>';
+    }
+    blockEl.appendChild(ctrls);
+    if (type === 'image') {
+      const srcEl = ctrls.querySelector('[data-eb-input="src"]');
+      const altEl = ctrls.querySelector('[data-eb-input="alt"]');
+      const wEl = ctrls.querySelector('[data-eb-input="width"]');
+      if (srcEl && savedSrc) { srcEl.value = savedSrc; srcEl.setAttribute('value', savedSrc); }
+      if (altEl && savedAlt) { altEl.value = savedAlt; altEl.setAttribute('value', savedAlt); }
+      if (wEl && savedW) { wEl.value = savedW; wEl.setAttribute('value', savedW); }
+    }
   }
 
   /* Generic drafts list */
