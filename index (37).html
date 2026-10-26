@@ -7066,6 +7066,12 @@
               '</div>'
             : '') +
         '</div>' +
+        (channel === 'email' && buildEmailHeaderHtml(emailHeaderCfg)
+          ? '<div style="border:1px dashed #c7d2fe;background:#f5f3ff;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+            + buildEmailHeaderHtml(emailHeaderCfg)
+            + '<div style="font-size:10.5px;color:#6d28d9;margin-top:6px;text-transform:uppercase;letter-spacing:.04em;font-weight:600">↑ Header email — otomatis di setiap blast, tidak ikut diedit di sini</div>'
+          + '</div>'
+          : '') +
         '<div ' + editableAttr + ' data-blast-input="body" class="email-card-body' + (readOnly ? ' readonly' : '') + '" data-placeholder="Click here and start typing your message…">' + (compose.body || compose.message || '') + '</div>' + (readOnly ? '' :
           '<div class="email-dropzone" data-blast-dropzone="end" style="padding:10px;text-align:center;font-size:11px;color:var(--muted);border:1px dashed var(--border);border-radius:6px;margin-top:6px">Drop module here ↓</div>'
         ) +
