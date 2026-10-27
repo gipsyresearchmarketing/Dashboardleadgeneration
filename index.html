@@ -7344,7 +7344,8 @@
         '<button type="button" data-eb-upload="1" style="font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600">⬆ Upload</button>' +
         '<input data-eb-input="src" data-eb-placeholder="https://..." style="width:40%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Image URL..." />' +
         '<input data-eb-input="alt" style="width:25%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Alt text" />' +
-        '<input data-eb-input="width" type="number" min="40" step="1" title="Lebar gambar (px). Kosongkan = penuh. Atau tarik titik biru di pojok gambar." style="width:84px;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Lebar px" />';
+        '<input data-eb-input="width" type="number" min="40" step="1" title="Lebar gambar (px). Kosongkan = penuh. Atau tarik titik biru di pojok gambar." style="width:84px;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Lebar px" />'
+        + '<input data-eb-input="href" style="width:100%;margin-top:4px;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Link gambar (opsional) — mis. https://promo.gipsyresearch.id" />';
       if (!blockEl.querySelector('.eb-image-preview')) {
         const pv = document.createElement('div');
         pv.className = 'eb-image-preview';
@@ -7363,9 +7364,15 @@
       const srcEl = ctrls.querySelector('[data-eb-input="src"]');
       const altEl = ctrls.querySelector('[data-eb-input="alt"]');
       const wEl = ctrls.querySelector('[data-eb-input="width"]');
+      const hEl = ctrls.querySelector('[data-eb-input="href"]');
       if (srcEl && savedSrc) { srcEl.value = savedSrc; srcEl.setAttribute('value', savedSrc); }
       if (altEl && savedAlt) { altEl.value = savedAlt; altEl.setAttribute('value', savedAlt); }
       if (wEl && savedW) { wEl.value = savedW; wEl.setAttribute('value', savedW); }
+      if (hEl) {
+        const ia = blockEl.querySelector('a[href]');
+        const hv = (ia && ia.getAttribute('href')) || blockEl.getAttribute('data-href') || '';
+        if (hv) { hEl.value = hv; hEl.setAttribute('value', hv); }
+      }
     }
   }
 
@@ -7877,7 +7884,16 @@
   function appLeads() { return CLOUD_SPECS.leads.get() || []; }
   function appPrependActivities(items) { saveActivities(items.concat(CLOUD_SPECS.activities.get() || [])); }
 
-  function safeLink(u) { u = String(u || '').trim(); return /^(https?:\/\/|mailto:)/i.test(u) ? u : '#'; }
+  function safeLink(u) {
+    u = String(u || '').trim();
+    if (!u) return '#';
+    // Scheme yang boleh: web, email, telpon, chat. LAINNYA (javascript:, data:, file:) DITOLAK.
+    if (/^(https?|mailto|tel|sms|callto|whatsapp|tg|geo):/i.test(u)) return u;
+    if (/^\/\//.test(u)) return 'https:' + u;                            // protocol-relative
+    if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return '#';                        // scheme lain -> tolak
+    if (/^[^\s@]+\.[^\s@]{2,}(\/.*)?$/i.test(u)) return 'https://' + u; // domain tanpa protocol -> tambahin
+    return '#';
+  }
 
   /** Konstanta tampilan email */
   const EMAIL_ACCENT = '#2563eb';
@@ -7913,6 +7929,16 @@
           const m = sel && /^(\d+)%$/.exec(sel.getAttribute('value') || sel.textContent || '');
           if (m) w = Math.round(EMAIL_CONTENT_W * parseInt(m[1], 10) / 100);
         }
+        // Link gambar: dari field href di editor, atau <a> yg nempel di blok / di atas blok.
+        let ihref = val(b, '[data-eb-input="href"]').trim();
+        if (!ihref) {
+          const ia = b.querySelector('a[href]');
+          if (ia) ihref = ia.getAttribute('href') || '';
+        }
+        if (!ihref) {
+          const pa = b.parentElement && b.parentElement.closest ? b.parentElement.closest('a[href]') : null;
+          if (pa) ihref = pa.getAttribute('href') || '';
+        }
         if (src) {
           out = doc.createElement('div');
           out.setAttribute('style', 'text-align:center;margin:22px 0');
@@ -7920,7 +7946,15 @@
           im.setAttribute('src', src); im.setAttribute('alt', alt);
           im.setAttribute('width', String(w));
           im.setAttribute('style', 'display:block;margin:0 auto;width:' + w + 'px;max-width:100%;height:auto;border:0;border-radius:10px');
-          out.appendChild(im);
+          if (ihref && safeLink(ihref) !== '#') {
+            const a = doc.createElement('a');
+            a.setAttribute('href', safeLink(ihref));
+            a.setAttribute('style', 'display:inline-block;text-decoration:none;border:0');
+            a.appendChild(im);
+            out.appendChild(a);
+          } else {
+            out.appendChild(im);
+          }
         }
       } else if (type === 'button') {
         const te = b.querySelector('[data-eb-input="text"]');
@@ -7956,6 +7990,12 @@
       if (out) b.replaceWith(out); else b.remove();
     });
     root.querySelectorAll('.email-block-controls, .email-block-label, .eb-controls, .eb-resize-handle, .eb-resize-badge, .email-dropgap').forEach(n => n.remove());
+    // Normalisasi href semua link (tambahin https:// kalo domain tanpa protocol)
+    root.querySelectorAll('a[href]').forEach(a => {
+      const h = safeLink(a.getAttribute('href'));
+      a.setAttribute('href', h);
+      if (!a.getAttribute('target')) a.setAttribute('target', '_blank');
+    });
     root.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
     root.querySelectorAll('[draggable]').forEach(n => n.removeAttribute('draggable'));
     // Rapikan tipografi (hanya properti yang belum di-set user)
