@@ -47,5 +47,20 @@ echo "→ Push..."
 git push origin main
 
 echo ""
-echo "✅ Selesai! Vercel akan auto-deploy dalam 1-2 menit."
-echo "   Cek: https://vercel.com/dashboard  →  project lo  →  Deployments"
+echo "✅ Push selesai. Menunggu Vercel auto-deploy..."
+
+# Tunggu deploy, lalu cek app-nya beneran load (tangkap error runtime)
+SITE="https://dashboardleadgeneration.vercel.app"
+for i in $(seq 1 15); do
+  sleep 12
+  if [ -x "./smoke-test.sh" ]; then
+    OUT=$(./smoke-test.sh "$SITE" 2>/dev/null)
+    case "$OUT" in
+      *"✅"*) echo "✅ Deploy siap & app load dengan benar."; exit 0 ;;
+      *"❌"*) echo "$OUT"; echo "   (deploy mungkin belum selesai — coba lagi beberapa saat)"; exit 1 ;;
+    esac
+  else
+    echo "   … masih deploy (percobaan $i)"
+  fi
+done
+echo "   Deploy belum terkonfirmasi. Cek manual: $SITE"
