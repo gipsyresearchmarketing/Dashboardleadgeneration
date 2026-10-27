@@ -6920,19 +6920,42 @@
       + '<button type="button" class="ech-chip-x" data-' + kind + '-remove="' + escapeHTML(email) + '" title="Hapus" style="background:transparent;border:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px">&times;</button>'
       + '</span>';
   }
+  /* Insert chip ke container. insertBefore() cuma nerima Node, jadi string HTML
+     harus diubah jadi element dulu ( kalau tidak -> TypeError, chip gak muncul ). */
+  function insertCcChip(box, beforeEl, email, kind) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = ccChipHtml(email, kind);
+    var node = tmp.firstElementChild;
+    if (!node) return null;
+    box.insertBefore(node, beforeEl);
+    return node;
+  }
   /* Baris Cc / Bcc di composer: label + container chip + input baru + dropdown audience. */
+  var CC_CHIP_MAX = 40;    // max chip yang dirender (200 Bcc = 200 elemen, bikin lambat)
   function ccBccRowHtml(kind, compose) {
     var list = String(compose[kind] || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-    var chips = list.map(function (em) { return ccChipHtml(em, kind); }).join('');
+    var shown = list.slice(0, CC_CHIP_MAX);
+    var rest = list.length - shown.length;
+    var chips = shown.map(function (em) { return ccChipHtml(em, kind); }).join('');
+    if (rest > 0) chips += '<span class="ech-chip" style="background:#f1f5f9;color:#475569">+' + rest + ' lainnya</span>';
     var label = kind === 'cc' ? 'Cc' : 'Bcc';
     var ph = kind === 'cc' ? 'tambah email cc…' : 'tambah email bcc…';
-    return '<div class="ech-row">'
-      + '<span class="ech-label">' + label + '</span>'
+    // Total resipien = To + Cc + Bcc (Gmail API limit 500 per pesan)
+    var toCount = (compose.recipients || []).length;
+    var ccCount = String(compose.cc || '').split(',').filter(function (x) { return x.trim(); }).length;
+    var bccCount = String(compose.bcc || '').split(',').filter(function (x) { return x.trim(); }).length;
+    var total = toCount + ccCount + bccCount;
+    var warn = total > 500
+      ? '<div style="flex-basis:100%;font-size:11px;color:#b91c1c;margin-top:4px">⚠️ Total resipien ' + total + ' — batas Gmail API 500 per pesan. Kurangi Bcc atau pecah jadi 2 email.</div>'
+      : '';
+    return '<div class="ech-row" style="flex-wrap:wrap">'
+      + '<span class="ech-label">' + label + (list.length ? ' <span data-ech-' + kind + '-count style="font-weight:400;color:var(--muted)">(' + list.length + ')</span>' : '') + '</span>'
       + '<div class="ech-to-input" data-ech-ccbox="' + kind + '" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center">'
       +   chips
       +   '<input type="text" class="ech-input-inline" data-ech-' + kind + '-add placeholder="' + ph + '" style="border:none;outline:none;flex:1;min-width:130px;padding:3px 4px;font-size:13px" autocomplete="off" />'
       + '</div>'
       + audSelectHtml(kind, 'email')
+      + warn
       + '</div>';
   }
 
@@ -9764,7 +9787,13 @@
     document.querySelectorAll('[data-ech-bcc]').forEach(el => {
       el.addEventListener('input', () => { blastState.compose.bcc = el.value; });
     });
-    /* ===== Cc / Bcc: chip (Enter = tambah, Backspace = hapus yg terakhir) ===== */
+    function ccUpdateCount(kind) {
+    var el = document.querySelector('[data-ech-' + kind + '-count]');
+    if (!el) return;
+    var n = String(blastState.compose[kind] || '').split(',').filter(function (x) { return x.trim(); }).length;
+    el.textContent = '(' + n + ')';
+  }
+  /* ===== Cc / Bcc: chip (Enter = tambah, Backspace = hapus yg terakhir) ===== */
     ['cc', 'bcc'].forEach(function (kind) {
       var addEl = document.querySelector('[data-ech-' + kind + '-add]');
       if (!addEl) return;
@@ -9787,7 +9816,8 @@
           addEl.value = '';
           if (!added.length) return;
           saveList(list);
-          added.forEach(function (em) { box.insertBefore(ccChipHtml(em, kind), addEl); });
+          added.forEach(function (em) { insertCcChip(box, addEl, em, kind); });
+          ccUpdateCount(kind);
           toast(added.length + ' email masuk ' + kind.toUpperCase());
           return;
         }
@@ -9814,7 +9844,8 @@
         });
         if (!added.length) return;
         saveList(list);
-        added.forEach(function (em) { box.insertBefore(ccChipHtml(em, kind), addEl); });
+        added.forEach(function (em) { insertCcChip(box, addEl, em, kind); });
+        ccUpdateCount(kind);
         toast(added.length + ' email masuk ' + kind.toUpperCase());
       });
       // Hapus chip
