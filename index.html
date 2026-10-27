@@ -10410,19 +10410,19 @@
           fi.click();
         });
       }
-    }
-    // Binding per-input DI LUAR guard: preview button bisa diganti jadi element <a> yang baru,
-    // dan element baru itu tetap harus dapat listener walau bodyHost sudah pernah di-bind.
+      // Binding per-input: di dalam guard, tapi tiap element punya guard sendiri (ebLiveBound)
+      // jadi element <a> yg baru dibuat tetap kebind.
       (bodyHost ? bodyHost.querySelectorAll('[data-eb-input]') : []).forEach(inp => {
         if (inp.dataset.ebLiveBound === '1') return;
         inp.dataset.ebLiveBound = '1';
         inp.addEventListener('input', () => {
-          const block = inp.closest('.email-block');
-          if (!block) return;
-          syncBlockPreview(block);
+          const blk = inp.closest('.email-block');
+          if (!blk) return;
+          syncBlockPreview(blk);
           syncBody();
         });
       });
+    }
 
 
     // Terapkan lebar tombol (full / px / auto) ke preview editor
@@ -10514,6 +10514,16 @@
             a.setAttribute('contenteditable', 'true');
             a.dataset.ebInput = 'text';
             a.dataset.ebPlaceholder = 'Click here, type button label';
+            // Element <a> baru: bind listener input-nya langsung (guard bodyHost udh pernah kepakai)
+            if (a.dataset.ebLiveBound !== '1') {
+              a.dataset.ebLiveBound = '1';
+              a.addEventListener('input', () => {
+                const blk = a.closest('.email-block');
+                if (!blk) return;
+                syncBlockPreview(blk);
+                syncBody();
+              });
+            }
             setupImageButtonLiveEditors();
           } else if (href && preview.tagName === 'A') {
             preview.setAttribute('href', href);
