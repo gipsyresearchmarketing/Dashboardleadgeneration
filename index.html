@@ -8356,6 +8356,8 @@
     });
     if (!targets.length) { toast('Tidak ada recipient dengan email yang valid'); return null; }
     if (!window.currentBrand) { toast('Brand belum ke-load, coba refresh'); return null; }
+    // Sync body dulu supaya link/teks yang baru diisi ikut terkirim.
+    try { if (typeof window.syncBody === 'function') window.syncBody(); } catch (e) {}
     const msg = 'Kirim email "' + compose.subject.trim() + '" ke ' + targets.length + ' penerima?' + (skipped.length ? '\n\n' + skipped.length + ' lead dilewati karena email kosong/tidak valid.' : '') + '\n\nEmail yang sudah terkirim tidak bisa ditarik kembali.';
     if (!confirm(msg)) return null;
     showBlastOverlay('sending', 'Mengirim email ke ' + targets.length + ' penerima…', 'Jangan klik Send lagi dan jangan tutup halaman ini sampai selesai.');
@@ -9722,6 +9724,7 @@
     window.refreshEmailDropzones = refreshEmailDropzones;
     window.setupEmailDragListeners = setupEmailDragListeners;
     window.setupImageButtonLiveEditors = setupImageButtonLiveEditors;
+    window.syncBody = syncBody;   // dipanggil dari save & kirim supaya body selalu sinkron
     window.syncBlockPreview = syncBlockPreview;
     window.attachBlockControls = attachBlockControls;
     const blastState = channel === 'email' ? emailBlast : waBlast;
@@ -10407,6 +10410,9 @@
           fi.click();
         });
       }
+    }
+    // Binding per-input DI LUAR guard: preview button bisa diganti jadi element <a> yang baru,
+    // dan element baru itu tetap harus dapat listener walau bodyHost sudah pernah di-bind.
       (bodyHost ? bodyHost.querySelectorAll('[data-eb-input]') : []).forEach(inp => {
         if (inp.dataset.ebLiveBound === '1') return;
         inp.dataset.ebLiveBound = '1';
@@ -10417,7 +10423,7 @@
           syncBody();
         });
       });
-    }
+
 
     // Terapkan lebar tombol (full / px / auto) ke preview editor
     function applyBtnWidth(block) {
@@ -10491,27 +10497,32 @@
       } else if (block.dataset.block === 'button') {
         const textEl = block.querySelector('[data-eb-input="text"]');
         const hrefEl = block.querySelector('[data-eb-input="href"]');
-        const preview = block.querySelector('.eb-button-preview');
+        // Preview bisa sudah jadi <a> (kalau sebelumnya ada href) -> tangani keduanya
+        const preview = block.querySelector('.eb-button-preview, a[data-eb-input="text"]');
         const text = textEl ? (textEl.textContent || textEl.innerText || textEl.value || '').trim() : '';
         const href = hrefEl ? hrefEl.value.trim() : '';
         if (preview) {
           preview.textContent = text || 'Click here, type button label';
-          // Optional: wrap in link tag if href provided (so preview reflects what email recipient sees)
-          if (href && !preview.querySelector('a')) {
+          // Bungkus preview jadi link kalau ada href (supaya preview = hasil email penerima)
+          if (href && preview.tagName !== 'A') {
             const a = document.createElement('a');
             a.href = href;
             a.target = '_blank';
             a.style.cssText = 'display:block;text-align:center;background:#eef2ff;border:2px dashed #cbd5e1;border-radius:6px;padding:12px 28px;color:#4338ca;font-size:14px;font-weight:600;cursor:text;min-width:120px;text-decoration:none';
             a.textContent = text || 'Click here, type button label';
             preview.parentNode.replaceChild(a, preview);
-            // Re-attach contentEditable since we replaced the node
             a.setAttribute('contenteditable', 'true');
             a.dataset.ebInput = 'text';
             a.dataset.ebPlaceholder = 'Click here, type button label';
             setupImageButtonLiveEditors();
+          } else if (href && preview.tagName === 'A') {
+            preview.setAttribute('href', href);
           }
         }
         applyBtnWidth(block);
+        // PENTING: simpan nilai input (href dlsb) ke atribut value — tanpa ini link hilang
+        // pas draft disimpan (branch image sudah punya ini, button sebelumnya tidak).
+        persistBlockInputs(block);
       }
     }
 
@@ -10822,6 +10833,8 @@
     });
     // save draft
     document.querySelector(`[data-blast-action="save-draft"][data-channel="${channel}"]`)?.addEventListener('click', () => {
+      // Sync body dulu — kalau ada input (link, gambar, teks) yang baru diisi, compose.body masih basi.
+      try { syncBody(); } catch (e) {}
       const compose = blastState.compose;
       const hasContent = channel === 'email'
         ? (compose.subject.trim() || compose.body.trim())
