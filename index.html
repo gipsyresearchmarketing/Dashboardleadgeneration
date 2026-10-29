@@ -8358,7 +8358,19 @@
     if (!window.currentBrand) { toast('Brand belum ke-load, coba refresh'); return null; }
     // Sync body dulu supaya link/teks yang baru diisi ikut terkirim.
     try { if (typeof window.syncBody === 'function') window.syncBody(); } catch (e) {}
-    const msg = 'Kirim email "' + compose.subject.trim() + '" ke ' + targets.length + ' penerima?' + (skipped.length ? '\n\n' + skipped.length + ' lead dilewati karena email kosong/tidak valid.' : '') + '\n\nEmail yang sudah terkirim tidak bisa ditarik kembali.';
+    // Hitung Cc/Bcc biar user bisa verifikasi sebelum kirim.
+    const ccCount = String(compose.cc || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean).length;
+    const bccCount = String(compose.bcc || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean).length;
+    const extraRecip = [];
+    if (ccCount) extraRecip.push(ccCount + ' Cc');
+    if (bccCount) extraRecip.push(bccCount + ' Bcc');
+    const totalRecip = targets.length + ccCount + bccCount;
+    const msg = 'Kirim email "' + compose.subject.trim() + '" ke ' + targets.length + ' penerima'
+      + (extraRecip.length ? ' (+ ' + extraRecip.join(' + ') + ')' : '')
+      + '?'
+      + (extraRecip.length ? '\n\nTotal ' + totalRecip + ' penerima dalam 1 pesan. Cc keliatan oleh semua penerima, Bcc gak keliatan sama sekali.' : '')
+      + (skipped.length ? '\n\n' + skipped.length + ' lead dilewati karena email kosong/tidak valid.' : '')
+      + '\n\nEmail yang sudah terkirim tidak bisa ditarik kembali.';
     if (!confirm(msg)) return null;
     showBlastOverlay('sending', 'Mengirim email ke ' + targets.length + ' penerima…', 'Jangan klik Send lagi dan jangan tutup halaman ini sampai selesai.');
 
