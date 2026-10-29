@@ -2362,10 +2362,10 @@
       cols: ['id','name','type','description','lead_ids','created_at','last_used','brand_id'],
       get: () => audiences, set: (r) => { audiences = (r || []).map(function (a) { return Object.assign({}, a, { lead_ids: audLeadIds(a) }); }); } },
     drafts_email: { table: 'blast_drafts', channel: 'email', order: 'created_at',
-      cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at','brand_id'],
+      cols: ['id','channel','subject','body','blocks','files','recipients','cc','bcc','audience_id','send_mode','scheduled_at','created_at','brand_id'],
       get: () => emailBlast.drafts, set: (r) => { emailBlast.drafts = r; } },
     history_email:{ table: 'blast_history', channel: 'email', order: 'created_at',
-      cols: ['id','channel','subject','body','message','blocks','files','recipients','audience_id','audience_name','status','scheduled_at','sent_at','created_at','brand_id'],
+      cols: ['id','channel','subject','body','message','blocks','files','recipients','cc','bcc','audience_id','audience_name','status','scheduled_at','sent_at','created_at','brand_id'],
       get: () => emailBlast.history, set: (r) => { emailBlast.history = r; } },
     drafts_wa:    { table: 'blast_drafts', channel: 'wa', order: 'created_at',
       cols: ['id','channel','subject','body','blocks','files','recipients','audience_id','send_mode','scheduled_at','created_at','brand_id'],
@@ -7603,6 +7603,18 @@
       '<div class="card" style="padding:14px;margin-bottom:12px">' +
         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);font-weight:600;margin-bottom:4px">' + (isEmail ? 'Subject' : 'Message') + '</div>' +
         '<div style="font-size:14px;font-weight:600;color:var(--fg);margin-bottom:10px">' + escapeHTML(isEmail ? (plainSnippet(titleField) || '(empty)') : (titleField || '(empty)')) + '</div>' +
+        ((h.cc && h.cc.length) || (h.bcc && h.bcc.length)
+          ? '<div style="margin:0 0 10px">'
+            + (h.cc && h.cc.length
+                ? '<details style="margin-bottom:4px"><summary style="font-size:11px;color:#4338ca;cursor:pointer">📋 Cc (' + h.cc.length + ') — klik buat lihat</summary>'
+                  + '<div style="font-size:11.5px;color:#475569;margin-top:4px;word-break:break-all;line-height:1.6">' + h.cc.map(escapeHTML).join(', ') + '</div></details>'
+                : '')
+            + (h.bcc && h.bcc.length
+                ? '<details style="margin-bottom:4px"><summary style="font-size:11px;color:#64748b;cursor:pointer">🙈 Bcc (' + h.bcc.length + ') — klik buat lihat</summary>'
+                  + '<div style="font-size:11.5px;color:#475569;margin-top:4px;word-break:break-all;line-height:1.6">' + h.bcc.map(escapeHTML).join(', ') + '</div></details>'
+                : '')
+          + '</div>'
+          : '') +
         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);font-weight:600;margin-bottom:4px">Body</div>' +
         (isEmail
           // Email body = HTML blocks (gambar/button/divider) — render, jangan escape.
@@ -7614,7 +7626,9 @@
           : '<div style="font-size:13px;color:var(--fg);white-space:pre-wrap;background:#f9fafb;padding:10px;border-radius:6px;max-height:300px;overflow-y:auto">' + escapeHTML(bodyField || '(empty)') + '</div>') +
       '</div>' +
       '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:14px">' +
-        '<span>👥 ' + (h.recipients?.length || 0) + ' recipient' + ((h.recipients?.length||0)===1?'':'s') + '</span>' +
+        '<span>👥 ' + (h.recipients?.length || 0) + ' recipient' + ((h.recipients?.length||0)===1?'':'s') + '</span>'
+        + ((h.cc && h.cc.length) ? '<span>📋 Cc: ' + h.cc.length + '</span>' : '')
+        + ((h.bcc && h.bcc.length) ? '<span>🙈 Bcc: ' + h.bcc.length + '</span>' : '') +
         '<span>📎 ' + (h.attachments?.length || 0) + ' attachment' + ((h.attachments?.length||0)===1?'':'s') + '</span>' +
         (h.audienceName ? '<span>👤 ' + escapeHTML(h.audienceName) + '</span>' : '') +
       '</div>' +
@@ -8049,6 +8063,12 @@
           return '<option value="' + p.k + '"' + (sel === p.k ? ' selected' : '') + '>' + p.label + '</option>';
         }).join('')
       + '<option value="custom">✎ Manual (URL icon sendiri)</option>';
+  }
+
+  /* Pecah daftar email (comma-separated) jadi array, buang yang invalid. */
+  function splitEmails(v) {
+    return String(v || '').split(',').map(function (x) { return x.trim(); })
+      .filter(function (x) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x); });
   }
 
   /* ====================================================
@@ -10863,7 +10883,7 @@
         : compose.message.trim();
       if (!hasContent) { toast('Nothing to save'); return; }
       const draft = channel === 'email'
-        ? { id:uid('D'), subject:compose.subject, body:compose.body, recipients:compose.recipients, blocks:compose.blocks||[], files:compose.files||[], sendMode:compose.sendMode, scheduled_at:compose.scheduled_at || null, created_at:new Date().toISOString() }
+        ? { id:uid('D'), subject:compose.subject, body:compose.body, recipients:compose.recipients, cc: splitEmails(compose.cc), bcc: splitEmails(compose.bcc), blocks:compose.blocks||[], files:compose.files||[], sendMode:compose.sendMode, scheduled_at:compose.scheduled_at || null, created_at:new Date().toISOString() }
         : { id:uid('D'), message:compose.message, media:compose.media, recipients:compose.recipients, sendMode:compose.sendMode, scheduled_at:compose.scheduled_at || null, created_at:new Date().toISOString() };
       blastState.drafts = [draft, ...blastState.drafts];
       saveBlast(storageKey, state);
