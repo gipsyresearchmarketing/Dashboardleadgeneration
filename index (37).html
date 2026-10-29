@@ -8106,6 +8106,14 @@
       + '<option value="custom">✎ Manual (URL icon sendiri)</option>';
   }
 
+  /* DEBUG (?dbg=1): catat siapa yang nulis Cc/Bcc + stack-nya. */
+  function ccTrace(kind, val) {
+    try {
+      if (!/(^|[?&])dbg=1/.test(location.search)) return;
+      console.log('[cc/bcc write]', kind, '=', val, '\n' + new Error().stack);
+    } catch (e) {}
+  }
+
   /* Pecah daftar email (comma-separated) jadi array, buang yang invalid. */
   function splitEmails(v) {
     return String(v || '').split(',').map(function (x) { return x.trim(); })
@@ -9911,6 +9919,7 @@
           pendEl.value = '';
         }
         const merged = Array.from(new Set(cur.concat(emails)));
+        ccTrace(which + ' (audience)', merged.join(', '));
         blastState.compose[which] = merged.join(', ');
         if (which === 'cc') blastState.compose.showCc = true;
         else blastState.compose.showBcc = true;
@@ -9924,7 +9933,7 @@
     });
     /* Input Cc/Bcc polos (shell lama) — tetap sinkron ke compose. */
     document.querySelectorAll('[data-ech-cc]').forEach(el => {
-      el.addEventListener('input', () => { blastState.compose.cc = el.value; });
+      el.addEventListener('input', () => { ccTrace('cc (input polos)', el.value); blastState.compose.cc = el.value; });
     });
     document.querySelectorAll('[data-ech-bcc]').forEach(el => {
       el.addEventListener('input', () => { blastState.compose.bcc = el.value; });
@@ -9943,7 +9952,7 @@
       var curList = function () {
         return String(blastState.compose[kind] || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
       };
-      var saveList = function (list) { blastState.compose[kind] = list.join(', '); };
+      var saveList = function (list) { ccTrace(kind, list.join(', ')); blastState.compose[kind] = list.join(', '); };
       addEl.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ',') {
           e.preventDefault();
