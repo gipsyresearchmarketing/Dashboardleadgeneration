@@ -3476,7 +3476,7 @@
             ${lead ? `<span class="text-xs text-gray-400">•</span>
               <button class="text-xs text-indigo-600 hover:underline" data-jump-lead="${lead.id}">${escapeHTML(lead.name)}</button>` : ''}
           </div>
-          ${a.notes ? `<div class="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1.5">${escapeHTML(a.notes)}</div>` : ''}
+          ${a.notes ? `<div class="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1.5">${escapeHTML(notesText(a.notes))}</div>` : ''}
         </div>
       `;
     }).join('')}</div>`;
@@ -4186,7 +4186,7 @@
                     <div class="text-xs text-gray-400 flex-shrink-0">${relativeTime(a.created_at)}</div>
                   </div>
                   <div class="text-xs text-gray-500 mb-1">${meta.label}</div>
-                  ${a.notes ? `<div class="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1.5">${escapeHTML(a.notes)}</div>` : ''}
+                  ${a.notes ? `<div class="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1.5">${escapeHTML(notesText(a.notes))}</div>` : ''}
                 </div>
               `;
             }).join('')}
@@ -5034,6 +5034,17 @@
 
   /* Profile view: info akun, ganti brand, sign out */
   function escHtml(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  /* Catatan activity bisa berisi HTML mentah (dari email lama) -> convert ke teks polos biar rapi. */
+  function notesText(n) {
+    var t = String(n == null ? '' : n);
+    if (!t) return '';
+    if (/<[a-z][\s>]/i.test(t)) {
+      var d = document.createElement('div');
+      d.innerHTML = t;
+      t = (d.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+    return t;
+  }
   /* ---------- Pengaturan pengirim (email & WhatsApp) per brand ---------- */
   async function brandApi(action, extra) {
     if (!window.currentBrand || !window.sb) throw new Error('Belum login / brand belum ke-load');
@@ -8580,7 +8591,8 @@
           lead_id: r.lead_id,
           type: channel, // 'email' or 'whatsapp'
           title: (channel === 'email' ? 'Email Blast: ' : 'WA Blast: ') + (compose.subject || compose.message || '').slice(0, 60),
-          notes: compose.body || compose.message || '',
+          // Ringkas jadi teks polos — jangan simpan HTML mentah (bikin Activity Log unusable)
+          notes: (channel === 'email' ? plainSnippet(compose.body || '') : (compose.message || '')).slice(0, 1200),
           created_at: sentAt,
         });
       });
