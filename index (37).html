@@ -7115,7 +7115,7 @@
                 '</span>';
               }).join('') +
               // Free-text input for adding more recipients (type then comma/enter)
-              '<input type="text" class="ech-input-inline" data-ech-add placeholder="' + (recipientCount === 0 ? 'recipient@email.com' : '+ add more') + '" />' +
+              '<input type="text" class="ech-input-inline" data-ech-add autocomplete="off" placeholder="' + (recipientCount === 0 ? 'recipient@email.com' : '+ add more') + '" />' +
             '</div>' +
             '<span class="ech-cc">' +
               '<button type="button" data-ech-toggle="cc" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">Cc</button>' +
@@ -8358,7 +8358,7 @@
     const msg = 'Kirim WhatsApp (' + (cfg.mode === 'template' ? 'template "' + cfg.template + '"' : 'teks bebas') + ') ke ' + targets.length + ' nomor?' +
       (skipped.length ? '\n\n' + skipped.length + ' kontak dilewati karena nomor tidak valid.' : '') +
       '\n\nPesan WhatsApp tidak bisa ditarik, dan pesan template dikenai biaya per pesan oleh Meta.';
-    if (!confirm(msg)) return null;
+    if (!confirm(msg)) { toast('Batal — isi WhatsApp tidak berubah'); return null; }
     showBlastOverlay('sending', 'Mengirim WhatsApp ke ' + targets.length + ' nomor…', 'Jangan klik Send lagi dan jangan tutup halaman ini sampai selesai.');
     const okIds = {}, failed = [];
     for (let i = 0; i < targets.length; i += 50) {
@@ -8432,7 +8432,7 @@
       + (extraRecip.length ? '\n\nTotal ' + totalRecip + ' penerima dalam 1 pesan. Cc keliatan oleh semua penerima, Bcc gak keliatan sama sekali.' : '')
       + (skipped.length ? '\n\n' + skipped.length + ' lead dilewati karena email kosong/tidak valid.' : '')
       + '\n\nEmail yang sudah terkirim tidak bisa ditarik kembali.';
-    if (!confirm(msg)) return null;
+    if (!confirm(msg)) { toast('Batal — isi email tidak berubah'); return null; }
     showBlastOverlay('sending', 'Mengirim email ke ' + targets.length + ' penerima…', 'Jangan klik Send lagi dan jangan tutup halaman ini sampai selesai.');
 
     let token = null;
