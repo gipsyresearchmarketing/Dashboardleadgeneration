@@ -2955,6 +2955,7 @@
       bcc: '',
       showCc: false,
       showBcc: false,
+      toDraft: '', ccDraft: '', bccDraft: '',
       blocks: [],        // Component blocks (image/button/divider/spacer) — shape {id, type, data}
       files: [],        // File attachment chips — shape {name}
       sendMode: 'now',
@@ -6973,7 +6974,7 @@
       + '<span class="ech-label">' + label + (list.length ? ' <span data-ech-' + kind + '-count style="font-weight:400;color:var(--muted)">(' + list.length + ')</span>' : '') + '</span>'
       + '<div class="ech-to-input" data-ech-ccbox="' + kind + '" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center">'
       +   chips
-      +   '<input type="text" class="ech-input-inline" data-ech-' + kind + '-add placeholder="' + ph + '" style="border:none;outline:none;flex:1;min-width:130px;padding:3px 4px;font-size:13px" autocomplete="off" />'
+      +   '<input type="text" class="ech-input-inline" data-ech-' + kind + '-add placeholder="' + ph + '" style="border:none;outline:none;flex:1;min-width:130px;padding:3px 4px;font-size:13px" autocomplete="off" value="' + escapeHTML(compose[kind + 'Draft'] || '') + '" />'
       + '</div>'
       + audSelectHtml(kind, 'email')
       + warn
@@ -7115,7 +7116,7 @@
                 '</span>';
               }).join('') +
               // Free-text input for adding more recipients (type then comma/enter)
-              '<input type="text" class="ech-input-inline" data-ech-add autocomplete="off" placeholder="' + (recipientCount === 0 ? 'recipient@email.com' : '+ add more') + '" />' +
+              '<input type="text" class="ech-input-inline" data-ech-add autocomplete="off" placeholder="' + (recipientCount === 0 ? 'recipient@email.com' : '+ add more') + '" value="' + escapeHTML(compose.toDraft || '') + '" />' +
             '</div>' +
             '<span class="ech-cc">' +
               '<button type="button" data-ech-toggle="cc" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px">Cc</button>' +
@@ -8650,7 +8651,7 @@
 
     // Reset compose
     if (channel === 'email') {
-      emailBlast.compose = { subject:'', body:'', recipients:[], blocks:[], files:[], sendMode:'now', scheduled_at:'', cc:'', bcc:'', showCc:false, showBcc:false };
+      emailBlast.compose = { subject:'', body:'', recipients:[], blocks:[], files:[], sendMode:'now', scheduled_at:'', cc:'', bcc:'', toDraft:'', ccDraft:'', bccDraft:'', showCc:false, showBcc:false };
     } else {
       waBlast.compose = { message:'', media:[], recipients:[], sendMode:'now', scheduled_at:'' };
     }
@@ -9842,6 +9843,8 @@
     // ===== Email card: free-text add recipient (type then comma/enter to commit) =====
     const addInput = document.querySelector('[data-ech-add]');
     if (addInput) {
+      // Simpan text yg belum di-Enter -> hilang kalo canvas di-render ulang (mis. pas klik Cc/Bcc)
+      addInput.addEventListener('input', () => { blastState.compose.toDraft = addInput.value; });
       addInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ',') {
           e.preventDefault();
@@ -9874,6 +9877,7 @@
             blastState.compose.recipients.push({ lead_id: lead.id });
           }
           addInput.value = '';
+          blastState.compose.toDraft = '';
           if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
           // Re-focus the input after re-render
           setTimeout(() => {
@@ -9917,6 +9921,7 @@
             if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em) && cur.indexOf(em) < 0) cur.push(em);
           });
           pendEl.value = '';
+          blastState.compose[which + 'Draft'] = '';
         }
         const merged = Array.from(new Set(cur.concat(emails)));
         ccTrace(which + ' (audience)', merged.join(', '));
@@ -9953,6 +9958,8 @@
         return String(blastState.compose[kind] || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
       };
       var saveList = function (list) { ccTrace(kind, list.join(', ')); blastState.compose[kind] = list.join(', '); };
+      // Simpan text yg belum di-Enter -> pulihkan kalo canvas di-render ulang
+      addEl.addEventListener('input', function () { blastState.compose[kind + 'Draft'] = addEl.value; });
       addEl.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ',') {
           e.preventDefault();
@@ -9965,6 +9972,7 @@
             list.push(em); added.push(em);
           });
           addEl.value = '';
+          blastState.compose[kind + 'Draft'] = '';
           if (!added.length) return;
           saveList(list);
           added.forEach(function (em) { insertCcChip(box, addEl, em, kind); });
@@ -10975,7 +10983,7 @@
       if (!draft) return;
       if (channel === 'email') {
         const draftBody = normalizeDraftBody(draft.body || '');
-        emailBlast.compose = { subject:plainSnippet(draft.subject), body:draftBody, recipients:normalizeRecipients(draft.recipients), cc:draft.cc||'', bcc:draft.bcc||'', showCc:!!draft.cc, showBcc:!!draft.bcc, blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        emailBlast.compose = { subject:plainSnippet(draft.subject), body:draftBody, recipients:normalizeRecipients(draft.recipients), cc:toEmailList(draft.cc).join(', '), bcc:toEmailList(draft.bcc).join(', '), showCc:toEmailList(draft.cc).length>0, showBcc:toEmailList(draft.bcc).length>0, toDraft:'', ccDraft:'', bccDraft:'', blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       } else {
         waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:normalizeRecipients(draft.recipients), sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
       }
