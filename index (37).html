@@ -2456,9 +2456,19 @@
         const changed = payload.filter(function (r) { return sent[r.id] !== JSON.stringify(r); });
         for (let i = 0; i < changed.length; i += 200) {
           const chunk = changed.slice(i, i + 200);
-          const u = await window.sb.from(spec.table).upsert(chunk);
-          if (u.error) throw u.error;
-          chunk.forEach(function (r) { sent[r.id] = JSON.stringify(r); });
+          let u = await window.sb.from(spec.table).upsert(chunk);
+          if (u.error && /column .*(cc|bcc).* does not exist/i.test(String(u.error.message || ''))) {
+            // Kolom cc/bcc belum ada di tabel (SQL belum dijalankan) -> coba lagi tanpa kolom itu,
+            // supaya data lain tetap kesimpan. Jangan sampai 1 kolom hilang gateways SELURUH riwayat.
+            const slim = chunk.map(function (r) { const o = Object.assign({}, r); delete o.cc; delete o.bcc; return o; });
+            u = await window.sb.from(spec.table).upsert(slim);
+            if (u.error) throw u.error;
+            chunk.forEach(function (r) { const o = Object.assign({}, r); delete o.cc; delete o.bcc; sent[r.id] = JSON.stringify(o); });
+            console.warn('Kolom cc/bcc belum ada di ' + spec.table + ' — data disimpan tanpa Cc/Bcc. Jalankan supabase/blast-cc-bcc.sql');
+          } else {
+            if (u.error) throw u.error;
+            chunk.forEach(function (r) { sent[r.id] = JSON.stringify(r); });
+          }
         }
         if (changed.length) {
           const probe = changed.slice(0, 50).map(function (r) { return r.id; });
@@ -7339,6 +7349,26 @@
         iIn.value = pImg.getAttribute('alt');
         iIn.setAttribute('value', iIn.value);
       }
+      // Draft lama belum punya field "Link gambar" -> tambahkan sekarang (biar gambar bisa di-link).
+      if (type === 'image' && !blockEl.querySelector('[data-eb-input="href"]')) {
+        const c0 = blockEl.querySelector('.eb-controls');
+        if (c0) {
+          const hIn = document.createElement('input');
+          hIn.setAttribute('data-eb-input', 'href');
+          hIn.setAttribute('style', 'width:100%;margin-top:4px;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px');
+          hIn.setAttribute('placeholder', 'Link gambar (opsional) — mis. https://promo.gipsyresearch.id');
+          const ia = blockEl.querySelector('a[href]');
+          if (ia && ia.getAttribute('href')) { hIn.value = ia.getAttribute('href'); hIn.setAttribute('value', hIn.value); }
+          c0.appendChild(hIn);
+          // Bind listener langsung (input yg baru di-inject mungkin lolos binding bulk)
+          hIn.addEventListener('input', function () {
+            const blk = hIn.closest('.email-block');
+            if (!blk) return;
+            try { if (typeof window.syncBlockPreview === 'function') window.syncBlockPreview(blk); } catch (e) {}
+            try { if (typeof window.syncBody === 'function') window.syncBody(); } catch (e) {}
+          });
+        }
+      }
       return;
     }
 
@@ -8470,7 +8500,16 @@
       + '<div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px">' + title + '</div>'
       + '<div style="font-size:13px;color:#64748b;line-height:1.5">' + sub + '</div></div>';
     ov.onclick = state === 'done' ? hideBlastOverlay : null;
-    if (state === 'done') { clearTimeout(window.__blastOvTimer); window.__blastOvTimer = setTimeout(hideBlastOverlay, 2600); }
+    clearTimeout(window.__blastOvTimer);
+    if (state === 'done') {
+      window.__blastOvTimer = setTimeout(hideBlastOverlay, 2600);
+    } else {
+      // Safety net: kalau prosesnya nge-hang, overlay gak boleh nyangkut selamanya.
+      window.__blastOvTimer = setTimeout(function () {
+        var cur = document.getElementById('blast-overlay');
+        if (cur && cur.dataset.state === 'sending') hideBlastOverlay();
+      }, 120000);
+    }
   }
   function hideBlastOverlay() {
     clearTimeout(window.__blastOvTimer);
@@ -8615,9 +8654,16 @@
     if (sendSummary) {
       const nFail = sendSummary.failed.length;
       const chLabel = channel === 'email' ? 'Email' : 'WhatsApp';
-      toast((channel === 'email' ? '✉ ' : '💬 ') + chLabel + ' terkirim ke ' + sentRecipients.length + ' penerima' + (nFail ? ' · ' + nFail + ' gagal' : ''));
+      var ccN = (compose.cc || '').split(',').filter(function (x) { return x.trim(); }).length;
+      var bccN = (compose.bcc || '').split(',').filter(function (x) { return x.trim(); }).length;
+      var extraN = (channel === 'email') ? (ccN + bccN) : 0;
+      var totalN = sentRecipients.length + extraN;
+      var detailTxt = 'Terkirim ke ' + totalN + ' penerima'
+        + (extraN ? ' (' + sentRecipients.length + ' To' + (ccN ? ' + ' + ccN + ' Cc' : '') + (bccN ? ' + ' + bccN + ' Bcc' : '') + ')' : '')
+        + '. Lihat di tab ' + (channel === 'email' ? 'Sent' : 'History') + '.';
+      toast((channel === 'email' ? '✉ ' : '💬 ') + chLabel + ' terkirim ke ' + totalN + ' penerima' + (nFail ? ' · ' + nFail + ' gagal' : ''));
       if (nFail) hideBlastOverlay();
-      else showBlastOverlay('done', chLabel + ' terkirim!', 'Terkirim ke ' + sentRecipients.length + ' penerima. Lihat di tab ' + (channel === 'email' ? 'Sent' : 'History') + '.');
+      else showBlastOverlay('done', chLabel + ' terkirim!', detailTxt);
       if (nFail) alert('Sebagian ' + (channel === 'email' ? 'email' : 'WhatsApp') + ' gagal terkirim (' + nFail + '):\n\n' + sendSummary.failed.slice(0, 8).map(f => '• ' + f.email + ' — ' + f.error).join('\n') + (nFail > 8 ? '\n…dan ' + (nFail - 8) + ' lainnya' : ''));
     } else {
       toast(isScheduled ? `⏰ ${channel==='email'?'Email':'WA'} Blast dijadwalkan (belum ada pengirim otomatis — belum akan terkirim sendiri)` : `✉ ${channel==='email'?'Email':'WA'} Blast sent ke ${compose.recipients.length} recipient`);
@@ -9770,6 +9816,7 @@
     window.setupImageButtonLiveEditors = setupImageButtonLiveEditors;
     window.syncBody = syncBody;   // dipanggil dari save & kirim supaya body selalu sinkron
     window.syncBlockPreview = syncBlockPreview;
+    window.syncBlockPreview = syncBlockPreview;
     window.attachBlockControls = attachBlockControls;
     const blastState = channel === 'email' ? emailBlast : waBlast;
     const storageKey = channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA;
@@ -9855,6 +9902,14 @@
           .filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))));
         if (!emails.length) { toast('Audience "' + a.name + '" tidak punya email yang valid'); return; }
         const cur = String(blastState.compose[which] || '').split(',').map(s => s.trim()).filter(Boolean);
+        // Commit email yg diketik tapi BELUM di-Enter (user langsung pilih audience) -> jangan hilang.
+        const pendEl = document.querySelector('[data-ech-' + which + '-add]');
+        if (pendEl && pendEl.value.trim()) {
+          pendEl.value.split(/[,;\s]+/).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (em) {
+            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em) && cur.indexOf(em) < 0) cur.push(em);
+          });
+          pendEl.value = '';
+        }
         const merged = Array.from(new Set(cur.concat(emails)));
         blastState.compose[which] = merged.join(', ');
         if (which === 'cc') blastState.compose.showCc = true;
