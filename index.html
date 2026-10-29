@@ -8442,7 +8442,8 @@
       + (skipped.length ? '\n\n' + skipped.length + ' lead dilewati karena email kosong/tidak valid.' : '')
       + '\n\nEmail yang sudah terkirim tidak bisa ditarik kembali.';
     if (!confirm(msg)) { toast('Batal — isi email tidak berubah'); return null; }
-    showBlastOverlay('sending', 'Mengirim email ke ' + targets.length + ' penerima…', 'Jangan klik Send lagi dan jangan tutup halaman ini sampai selesai.');
+    var totalRcpt = targets.length + String(compose.cc || '').split(',').filter(function (x) { return x.trim(); }).length + String(compose.bcc || '').split(',').filter(function (x) { return x.trim(); }).length;
+    showBlastOverlay('sending', 'Mengirim email ke ' + totalRcpt + ' penerima…', 'Kalau penerimanya banyak, prosesnya bisa 1-2 menit. Jangan tutup halaman ini.');
 
     let token = null;
     try { const ss = await window.sb.auth.getSession(); token = ss && ss.data && ss.data.session && ss.data.session.access_token; } catch (e) {}
@@ -8501,6 +8502,7 @@
       document.body.appendChild(ov);
     }
     ov.dataset.state = state;
+    if (state === 'sending') ov.dataset.startedAt = String(Date.now());
     const icon = state === 'sending'
       ? '<div style="width:38px;height:38px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:blastspin .8s linear infinite;margin:0 auto 14px"></div>'
       : '<div style="font-size:40px;line-height:1;margin-bottom:10px">✅</div>';
@@ -8525,6 +8527,16 @@
     const ov = document.getElementById('blast-overlay');
     if (ov) ov.remove();
   }
+  /* Sweeper: overlay 'sending' yg nyangkut (mis. fetch-nya gak pernah selesai) harus dibuang,
+     kalau tidak canvas jadi gak bisa diklik. */
+  try {
+    setInterval(function () {
+      const ov = document.getElementById('blast-overlay');
+      if (!ov || ov.dataset.state !== 'sending') return;
+      if (!ov.dataset.startedAt) { ov.dataset.startedAt = String(Date.now()); return; }
+      if (Date.now() - Number(ov.dataset.startedAt) > 90000) hideBlastOverlay();
+    }, 5000);
+  } catch (e) {}
 
   /** Wrapper: cuma satu proses kirim yang boleh jalan sekaligus. */
   async function sendBlast(channel) {
@@ -8647,7 +8659,7 @@
       appPrependActivities(newActivities);
     }
 
-    saveBlast(channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA, state);
+    try { saveBlast(channel === 'email' ? STORAGE_KEY_BLAST_EMAIL : STORAGE_KEY_BLAST_WA, state); } catch (e) { console.warn('saveBlast gagal', e); }
 
     // Reset compose
     if (channel === 'email') {
@@ -8657,9 +8669,11 @@
     }
 
     state.activeTab = 'history';
-    if (channel === 'email') renderEmailBlastView();
-    else renderWaBlastView();
-    renderAll();
+    try {
+      if (channel === 'email') renderEmailBlastView();
+      else renderWaBlastView();
+      renderAll();
+    } catch (e) { console.warn('render setelah kirim gagal', e); }
     if (sendSummary) {
       const nFail = sendSummary.failed.length;
       const chLabel = channel === 'email' ? 'Email' : 'WhatsApp';
