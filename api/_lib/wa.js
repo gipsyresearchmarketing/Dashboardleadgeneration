@@ -88,9 +88,8 @@ async function sendOne(ctx, r) {
   if (!to) return { lead_id: r && r.lead_id, phone: String((r && r.phone) || ''), ok: false, error: 'Nomor tidak valid' };
   const payload = buildPayload(ctx, r || {}, to);
   try {
-    const url = ctx.waba
-      ? `https://graph.facebook.com/${ctx.version}/${ctx.waba}/phone_numbers/${ctx.phoneId}/messages`
-      : `https://graph.facebook.com/${ctx.version}/${ctx.phoneId}/messages`;
+    // Endpoint kirim Cloud API selalu /{phone-number-id}/messages (WABA ID tidak dipakai di URL ini)
+    const url = `https://graph.facebook.com/${ctx.version}/${encodeURIComponent(ctx.phoneId)}/messages`;
     const resp = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${ctx.token}`, 'Content-Type': 'application/json' },
