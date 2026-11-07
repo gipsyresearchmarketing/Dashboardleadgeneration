@@ -7461,7 +7461,10 @@
       const block = document.createElement('div');
       block.className = 'email-block';
       block.setAttribute('data-block', isImg ? 'image' : 'button');
-      block.setAttribute('contenteditable', 'false');
+      // Hanya blok MEDIA yg contenteditable=false. Kalau blok teks ikut di-set false,
+      // user gak bisa klik buat edit teksnya (terdasa "klik stuck").
+      const isMedia = !!(node.querySelector && node.querySelector('.eb-image-preview, .eb-btn-wrap, .eb-button-preview, img'));
+      if (isMedia) block.setAttribute('contenteditable', 'false');
       block.setAttribute('style', isImg
         ? 'text-align:center;cursor:default;padding:8px 0'
         : 'text-align:center;padding:8px 0');
@@ -7482,6 +7485,26 @@
     });
   }
 
+
+  /* Buang header/footer yg sudah tersimpan di body draft — biar gak dobel
+     dengan header/footer config brand yg sekarang. */
+  function stripSavedHeaderFooter(html) {
+    if (!html) return html;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = String(html);
+    var removed = tmp.querySelectorAll('[data-hf="header"], [data-hf="footer"]');
+    for (var i = 0; i < removed.length; i++) removed[i].remove();
+    // Header/footer versi lama (sebelum ada penanda data-hf) -> cari lewat signature-nya
+    var old = tmp.querySelectorAll('table[style*="border-bottom:1px solid #e2e8f0"], div[style*="border-top:1px solid #e2e8f0"]');
+    for (var j = 0; j < old.length; j++) {
+      var t = old[j].textContent || '';
+      var st = old[j].getAttribute('style') || '';
+      // Hanya buang kalau isinya kelihatan kayak header/footer (bukan paragraf biasa)
+      if (/border-bottom:1px solid #e2e8f0/.test(st) && t.length < 400) old[j].remove();
+      else if (/border-top:1px solid #e2e8f0/.test(st) && t.length < 400) old[j].remove();
+    }
+    return tmp.innerHTML;
+  }
 
   /* Body draft korup bisa berisi gambar yang sama 2x: satu dari blok bener,
      satu lagi dari HTML ter-escape yang di-decode. Sisakan yang pertama. */
@@ -7577,7 +7600,7 @@
         // Body draft = canvas sungguhan: blok gambar/button bisa diedit (Upload, ganti URL, resize).
         ? '<div class="email-card-body draft-edit-body" data-draft-body="' + draft.id + '" contenteditable="true" ' +
             'style="border:1px solid var(--border);border-radius:8px;background:#fff;padding:14px;min-height:90px" ' +
-            'data-placeholder="Tulis pesan...">' + buildEmailHeaderHtml(emailHeaderCfg) + (normalizeDraftBody(message) || '<em style="color:#9ca3af">(empty message)</em>') + buildEmailFooterHtml(emailHeaderCfg) + '</div>' +
+            'data-placeholder="Tulis pesan...">' + buildEmailHeaderHtml(emailHeaderCfg) + (stripSavedHeaderFooter(normalizeDraftBody(message)) || '<em style="color:#9ca3af">(empty message)</em>') + buildEmailFooterHtml(emailHeaderCfg) + '</div>' +
           '<div style="font-size:11px;color:var(--muted);margin-top:6px">💡 Hover blok gambar untuk Upload / ganti URL / ubah lebar. Klik <b>💾 Save Changes</b> untuk menyimpan.</div>'
         : '<textarea data-draft-input="message" data-draft-id="' + draft.id + '" class="input" rows="10" placeholder="Tulis pesan...">' + escapeHTML(message) + '</textarea>') +
       (attachments.length > 0 ? '<div style="margin-top:14px;padding:10px;background:#f5f3ff;border-radius:6px;font-size:12px;color:#4338ca"><strong>' + attachments.length + '</strong> attachment' + (attachments.length === 1 ? '' : 's') + ' (image/button/divider) akan ikut terkirim</div>' : '') +
@@ -8196,8 +8219,8 @@
     if (name || tagline) {
       rows += '<tr><td style="text-align:center">' + nameHtml + tagHtml + '</td></tr>';
     }
-    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:1px solid #e2e8f0;padding-bottom:16px;margin-bottom:24px">'
-      + rows + '</table>';
+    return '<div data-hf="header"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:1px solid #e2e8f0;padding-bottom:16px;margin-bottom:24px">'
+      + rows + '</table></div>';
   }
 
   /* Bangun HTML footer (link sosmed + teks). */
@@ -8231,7 +8254,7 @@
       ? '<div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:12px;color:#94a3b8;line-height:1.5;text-align:center">' + escapeHTML(text) + '</div>'
       : '';
     if (!rows && !textRow) return '';
-    return '<div style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:28px;text-align:center">' + rows + textRow + '</div>';
+    return '<div data-hf="footer" style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:28px;text-align:center">' + rows + textRow + '</div>';
   }
 
   function buildEmailHtml(compose) {
