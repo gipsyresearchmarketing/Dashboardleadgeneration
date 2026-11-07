@@ -1636,8 +1636,8 @@
      * WHATSAPP (gaya WhatsApp Web): inbox, balas, broadcast, riwayat
      * ================================================================= */
     #view-wa-blast { max-width: none; padding: 16px 20px; }
-    .wa-shell { display:grid; grid-template-columns:340px 1fr; height:calc(100vh - 110px); min-height:520px; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface); }
-    .wa-list { border-right:1px solid var(--border); display:flex; flex-direction:column; min-width:0; }
+    .wa-shell { display:grid; grid-template-columns:340px 1fr; grid-template-rows:minmax(0,1fr); height:calc(100vh - 110px); min-height:520px; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface); }
+    .wa-list { border-right:1px solid var(--border); display:flex; flex-direction:column; min-width:0; min-height:0; }
     .wa-topbar { background:#f0f2f5; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); gap:8px; }
     .wa-topbar .wa-me { display:flex; align-items:center; gap:10px; min-width:0; }
     .wa-topbar .wa-me b { font-size:13.5px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
