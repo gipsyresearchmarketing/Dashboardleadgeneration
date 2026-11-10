@@ -3858,6 +3858,20 @@
                 : '<span class="badge ' + (STATUS_META[lead.status] ? STATUS_META[lead.status].badge : 'badge-gray') + '">' + escapeHTML(lead.status) + '</span>'}
               <span class="text-xs text-gray-500">${formatIDR(lead.sales_value)}</span>
             </div>
+            ${(() => {
+              const fu = wsFollowUpCounts(lead.id);
+              const badges = [];
+              if (fu.email) badges.push('<span title="Follow up via email" style="font-size:10px;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:1px 5px">✉ ' + fu.email + '</span>');
+              if (fu.whatsapp) badges.push('<span title="Follow up via WhatsApp" style="font-size:10px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:1px 5px">💬 ' + fu.whatsapp + '</span>');
+              if (fu.call) badges.push('<span title="Follow up via call" style="font-size:10px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:1px 5px">☎ ' + fu.call + '</span>');
+              if (!badges.length) return '';
+              return '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">' + badges.join('') + '</div>';
+            })()}
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+              <button type="button" class="btn btn-outline" data-follow-up="whatsapp" data-lead-id="${escapeHTML(lead.id)}" style="font-size:11.5px;padding:5px 10px;color:#16a34a;border-color:#bbf7d0;background:#f0fdf4">💬 Tandai Follow Up WA</button>
+              <button type="button" class="btn btn-outline" data-follow-up="email" data-lead-id="${escapeHTML(lead.id)}" style="font-size:11.5px;padding:5px 10px;color:#2563eb;border-color:#bfdbfe;background:#eff6ff">✉️ Tandai Follow Up Email</button>
+              <button type="button" class="btn btn-outline" data-follow-up="call" data-lead-id="${escapeHTML(lead.id)}" style="font-size:11.5px;padding:5px 10px;color:#b45309;border-color:#fde68a;background:#fffbeb">☎ Tandai Follow Up Telpon</button>
+            </div>
           </div>
         </header>
 
@@ -4445,6 +4459,17 @@
           renderAll();
           updateSidebarCounts();
           toast('🗑 ' + lead.name + ' deleted');
+          return;
+        }
+        // Tandai Follow Up (WA / Email / Telpon) dari rincian kontak.
+        // -> buat activity follow-up + geser status -> kanban ikut ke-update.
+        const fuBtn = e.target.closest('[data-follow-up]');
+        if (fuBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const kind = fuBtn.getAttribute('data-follow-up');
+          const leadId = fuBtn.getAttribute('data-lead-id');
+          applyFollowUp(leadId, kind);
           return;
         }
         // Close (X) button — top-right of header
@@ -5971,6 +5996,46 @@
       call: acts.filter(function (a) { return a.type === 'call'; }).length,
       total: acts.length,
     };
+  }
+
+  /* Tandai follow-up dari rincian kontak.
+     - buat activity follow-up (type: whatsapp / email / call)
+     - geser status ke stage yang sesuai
+     - kanban + badge ikut ke-update
+     Riwayat follow-up tetap ada walau contact-nya lalu pindah ke stage lain. */
+  var FOLLOW_UP_META = {
+    whatsapp: { type: 'whatsapp', status: 'Followed Up (WhatsApp)', label: 'WhatsApp' },
+    email:    { type: 'email',    status: 'Followed Up (Email)',    label: 'Email' },
+    call:     { type: 'call',     status: 'Followed Up (WhatsApp)', label: 'Telpon' },
+  };
+  function applyFollowUp(leadId, kind) {
+    var m = FOLLOW_UP_META[kind];
+    if (!m || !leadId) return;
+    var lead = state.leads.find(function (l) { return l.id === leadId; });
+    if (!lead) return;
+    var now = new Date().toISOString();
+    var prevStatus = lead.status;
+    // 1) Catat activity follow-up (riwayat: WA + Email + ... tetap keliatan)
+    try {
+      appPrependActivities([{
+        id: generateActivityId(),
+        lead_id: leadId,
+        type: m.type,
+        title: 'Follow up via ' + m.label,
+        notes: 'Dicatat manual dari rincian kontak',
+        created_at: now,
+      }]);
+    } catch (e) { /* history bukan hal kritis */ }
+    // 2) Geser status -> kanban ikut ke-update
+    state.leads = state.leads.map(function (l) {
+      return l.id === leadId ? { ...l, status: m.status, last_contacted_at: now } : l;
+    });
+    saveLeads(state.leads);
+    // 3) Refresh semua tampilan
+    wsRenderAll && wsRenderAll();
+    renderAll && renderAll();
+    toast((kind === 'whatsapp' ? '💬' : kind === 'email' ? '✉️' : '☎') + ' Follow up via ' + m.label + ' dicatat' +
+      (prevStatus !== m.status ? ' · status → ' + m.status : ''));
   }
 
   function wsCompanyCardEl(lead) {
