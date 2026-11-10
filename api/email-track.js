@@ -97,7 +97,7 @@ module.exports = async (req, res) => {
     if (!body || typeof body !== 'object') return res.status(400).json({ error: 'Body tidak valid' });
     if (String(body.action || '') !== 'stats') return res.status(400).json({ error: 'Action tidak dikenal' });
 
-    const a = authBrand(req, body.brand_id);
+    const a = await authBrand(req, body.brand_id);
     if (a.error) return res.status(a.status).json({ error: a.error });
 
     const brandId = a.brandId;
