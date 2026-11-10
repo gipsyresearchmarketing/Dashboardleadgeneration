@@ -2347,7 +2347,7 @@
 
   const CLOUD_SPECS = {
     leads:        { table: 'leads', order: 'created_at',
-      cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at','product_name','position','transaction_date','brand_id'],
+      cols: ['id','type','name','company','email','phone','status','sales_value','notes','last_contacted_at','tags','created_at','product_name','position','transaction_date','follow_ups','brand_id'],
       get: () => state.leads, set: (r) => { state.leads = r; } },
     activities:   { table: 'activities', order: 'created_at',
       cols: ['id','lead_id','type','title','notes','created_at','brand_id'],
@@ -3867,11 +3867,6 @@
               if (!badges.length) return '';
               return '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">' + badges.join('') + '</div>';
             })()}
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
-              <button type="button" class="btn btn-outline" data-follow-up="whatsapp" data-lead-id="${escapeHTML(lead.id)}" style="font-size:11.5px;padding:5px 10px;color:#16a34a;border-color:#bbf7d0;background:#f0fdf4">💬 Tandai Follow Up WA</button>
-              <button type="button" class="btn btn-outline" data-follow-up="email" data-lead-id="${escapeHTML(lead.id)}" style="font-size:11.5px;padding:5px 10px;color:#2563eb;border-color:#bfdbfe;background:#eff6ff">✉️ Tandai Follow Up Email</button>
-              <button type="button" class="btn btn-outline" data-follow-up="call" data-lead-id="${escapeHTML(lead.id)}" style="font-size:11.5px;padding:5px 10px;color:#b45309;border-color:#fde68a;background:#fffbeb">☎ Tandai Follow Up Telpon</button>
-            </div>
           </div>
         </header>
 
@@ -3941,6 +3936,27 @@
         </div>
         `}
       </section>
+
+      ${(() => {
+        const fu = leadFollowUps(lead);
+        const box = (kind, label, color, bg, border, count) => {
+          const on = fu.indexOf(kind) >= 0;
+          return '<label style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid ' + (on ? border : 'var(--border)') + ';border-radius:7px;background:' + (on ? bg : 'transparent') + ';cursor:pointer;font-size:12.5px;color:' + (on ? color : 'var(--fg)') + ';user-select:none">'
+            + '<input type="checkbox" data-follow-up-toggle="' + kind + '" data-lead-id="' + escapeHTML(lead.id) + '"' + (on ? ' checked' : '') + ' style="width:15px;height:15px;accent-color:' + color + ';cursor:pointer;margin:0" />'
+            + label + (count ? ' <span style="font-size:10px;color:var(--muted)">· ' + count + 'x</span>' : '')
+            + '</label>';
+        };
+        const counts = wsFollowUpCounts(lead.id);
+        return '<section class="drawer-section">'
+          + '<h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Follow Up</h3>'
+          + '<div class="flex flex-wrap gap-2">'
+          +   box('whatsapp', '💬 WhatsApp', '#16a34a', '#f0fdf4', '#bbf7d0', counts.whatsapp)
+          +   box('email', '✉️ Email', '#2563eb', '#eff6ff', '#bfdbfe', counts.email)
+          +   box('call', '☎ Telpon', '#b45309', '#fffbeb', '#fde68a', counts.call)
+          + '</div>'
+          + '<div style="font-size:11px;color:var(--muted);margin-top:7px;line-height:1.5">Centang untuk mencatat follow-up. Contact otomatis masuk ke kolom kanban sesuai pilihan, dan riwayatnya tetap tersimpan walau lalu dipindah ke stage lain.</div>'
+          + '</section>';
+      })()}
 
       <section class="drawer-section">
         <div class="flex items-center justify-between mb-2">
@@ -4470,6 +4486,16 @@
           const kind = fuBtn.getAttribute('data-follow-up');
           const leadId = fuBtn.getAttribute('data-lead-id');
           applyFollowUp(leadId, kind);
+          return;
+        }
+        // Checkbox follow-up (dicentang / dilepas)
+        const fuCheck = e.target.closest('[data-follow-up-toggle]');
+        if (fuCheck) {
+          e.preventDefault();
+          e.stopPropagation();
+          const kind = fuCheck.getAttribute('data-follow-up-toggle');
+          const leadId = fuCheck.getAttribute('data-lead-id');
+          toggleFollowUp(leadId, kind, !!fuCheck.checked);
           return;
         }
         // Close (X) button — top-right of header
@@ -5987,13 +6013,38 @@
     return new Date(iso).toLocaleDateString('en-US', { day:'2-digit', month:'short' });
   }
 
+  /* Daftar follow-up contact: 'wa' | 'email' | 'call' (disimpan di leads.follow_ups). */
+  function leadFollowUps(lead) {
+    var raw = (lead && lead.follow_ups) || [];
+    if (!Array.isArray(raw)) { try { raw = JSON.parse(raw); } catch (e) { raw = []; } }
+    if (!Array.isArray(raw)) raw = [];
+    return raw.map(function (x) {
+      var v = String(x || '').toLowerCase();
+      if (v === 'whatsapp' || v === 'wa') return 'wa';
+      if (v === 'email' || v === 'mail') return 'email';
+      if (v === 'call' || v === 'telpon' || v === 'phone') return 'call';
+      return '';
+    }).filter(Boolean);
+  }
+
   /* Jumlah follow-up per contact (email / whatsapp) dari riwayat activity. */
   function wsFollowUpCounts(leadId) {
     var acts = (state.activities || []).filter(function (a) { return a.lead_id === leadId; });
+    var lead = state.leads.find(function (l) { return l.id === leadId; });
+    var flags = leadFollowUps(lead);
+    var email = flags.filter(function (f) { return f === 'email'; }).length;
+    var whatsapp = flags.filter(function (f) { return f === 'wa'; }).length;
+    var call = flags.filter(function (f) { return f === 'call'; }).length;
+    // Kalau lead belum punya flag (data lama) -> pakai hitungan activity
+    if (!flags.length) {
+      email = acts.filter(function (a) { return a.type === 'email'; }).length;
+      whatsapp = acts.filter(function (a) { return a.type === 'whatsapp'; }).length;
+      call = acts.filter(function (a) { return a.type === 'call'; }).length;
+    }
     return {
-      email: acts.filter(function (a) { return a.type === 'email'; }).length,
-      whatsapp: acts.filter(function (a) { return a.type === 'whatsapp'; }).length,
-      call: acts.filter(function (a) { return a.type === 'call'; }).length,
+      email: email,
+      whatsapp: whatsapp,
+      call: call,
       total: acts.length,
     };
   }
@@ -6036,6 +6087,55 @@
     renderAll && renderAll();
     toast((kind === 'whatsapp' ? '💬' : kind === 'email' ? '✉️' : '☎') + ' Follow up via ' + m.label + ' dicatat' +
       (prevStatus !== m.status ? ' · status → ' + m.status : ''));
+  }
+
+  /* Centang / lepas checkbox follow-up di rincian kontak.
+     Centang  -> simpen flag + catat activity + geser stage ke kolom kanban yang sesuai.
+     Lepas    -> hapus flag (riwayat activity tetap disimpan sebagai jejak). */
+  var FOLLOW_UP_KIND = { whatsapp: 'wa', email: 'email', call: 'call' };
+  function toggleFollowUp(leadId, kind, checked) {
+    var key = FOLLOW_UP_KIND[kind];
+    if (!key || !leadId) return;
+    var lead = state.leads.find(function (l) { return l.id === leadId; });
+    if (!lead) return;
+    var now = new Date().toISOString();
+    var flags = leadFollowUps(lead);
+    var has = flags.indexOf(key) >= 0;
+    if (checked && !has) {
+      flags.push(key);
+      // Catat activity follow-up
+      try {
+        var m = FOLLOW_UP_META[kind];
+        appPrependActivities([{
+          id: generateActivityId(),
+          lead_id: leadId,
+          type: m.type,
+          title: 'Follow up via ' + m.label,
+          notes: 'Dicatat dari checkbox follow-up',
+          created_at: now,
+        }]);
+      } catch (e) { /* history bukan hal kritis */ }
+    } else if (!checked && has) {
+      flags = flags.filter(function (f) { return f !== key; });
+    }
+    // Geser stage:
+    //  - stage akhir (Won/Lost) atau In Negotiation -> JANGAN digeser (riwayat follow-up tetap)
+    //  - selain itu -> kolom kanban ikut checkbox (email menang kalau dua-duanya)
+    var stage = lead.status;
+    var keepStage = stage === 'Won/Sales' || stage === 'Lost' || stage === 'In Negotiation';
+    if (!keepStage) {
+      if (flags.indexOf('email') >= 0) stage = 'Followed Up (Email)';
+      else if (flags.indexOf('wa') >= 0) stage = 'Followed Up (WhatsApp)';
+      else stage = 'New Lead';
+    }
+    state.leads = state.leads.map(function (l) {
+      return l.id === leadId ? { ...l, follow_ups: flags, status: stage, last_contacted_at: checked ? now : l.last_contacted_at } : l;
+    });
+    saveLeads(state.leads);
+    wsRenderAll && wsRenderAll();
+    renderAll && renderAll();
+    if (checked) toast('✓ Follow up dicatat · ' + stage);
+    else toast('Follow up dilepas · ' + stage);
   }
 
   function wsCompanyCardEl(lead) {
@@ -6135,7 +6235,11 @@
         const newStatus = col.getAttribute('data-status');
         const oldLead = state.leads.find(l => l.id === id);
         const oldStatus = oldLead ? oldLead.status : '';
-        state.leads = state.leads.map(l => l.id === id ? { ...l, status: newStatus, last_contacted_at: new Date().toISOString() } : l);
+        // Sync flag follow-up sesuai kolom tujuan (flag lama TIDAK dihapus)
+        let flags = oldLead ? leadFollowUps(oldLead).slice() : [];
+        if (newStatus === 'Followed Up (WhatsApp)' && flags.indexOf('wa') < 0) flags.push('wa');
+        if (newStatus === 'Followed Up (Email)' && flags.indexOf('email') < 0) flags.push('email');
+        state.leads = state.leads.map(l => l.id === id ? { ...l, status: newStatus, follow_ups: flags, last_contacted_at: new Date().toISOString() } : l);
         saveLeads(state.leads);
         // Catat follow-up activity -> riwayat per contact keliatan (email / WA / call / note)
         if (oldStatus !== newStatus) {

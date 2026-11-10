@@ -32,6 +32,7 @@ CREATE TABLE leads (
   notes         text NOT NULL DEFAULT '',
   last_contacted_at timestamptz,
   tags          text[] NOT NULL DEFAULT '{}',
+  follow_ups    text[] NOT NULL DEFAULT '{}',   -- daftar follow-up: wa / email / call
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 

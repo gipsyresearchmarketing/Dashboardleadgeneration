@@ -59,3 +59,10 @@ SELECT table_name, column_name, data_type
 FROM information_schema.columns
 WHERE table_name IN ('email_track', 'email_events')
 ORDER BY table_name, ordinal_position;
+
+
+-- =====================================================
+-- BAGIAN 4 — Kolom follow_ups di tabel leads
+-- (daftar follow-up: wa / email / call — dipakai checkbox di rincian kontak)
+-- =====================================================
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS follow_ups text[] NOT NULL DEFAULT '{}';
