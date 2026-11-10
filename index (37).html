@@ -3946,7 +3946,9 @@
       ${(() => {
         const fu = leadFollowUps(lead);
         const box = (kind, label, color, bg, border, count) => {
-          const on = fu.indexOf(kind) >= 0;
+          // PENTING: flag disimpan sbg 'wa'/'email'/'call' — cek pakai key yg sama.
+          const flagKey = { whatsapp: 'wa', email: 'email', call: 'call' }[kind] || kind;
+          const on = fu.indexOf(flagKey) >= 0;
           return '<label style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid ' + (on ? border : 'var(--border)') + ';border-radius:7px;background:' + (on ? bg : 'transparent') + ';cursor:pointer;font-size:12.5px;color:' + (on ? color : 'var(--fg)') + ';user-select:none">'
             + '<input type="checkbox" data-follow-up-toggle="' + kind + '" data-lead-id="' + escapeHTML(lead.id) + '"' + (on ? ' checked' : '') + ' style="width:15px;height:15px;accent-color:' + color + ';cursor:pointer;margin:0" />'
             + label + (count ? ' <span style="font-size:10px;color:var(--muted)">· ' + count + 'x</span>' : '')
@@ -5984,9 +5986,19 @@
   function wsColumnMatch(lead, columnId) {
     const st = lead.status;
     const flags = leadFollowUps(lead);
-    if (columnId === 'Followed Up (WhatsApp)') return flags.indexOf('wa') >= 0;
-    if (columnId === 'Followed Up (Email)') return flags.indexOf('email') >= 0;
-    if (st === 'Followed Up (WhatsApp)' || st === 'Followed Up (Email)') return false;
+    const isFollowCol = columnId === 'Followed Up (WhatsApp)' || columnId === 'Followed Up (Email)';
+    if (isFollowCol) {
+      const key = columnId === 'Followed Up (WhatsApp)' ? 'wa' : 'email';
+      // Kalau lead belum punya flag (data lama) -> pakai status
+      if (flags.length) return flags.indexOf(key) >= 0;
+      return st === columnId;
+    }
+    // Kolom biasa: status harus cocok. Kalau status-nya follow-up stage, jangan dobel —
+    // kecuali lead lama tanpa flag (biar gak hilang dari board).
+    if (st === 'Followed Up (WhatsApp)' || st === 'Followed Up (Email)') {
+      if (!flags.length) return st === columnId;
+      return false;
+    }
     return st === columnId;
   }
   let wsState = {
@@ -6038,6 +6050,11 @@
     var raw = (lead && lead.follow_ups) || [];
     if (!Array.isArray(raw)) { try { raw = JSON.parse(raw); } catch (e) { raw = []; } }
     if (!Array.isArray(raw)) raw = [];
+    // Data lama (belum ada kolom follow_ups) -> derive dari status, biar checkbox & board konsisten
+    if (!raw.length && lead && lead.status) {
+      if (lead.status === 'Followed Up (WhatsApp)') raw = ['wa'];
+      else if (lead.status === 'Followed Up (Email)') raw = ['email'];
+    }
     return raw.map(function (x) {
       var v = String(x || '').toLowerCase();
       if (v === 'whatsapp' || v === 'wa') return 'wa';
