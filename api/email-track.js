@@ -32,20 +32,22 @@ function rid(prefix) {
   return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
-/* Catat 1 event (open / click). Gagal? jangan ganggu email penerima. */
+/* Catat 1 event (open / click). Gagal? jangan ganggu email penerima.
+   CATATAN: kolom `id` di email_events bertipe UUID — harus uuid, bukan teks. */
 async function recordEvent(tr, type, url) {
   try {
     await svc('email_events', {
       method: 'POST',
       headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
       body: JSON.stringify({
-        id: rid('EV'),
+        id: require('crypto').randomUUID(),
         brand_id: tr.brand_id || null,
         blast_id: tr.blast_id || null,
         token: tr.token,
         recipient_email: tr.recipient_email || null,
         type: type,
         url: url || null,
+        created_at: new Date().toISOString(),
       }),
     });
   } catch (e) {
