@@ -249,7 +249,8 @@ module.exports = async (req, res) => {
       }));
       results.push(...out);
     }
-    return res.status(200).json({ results });
+    // Flag tracking biar gampang dicek dari Network tab / log Vercel
+    return res.status(200).json({ results: results, tracking: trackingOn, tracking_enabled: trackingOn });
   } catch (e) {
     console.error('[send-email]', e);
     return res.status(500).json({ error: String((e && e.message) || e).slice(0, 300) });
