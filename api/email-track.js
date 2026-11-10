@@ -132,6 +132,7 @@ module.exports = async (req, res) => {
         byToken[t.token] = {
           token: t.token,
           email: t.recipient_email || '',
+          role: t.role || 'to',
           lead_id: t.lead_id || null,
           sent_at: t.sent_at,
           delivered: !!t.delivered_at,
@@ -176,6 +177,22 @@ module.exports = async (req, res) => {
       const replied = rows.filter((r) => r.replied).length;
       const totalClicks = rows.reduce((n, r) => n + r.clicks, 0);
       const pct = (n) => (sent ? Math.round((n / sent) * 1000) / 10 : 0);
+      // Rincian per jenis penerima (to / cc / bcc)
+      const roleOf = (r) => (r.role === 'cc' || r.role === 'bcc') ? r.role : 'to';
+      const roles = ['to', 'cc', 'bcc'].map(function (k) {
+        const g = rows.filter((r) => roleOf(r) === k);
+        return {
+          role: k,
+          sent: g.length,
+          delivered: g.filter((r) => r.delivered).length,
+          bounced: g.filter((r) => r.bounced).length,
+          opened: g.filter((r) => r.opens > 0).length,
+          clicked: g.filter((r) => r.clicks > 0).length,
+          replied: g.filter((r) => r.replied).length,
+          open_rate: g.length ? Math.round((g.filter((r) => r.opens > 0).length / g.length) * 1000) / 10 : 0,
+          click_rate: g.length ? Math.round((g.filter((r) => r.clicks > 0).length / g.length) * 1000) / 10 : 0,
+        };
+      }).filter((r) => r.sent > 0);
 
       return res.status(200).json({
         ok: true,
@@ -192,10 +209,12 @@ module.exports = async (req, res) => {
           open_rate: pct(opened),
           click_rate: pct(clicked),
           reply_rate: pct(replied),
+          by_role: roles,
         },
         recipients: rows.map((r) => ({
           token: r.token,
           email: r.email,
+          role: roleOf(r),
           lead_id: r.lead_id,
           sent_at: r.sent_at,
           delivered: r.delivered,

@@ -213,44 +213,76 @@ module.exports = async (req, res) => {
     const trackBrandId = String(body.brand_id || '').trim();
     const origin = publicOrigin(req);
     const trackingOn = !!(blastId && origin);
-    // 5 email paralel; cc/bcc hanya dilampirkan di email pertama supaya tidak dobel-dobel
+
+    /* Kirim 1 email ke 1 penerima + token tracking sendiri.
+       Dipakai untuk: To, Cc, dan Bcc — masing-masing dapet salinan sendiri,
+       jadi open/click bisa diatribusi per orang dan gak ada email dobel. */
+    async function sendToOne(email, role, leadId) {
+      let token = '';
+      let mailHtml = html;
+      const links = [];
+      try {
+        if (trackingOn) {
+          token = makeToken();
+          mailHtml = injectTracking(html, token, origin, links);
+          await saveTrack({
+            token: token,
+            brand_id: trackBrandId || null,
+            blast_id: blastId,
+            lead_id: leadId || null,
+            recipient_email: email,
+            subject: subject,
+            role: role,
+            sent_at: new Date().toISOString(),
+            links: links,
+          });
+        }
+        await send({ to: email, subject, html: mailHtml, text, attachments });
+        if (token) await updateTrack(token, { delivered_at: new Date().toISOString() });
+        return { email: email, role: role, ok: true };
+      } catch (e) {
+        const errMsg = String((e && e.message) || e).slice(0, 300);
+        if (token) await updateTrack(token, { bounced: true, error: errMsg });
+        return { email: email, role: role, ok: false, error: errMsg };
+      }
+    }
+
+    // 5 email paralel untuk penerima To
     for (let i = 0; i < recipients.length; i += 5) {
       const slice = recipients.slice(i, i + 5);
-      const out = await Promise.all(slice.map(async (r, j) => {
+      const out = await Promise.all(slice.map(async (r) => {
         const email = String((r && r.email) || '').trim();
         if (!EMAIL_RE.test(email)) return { lead_id: r && r.lead_id, email, ok: false, error: 'Email tidak valid' };
-        let token = '';
-        try {
-          const first = i === 0 && j === 0;
-          let mailHtml = html;
-          const links = [];
-          if (trackingOn) {
-            token = makeToken();
-            mailHtml = injectTracking(html, token, origin, links);
-            await saveTrack({
-              token: token,
-              brand_id: trackBrandId || null,
-              blast_id: blastId,
-              lead_id: (r && r.lead_id) || null,
-              recipient_email: email,
-              subject: subject,
-              sent_at: new Date().toISOString(),
-              links: links,
-            });
-          }
-          await send({ to: email, subject, html: mailHtml, text, attachments, cc: first && cc.length ? cc : undefined, bcc: first && bcc.length ? bcc : undefined });
-          if (token) await updateTrack(token, { delivered_at: new Date().toISOString() });
-          return { lead_id: r.lead_id, email, ok: true };
-        } catch (e) {
-          const errMsg = String((e && e.message) || e).slice(0, 300);
-          if (token) await updateTrack(token, { bounced: true, error: errMsg });
-          return { lead_id: r.lead_id, email, ok: false, error: errMsg };
-        }
+        const res = await sendToOne(email, 'to', r && r.lead_id);
+        return { lead_id: r.lead_id, email: res.email, ok: res.ok, error: res.error, role: res.role };
+      }));
+      results.push(...out);
+    }
+    // Cc & Bcc: masing-masing dapet email sendiri (bukan header) -> bisa dilacak per orang
+    if (cc.length) {
+      const out = await Promise.all(cc.map(async (em) => {
+        const res = await sendToOne(em, 'cc', null);
+        return { email: res.email, ok: res.ok, error: res.error, role: res.role };
+      }));
+      results.push(...out);
+    }
+    if (bcc.length) {
+      const out = await Promise.all(bcc.map(async (em) => {
+        const res = await sendToOne(em, 'bcc', null);
+        return { email: res.email, ok: res.ok, error: res.error, role: res.role };
       }));
       results.push(...out);
     }
     // Flag tracking biar gampang dicek dari Network tab / log Vercel
-    return res.status(200).json({ results: results, tracking: trackingOn, tracking_enabled: trackingOn });
+    return res.status(200).json({
+      results: results,
+      tracking: trackingOn,
+      tracking_enabled: trackingOn,
+      sent_total: results.filter((r) => r.ok).length,
+      to_count: results.filter((r) => r.role === 'to').length,
+      cc_count: results.filter((r) => r.role === 'cc').length,
+      bcc_count: results.filter((r) => r.role === 'bcc').length,
+    });
   } catch (e) {
     console.error('[send-email]', e);
     return res.status(500).json({ error: String((e && e.message) || e).slice(0, 300) });

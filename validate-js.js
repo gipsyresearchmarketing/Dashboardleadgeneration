@@ -56,6 +56,6 @@ globalThis.module = { exports: {} };
 globalThis.require = function(){ return {}; };
 
 console.log('Root project: ' + root + '\n');
-['api/img.js','api/brand-settings.js','api/send-email.js','api/send-wa.js',
+['api/img.js','api/brand-settings.js','api/send-email.js','api/send-wa.js','api/email-track.js',
  'api/_lib/wa.js','api/_lib/brand.js','index (37).html','index.html'
 ].forEach(function(f){ check(f, /\.html$/.test(f)); });

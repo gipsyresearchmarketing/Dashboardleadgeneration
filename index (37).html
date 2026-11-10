@@ -4553,10 +4553,31 @@
       el.addEventListener('click', (ev) => {
         ev.stopPropagation();
         const newStatus = el.getAttribute('data-set-status');
+        const oldStatus = (state.leads.find(l => l.id === leadId) || {}).status || '';
         state.leads = state.leads.map(l => l.id === leadId
           ? { ...l, status: newStatus, last_contacted_at: new Date().toISOString() }
           : l);
         saveLeads(state.leads);
+        // Catat follow-up activity (biar riwayat di rincian kontak & badge kanban ke-update)
+        if (oldStatus !== newStatus) {
+          try {
+            const actType = {
+              'Followed Up (WhatsApp)': 'whatsapp',
+              'Followed Up (Email)': 'email',
+              'In Negotiation': 'meeting',
+            }[newStatus] || 'note';
+            const newLabel = (STATUS_META[newStatus] && STATUS_META[newStatus].label) || newStatus;
+            const oldLabel = (STATUS_META[oldStatus] && STATUS_META[oldStatus].label) || oldStatus;
+            appPrependActivities([{
+              id: generateActivityId(),
+              lead_id: leadId,
+              type: actType,
+              title: 'Pindah ke ' + newLabel,
+              notes: (oldLabel && oldLabel !== newStatus ? 'Dari ' + oldLabel + ' → ' + newLabel : newLabel),
+              created_at: new Date().toISOString(),
+            }]);
+          } catch (e) { /* history bukan hal kritis */ }
+        }
         closeDropdowns();
         renderAll();
         // If drawer is open for this lead, refresh its body
@@ -5941,6 +5962,17 @@
     return new Date(iso).toLocaleDateString('en-US', { day:'2-digit', month:'short' });
   }
 
+  /* Jumlah follow-up per contact (email / whatsapp) dari riwayat activity. */
+  function wsFollowUpCounts(leadId) {
+    var acts = (state.activities || []).filter(function (a) { return a.lead_id === leadId; });
+    return {
+      email: acts.filter(function (a) { return a.type === 'email'; }).length,
+      whatsapp: acts.filter(function (a) { return a.type === 'whatsapp'; }).length,
+      call: acts.filter(function (a) { return a.type === 'call'; }).length,
+      total: acts.length,
+    };
+  }
+
   function wsCompanyCardEl(lead) {
     const tagsHtml = (lead.tags || []).slice(0, 2).map(t =>
       `<span class="chip ${tagColor(t)}" style="font-size:10px">${escapeHTML(t)}</span>`
@@ -5972,6 +6004,14 @@
               ${formatIDR(lead.sales_value)}
             </div>` : ''}
           </div>
+          ${(() => { const fu = wsFollowUpCounts(lead.id); if (!fu.total) return '';
+            const bits = [];
+            if (fu.email) bits.push('<span title="Follow up via email" style="font-size:10px;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:1px 5px">✉ ' + fu.email + '</span>');
+            if (fu.whatsapp) bits.push('<span title="Follow up via WhatsApp" style="font-size:10px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:1px 5px">💬 ' + fu.whatsapp + '</span>');
+            if (fu.call) bits.push('<span title="Follow up via call" style="font-size:10px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:1px 5px">☎ ' + fu.call + '</span>');
+            if (!bits.length) bits.push('<span style="font-size:10px;color:var(--muted)">0 follow-up</span>');
+            return '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">' + bits.join('') + '</div>';
+          })()}
           ${tagsHtml || (lead.tags || []).length > 0 ? `<div class="flex flex-wrap gap-1">${tagsHtml}${(lead.tags || []).length > 2 ? `<span class="chip" style="font-size:10px;background:#fafafa">+${(lead.tags||[]).length-2}</span>` : ''}</div>` : ''}
         </div>
       </div>`;
@@ -6028,8 +6068,30 @@
         const id = e.dataTransfer.getData('text/ws-lead-id');
         if (!id) return;
         const newStatus = col.getAttribute('data-status');
+        const oldLead = state.leads.find(l => l.id === id);
+        const oldStatus = oldLead ? oldLead.status : '';
         state.leads = state.leads.map(l => l.id === id ? { ...l, status: newStatus, last_contacted_at: new Date().toISOString() } : l);
         saveLeads(state.leads);
+        // Catat follow-up activity -> riwayat per contact keliatan (email / WA / call / note)
+        if (oldStatus !== newStatus) {
+          try {
+            const actType = {
+              'Followed Up (WhatsApp)': 'whatsapp',
+              'Followed Up (Email)': 'email',
+              'In Negotiation': 'meeting',
+            }[newStatus] || 'note';
+            const newLabel = (WS_STATUS_BY_ID[newStatus] && WS_STATUS_BY_ID[newStatus].label) || newStatus;
+            const oldLabel = (WS_STATUS_BY_ID[oldStatus] && WS_STATUS_BY_ID[oldStatus].label) || oldStatus;
+            appPrependActivities([{
+              id: generateActivityId(),
+              lead_id: id,
+              type: actType,
+              title: 'Pindah ke ' + newLabel,
+              notes: (oldLabel && oldLabel !== newLabel ? 'Dari ' + oldLabel + ' → ' + newLabel : newLabel),
+              created_at: new Date().toISOString(),
+            }]);
+          } catch (e) { /* history bukan hal kritis */ }
+        }
         // Refresh both workspace AND CRM views
         wsRenderAll();
         renderAll && renderAll();
@@ -7696,11 +7758,31 @@
       + tile('Diklik', s.clicked || 0, (s.click_rate || 0) + '%', '#7c3aed')
       + tile('Reply', s.replied || 0, (s.reply_rate || 0) + '%', '#0891b2')
       + '</div>';
+    // Rincian per jenis penerima (To / Cc / Bcc)
+    var roleRows = '';
+    if (s.by_role && s.by_role.length) {
+      var roleLabel = { to: 'To', cc: 'Cc', bcc: 'Bcc' };
+      var roleColor = { to: '#2563eb', cc: '#7c3aed', bcc: '#0891b2' };
+      roleRows = '<div style="margin-top:10px">'
+        + '<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Rincian To / Cc / Bcc</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:8px">'
+        + s.by_role.map(function (r) {
+            return '<div style="flex:1;min-width:150px;padding:8px 10px;border:1px solid var(--border);border-left:3px solid ' + (roleColor[r.role] || '#94a3b8') + ';border-radius:6px;background:#fff">'
+              + '<div style="font-size:11px;font-weight:700;color:' + (roleColor[r.role] || 'var(--fg)') + '">' + (roleLabel[r.role] || r.role) + '</div>'
+              + '<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:2px">'
+              + r.sent + ' terkirim · ' + r.delivered + ' delivered'
+              + (r.bounced ? ' · <span style="color:#b91c1c">' + r.bounced + ' gagal</span>' : '')
+              + '<br>👁 ' + r.opened + ' (' + r.open_rate + '%) · 🖱 ' + r.clicked + ' (' + r.click_rate + '%)'
+              + '</div></div>';
+          }).join('')
+        + '</div></div>';
+    }
     var note = '<div style="font-size:11px;color:#92400e;margin-top:8px;line-height:1.5">'
       + '⚠️ <b>Open rate = perkiraan.</b> Gmail &amp; Apple Mail memuat gambar di depan, jadi satu email yang dibuka bisa tercatat beberapa kali. '
       + 'Click rate akurat (link dicatat tiap diklik).'
       + '</div>';
     var rows = (st.recipients || []).filter(function (r) { return r.opens || r.clicks || r.bounced || r.replied; });
+    var roleTag = { to: 'To', cc: 'Cc', bcc: 'Bcc' };
     var tbl = '';
     if (rows.length) {
       tbl = '<details style="margin-top:10px"><summary style="font-size:11.5px;color:var(--muted);cursor:pointer">'
@@ -7713,13 +7795,15 @@
             if (r.replied) bits.push('💬 reply');
             if (r.bounced) bits.push('❌ gagal: ' + escapeHTML(String(r.error || '').slice(0, 60)));
             return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">'
-              + '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHTML(r.email || '—') + '</span>'
+              + '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+              + '<b style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-right:5px">' + (roleTag[r.role] || 'To') + '</b>'
+              + escapeHTML(r.email || '—') + '</span>'
               + '<span style="color:var(--muted);white-space:nowrap">' + (bits.join(' · ') || '—') + '</span></div>';
           }).join('')
         + '</div></details>';
     }
     return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#fafbfc">'
-      + head + tiles + note + tbl + '</div>';
+      + head + tiles + roleRows + note + tbl + '</div>';
   }
   async function loadEmailStats(blastId) {
     if (!blastId || !window.currentBrand) return;
