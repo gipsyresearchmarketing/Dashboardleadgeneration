@@ -7650,15 +7650,104 @@
         renderHistoryDetail(selected, channel, isEmail) +
       '</div>' +
     '</div>';
+    // Muat statistik blast (open/click/reply) untuk email
+    if (isEmail && selected && selected.id) {
+      var sid = selected.id;
+      if (emailStatsCache[sid]) {
+        setTimeout(function () {
+          var b = document.getElementById('email-stat-' + sid);
+          if (b) b.innerHTML = emailStatsInner(emailStatsCache[sid]);
+        }, 0);
+      } else {
+        loadEmailStats(sid);
+      }
+    }
   }
 
   // Read-only detail panel for a HISTORY entry
+  /* ====================================================
+   * ANALISA EMAIL BLAST (open rate / click rate / reply)
+   * Data dari /api/email-track (statistik blast).
+   * ==================================================== */
+  var emailStatsCache = {};
+
+  function emailStatBox(id) {
+    return '<div id="email-stat-' + id + '" style="margin-bottom:14px"></div>';
+  }
+  function emailStatsInner(st) {
+    if (!st) return '';
+    var s = st.summary || {};
+    function tile(label, val, sub, color) {
+      return '<div style="flex:1;min-width:104px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fff">'
+        + '<div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600">' + label + '</div>'
+        + '<div style="font-size:20px;font-weight:700;color:' + (color || 'var(--fg)') + ';line-height:1.25;margin-top:2px">' + val + '</div>'
+        + (sub ? '<div style="font-size:11px;color:var(--muted);margin-top:1px">' + sub + '</div>' : '')
+        + '</div>';
+    }
+    var pct = function (n) { return (s.sent ? Math.round((n / s.sent) * 1000) / 10 : 0); };
+    var head = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+      + '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">📊 Analisa blast</div>'
+      + (s.sent ? '<div style="font-size:11px;color:var(--muted)">' + s.sent + ' penerima</div>' : '')
+      + '</div>';
+    var tiles = '<div style="display:flex;flex-wrap:wrap;gap:8px">'
+      + tile('Terkirim', s.sent || 0, '', 'var(--fg)')
+      + tile('Delivered', s.delivered || 0, s.failed ? (s.failed + ' gagal') : '', '#16a34a')
+      + tile('Dibuka', s.opened || 0, (s.open_rate || 0) + '% (perkiraan)', '#2563eb')
+      + tile('Diklik', s.clicked || 0, (s.click_rate || 0) + '%', '#7c3aed')
+      + tile('Reply', s.replied || 0, (s.reply_rate || 0) + '%', '#0891b2')
+      + '</div>';
+    var note = '<div style="font-size:11px;color:#92400e;margin-top:8px;line-height:1.5">'
+      + '⚠️ <b>Open rate = perkiraan.</b> Gmail &amp; Apple Mail memuat gambar di depan, jadi satu email yang dibuka bisa tercatat beberapa kali. '
+      + 'Click rate akurat (link dicatat tiap diklik).'
+      + '</div>';
+    var rows = (st.recipients || []).filter(function (r) { return r.opens || r.clicks || r.bounced || r.replied; });
+    var tbl = '';
+    if (rows.length) {
+      tbl = '<details style="margin-top:10px"><summary style="font-size:11.5px;color:var(--muted);cursor:pointer">'
+        + 'Rincian per penerima (' + rows.length + ')</summary>'
+        + '<div style="margin-top:8px;font-size:11.5px">'
+        + rows.map(function (r) {
+            var bits = [];
+            if (r.opens) bits.push('👁 ' + r.opens + 'x buka');
+            if (r.clicks) bits.push('🖱 ' + r.clicks + 'x klik');
+            if (r.replied) bits.push('💬 reply');
+            if (r.bounced) bits.push('❌ gagal: ' + escapeHTML(String(r.error || '').slice(0, 60)));
+            return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">'
+              + '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHTML(r.email || '—') + '</span>'
+              + '<span style="color:var(--muted);white-space:nowrap">' + (bits.join(' · ') || '—') + '</span></div>';
+          }).join('')
+        + '</div></details>';
+    }
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#fafbfc">'
+      + head + tiles + note + tbl + '</div>';
+  }
+  async function loadEmailStats(blastId) {
+    if (!blastId || !window.currentBrand) return;
+    try {
+      var ss = await window.sb.auth.getSession();
+      var token = ss && ss.data && ss.data.session && ss.data.session.access_token;
+      if (!token) return;
+      var resp = await fetch('/api/email-track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ action: 'stats', brand_id: window.currentBrand.id, blast_id: blastId }),
+      });
+      var data = null; try { data = await resp.json(); } catch (e) {}
+      if (!resp.ok || !data || !data.summary) return;
+      emailStatsCache[blastId] = data;
+      var box = document.getElementById('email-stat-' + blastId);
+      if (box) box.innerHTML = emailStatsInner(data);
+    } catch (e) { /* diamkan, statistik cuma tambahan */ }
+  }
+
   function renderHistoryDetail(h, channel, isEmail) {
     if (!h) return '<div class="text-sm text-gray-500 italic">Select a history entry on the left to view.</div>';
     const isScheduled = h.status === 'scheduled';
+    const statsBox = isEmail && h.id ? emailStatBox(h.id) : '';
     const titleField = isEmail ? h.subject : h.message;
     const bodyField = isEmail ? h.body : h.message;
     return '<div>' +
+      statsBox +
       '<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">' +
         '<div class="flex items-center gap-2">' +
           '<span class="badge ' + (isScheduled ? 'badge-amber' : 'badge-emerald') + '" style="font-size:11px">' + (isScheduled ? '⏰ SCHEDULED' : '✓ SENT') + '</span>' +
@@ -8436,7 +8525,7 @@
     return { okRecipients: okRecipients, failed: failed, skipped: skipped };
   }
 
-  async function sendEmailsViaApi(compose) {
+  async function sendEmailsViaApi(compose, blastId) {
     const leads = appLeads();
     const targets = [], skipped = [], seen = {};
     compose.recipients.forEach(r => {
@@ -8488,7 +8577,7 @@
         const resp = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ brand_id: window.currentBrand.id, subject: compose.subject.trim(), html: html, recipients: batch, files: files, cc: i === 0 ? cc : '', bcc: i === 0 ? bcc : '' }),
+          body: JSON.stringify({ brand_id: window.currentBrand.id, blast_id: blastId || '', subject: compose.subject.trim(), html: html, recipients: batch, files: files, cc: i === 0 ? cc : '', bcc: i === 0 ? bcc : '' }),
         });
         let data = null; try { data = await resp.json(); } catch (e) {}
         if (!resp.ok || !data || !Array.isArray(data.results)) {
@@ -8642,7 +8731,7 @@
       if (!sendSummary) return;           // dibatalkan / gagal total (pesan sudah ditampilkan)
       sentRecipients = sendSummary.okRecipients;
     } else if (channel === 'email' && !isScheduled) {
-      sendSummary = await sendEmailsViaApi(compose);
+      sendSummary = await sendEmailsViaApi(compose, blastId);
       if (!sendSummary) return;           // dibatalkan / gagal total (pesan sudah ditampilkan)
       sentRecipients = sendSummary.okRecipients;
     }

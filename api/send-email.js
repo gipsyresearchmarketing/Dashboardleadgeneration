@@ -8,6 +8,8 @@
  *               Default host smtp.gmail.com:465 -> pakai Gmail + App Password.
  * Opsional : REPLY_TO, SUPABASE_URL, SUPABASE_ANON_KEY
  */
+const { svc, svcHeaders } = require('./_lib/wa');
+
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ugxrtiitmqrfrdpmcxka.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_JTxgxH__IgjcJhGkncaIkQ_erJNnZDG';
 const MAX_RECIPIENTS = 100;
@@ -21,6 +23,63 @@ function htmlToText(html) {
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
     .replace(/\n{3,}/g, '\n\n').trim();
+}
+
+
+/* ---------- Tracking blast (open / click) ----------
+ * PRIVASI: URL publik hanya berisi token acak + index link.
+ * Email penerima, blast_id, dan URL tujuan disimpan di DB (server-side),
+ * JANGAN pernah ditaruh di URL yang dilihat penerima. */
+function publicOrigin(req) {
+  const proto = String((req.headers['x-forwarded-proto'] || 'https')).split(',')[0].trim();
+  const host = String((req.headers['x-forwarded-host'] || req.headers.host || '')).split(',')[0].trim();
+  return host ? proto + '://' + host : '';
+}
+function makeToken() {
+  return 'tk_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+}
+/* Bungkus link eksternal jadi URL tracking (token + index) + sisipkan piksel 1x1.
+ * Array `links` diisi dengan URL tujuan (disimpan server-side, bukan di URL publik). */
+function injectTracking(html, token, origin, links) {
+  let out = String(html || '');
+  if (!token || !origin) return out;
+  out = out.replace(/<a\s+[^>]*href=["']([^"']+)["'][^>]*>/gi, (m, href) => {
+    if (/^(mailto:|tel:|sms:|#)/i.test(href)) return m;
+    if (href.indexOf('/api/email-track') >= 0) return m;
+    const idx = links.length;
+    links.push(href);
+    const tracked = origin + '/api/email-track?type=click&t=' + encodeURIComponent(token) + '&c=' + idx;
+    return m.replace(/href=["'][^"']*["']/i, 'href="' + tracked + '"');
+  });
+  const px = '<img src="' + origin + '/api/email-track?type=open&t=' + encodeURIComponent(token) +
+    '" width="1" height="1" alt="" style="display:none!important;width:1px!important;height:1px!important;border:0!important" />';
+  if (/<\/body>/i.test(out)) out = out.replace(/<\/body>/i, px + '</body>');
+  else out += px;
+  return out;
+}
+/* Simpan 1 baris email_track (best-effort, jangan ganggu pengiriman). */
+async function saveTrack(row) {
+  try {
+    await svc('email_track', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify(row),
+    });
+  } catch (e) {
+    console.warn('[send-email] gagal simpan track:', e && e.message);
+  }
+}
+async function updateTrack(token, patch) {
+  try {
+    const q = 'token=eq.' + encodeURIComponent(token);
+    await svc('email_track?' + q, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(patch),
+    });
+  } catch (e) {
+    console.warn('[send-email] gagal update track:', e && e.message);
+  }
 }
 
 const MAX_FILES = 10;
@@ -149,18 +208,43 @@ module.exports = async (req, res) => {
     const cc = parseEmails(body.cc);
     const bcc = parseEmails(body.bcc);
     const results = [];
+    // Tracking blast (open/click) — butuh blast_id dari client. Kalau kosong, tetep kirim tanpa tracking.
+    const blastId = String(body.blast_id || '').trim();
+    const trackBrandId = String(body.brand_id || '').trim();
+    const origin = publicOrigin(req);
+    const trackingOn = !!(blastId && origin);
     // 5 email paralel; cc/bcc hanya dilampirkan di email pertama supaya tidak dobel-dobel
     for (let i = 0; i < recipients.length; i += 5) {
       const slice = recipients.slice(i, i + 5);
       const out = await Promise.all(slice.map(async (r, j) => {
         const email = String((r && r.email) || '').trim();
         if (!EMAIL_RE.test(email)) return { lead_id: r && r.lead_id, email, ok: false, error: 'Email tidak valid' };
+        let token = '';
         try {
           const first = i === 0 && j === 0;
-          await send({ to: email, subject, html, text, attachments, cc: first && cc.length ? cc : undefined, bcc: first && bcc.length ? bcc : undefined });
+          let mailHtml = html;
+          const links = [];
+          if (trackingOn) {
+            token = makeToken();
+            mailHtml = injectTracking(html, token, origin, links);
+            await saveTrack({
+              token: token,
+              brand_id: trackBrandId || null,
+              blast_id: blastId,
+              lead_id: (r && r.lead_id) || null,
+              recipient_email: email,
+              subject: subject,
+              sent_at: new Date().toISOString(),
+              links: links,
+            });
+          }
+          await send({ to: email, subject, html: mailHtml, text, attachments, cc: first && cc.length ? cc : undefined, bcc: first && bcc.length ? bcc : undefined });
+          if (token) await updateTrack(token, { delivered_at: new Date().toISOString() });
           return { lead_id: r.lead_id, email, ok: true };
         } catch (e) {
-          return { lead_id: r.lead_id, email, ok: false, error: String((e && e.message) || e).slice(0, 300) };
+          const errMsg = String((e && e.message) || e).slice(0, 300);
+          if (token) await updateTrack(token, { bounced: true, error: errMsg });
+          return { lead_id: r.lead_id, email, ok: false, error: errMsg };
         }
       }));
       results.push(...out);
