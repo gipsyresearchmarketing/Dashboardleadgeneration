@@ -2457,16 +2457,22 @@
         for (let i = 0; i < changed.length; i += 200) {
           const chunk = changed.slice(i, i + 200);
           let u = await window.sb.from(spec.table).upsert(chunk);
-          if (u.error && /column .*(cc|bcc).* does not exist/i.test(String(u.error.message || ''))) {
-            // Kolom cc/bcc belum ada di tabel (SQL belum dijalankan) -> coba lagi tanpa kolom itu,
-            // supaya data lain tetap kesimpan. Jangan sampai 1 kolom hilang gateways SELURUH riwayat.
-            const slim = chunk.map(function (r) { const o = Object.assign({}, r); delete o.cc; delete o.bcc; return o; });
-            u = await window.sb.from(spec.table).upsert(slim);
-            if (u.error) throw u.error;
-            chunk.forEach(function (r) { const o = Object.assign({}, r); delete o.cc; delete o.bcc; sent[r.id] = JSON.stringify(o); });
-            console.warn('Kolom cc/bcc belum ada di ' + spec.table + ' — data disimpan tanpa Cc/Bcc. Jalankan supabase/blast-cc-bcc.sql');
+          if (u.error) {
+            // Kolom baru belum ada di DB (SQL ALTER TABLE belum dijalankan) -> coba lagi tanpa
+            // kolom itu, supaya data lain tetap kesimpan. 1 kolom hilang jangan gateways semua.
+            const msg = String((u.error && u.error.message) || '');
+            const mm = msg.match(/column\s+(?:[\w]+\.)?(\w+)\s+does not exist/i);
+            const miss = mm ? mm[1] : null;
+            if (miss && (spec.cols || []).indexOf(miss) >= 0) {
+              const slim = chunk.map(function (r) { const o = Object.assign({}, r); delete o[miss]; return o; });
+              u = await window.sb.from(spec.table).upsert(slim);
+              if (u.error) throw u.error;
+              chunk.forEach(function (r) { const o = Object.assign({}, r); delete o[miss]; sent[r.id] = JSON.stringify(o); });
+              console.warn('Kolom "' + miss + '" belum ada di tabel ' + spec.table + ' — data disimpan tanpa kolom itu. Jalankan SQL ALTER TABLE untuk mengaktifkannya.');
+            } else {
+              throw u.error;
+            }
           } else {
-            if (u.error) throw u.error;
             chunk.forEach(function (r) { sent[r.id] = JSON.stringify(r); });
           }
         }
@@ -5969,6 +5975,20 @@
     { id: 'Lost',                     label: 'Lost',                dotClass: 'status-dot-lost',   order: 5 },
   ];
   const WS_STATUS_BY_ID = Object.fromEntries(WS_STATUSES.map(s => [s.id, s]));
+  /* Kolom "Followed Up" ditentukan oleh FLAG follow_ups (bukan status tunggal):
+     - centang WA  -> muncul di kolom Followed Up (WA)
+     - centang Email -> muncul di kolom Followed Up (Email)
+     - centang dua-duanya -> muncul di KEDUA kolom
+     Stage lain (New Lead / In Negotiation / Won / Lost) pakai status biasa.
+     Kalau status-nya sudah "Followed Up", kolom itu pakai flag — jadi gak dobel. */
+  function wsColumnMatch(lead, columnId) {
+    const st = lead.status;
+    const flags = leadFollowUps(lead);
+    if (columnId === 'Followed Up (WhatsApp)') return flags.indexOf('wa') >= 0;
+    if (columnId === 'Followed Up (Email)') return flags.indexOf('email') >= 0;
+    if (st === 'Followed Up (WhatsApp)' || st === 'Followed Up (Email)') return false;
+    return st === columnId;
+  }
   let wsState = {
     wsView: 'board',
     calCursor: new Date(2026, 7, 1), // August 2026
@@ -6203,7 +6223,7 @@
     const addLabel = filterType === 'person' ? 'Contact' : 'Company';
     const newType = filterType === 'person' ? 'person' : 'company';
     host.innerHTML = `<div class="board">${WS_STATUSES.map(s => {
-      const items = list.filter(t => t.status === s.id);
+      const items = list.filter(t => wsColumnMatch(t, s.id));
       return `
         <div class="column" data-status="${s.id}">
           <div class="column-header">
