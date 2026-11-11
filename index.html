@@ -3733,7 +3733,7 @@
         state.tasks = state.tasks.filter(t => t.lead_id !== id);
         saveTasks(state.tasks);
         renderAll();
-        updateSidebarCounts();
+        renderSidebarCounts();
         toast('🗑 ' + lead.name + ' deleted');
       });
     });
@@ -4481,7 +4481,7 @@
           saveTasks(state.tasks);
           closeDrawer();
           renderAll();
-          updateSidebarCounts();
+          renderSidebarCounts();
           toast('🗑 ' + lead.name + ' deleted');
           return;
         }
@@ -5887,7 +5887,7 @@
     if (typeof wsRenderBoard === 'function') wsRenderBoard(isContactsView ? 'person' : undefined);
     if (typeof renderTable === 'function') renderTable();
     renderAll();
-    updateSidebarCounts();
+    renderSidebarCounts();
     toast('✓ ' + count + ' lead di-convert ke ' + label);
   });
 
@@ -6499,7 +6499,7 @@
     } finally {
       window.__inboxSyncing = false;
       if (added) {
-        if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+        if (typeof renderSidebarCounts === 'function') renderSidebarCounts();
         const visible = (state.view === 'inbox') || (state.view === 'email-blast' && emailBlast.activeTab === 'inbox');
         if (visible) renderInboxView();
       }
@@ -6718,7 +6718,7 @@
           saveInboundEmails(state.inboxEmails);
         }
         renderInboxView();
-        updateSidebarCounts();
+        renderSidebarCounts();
       });
     });
     // Filter pills
@@ -6749,7 +6749,7 @@
           e.starred = !e.starred;
           saveInboundEmails(state.inboxEmails);
           renderInboxView();
-          updateSidebarCounts();
+          renderSidebarCounts();
         }
       });
     });
@@ -6764,7 +6764,7 @@
           saveInboundEmails(state.inboxEmails);
           toast('📦 Email archived');
           renderInboxView();
-          updateSidebarCounts();
+          renderSidebarCounts();
         }
       });
     });
@@ -6778,7 +6778,7 @@
         saveInboundEmails(state.inboxEmails);
         toast('🗑 Email deleted');
         renderInboxView();
-        updateSidebarCounts();
+        renderSidebarCounts();
       });
     });
     // Open lead drawer
@@ -6788,7 +6788,7 @@
         state.drawerLeadId = id;
         state.drawerTab = 'overview';
         setView('contacts');
-        renderLeadDrawer();
+        openDrawer(id);
       });
     });
     // Reply via email blast
@@ -6865,7 +6865,7 @@
           saveInboundEmails(state.inboxEmails);
           toast('✓ Marked as replied');
           renderInboxView();
-          updateSidebarCounts();
+          renderSidebarCounts();
         }
       });
     });
@@ -7716,6 +7716,71 @@
       if (node.closest('.email-block')) return;  // sudah punya wrapper — tidak perlu
       orphans.push(node);
     });
+    // <img> telanjang (draft lama, belum punya wrapper .email-block) -> jadikan blok gambar
+    // yg bisa diedit lagi (Upload / ganti URL / ubah lebar). DULU img model gini dibuang
+    // di dedupeImageBlocks -> hilang permanen dari draft.
+    const looseImgs = [];
+    root.querySelectorAll('img').forEach(img => {
+      if (img.closest('.email-block')) return;         // sudah ada wrapper-nya
+      if (img.closest('.eb-image-preview')) return;    // ditangani di bawah
+      looseImgs.push(img);
+    });
+    looseImgs.forEach(img => {
+      const parent = img.parentNode;
+      if (!parent) return;
+      const src = img.getAttribute('src') || '';
+      const alt = img.getAttribute('alt') || '';
+      const pxOnly = (v) => (v && /px$/.test(String(v).trim())) ? parseInt(v, 10) || 0 : 0;
+      let w = 0;
+      if (img.style) w = pxOnly(img.style.width);
+      if (!w) w = parseInt(img.getAttribute('width'), 10) || 0;
+
+      const block = document.createElement('div');
+      block.className = 'email-block';
+      block.setAttribute('data-block', 'image');
+      block.setAttribute('contenteditable', 'false');
+      block.setAttribute('style', 'text-align:center;cursor:default;padding:8px 0');
+
+      const preview = document.createElement('div');
+      preview.className = 'eb-image-preview';
+      preview.setAttribute('style', 'min-height:0;background:transparent;border:0;display:block;text-align:center');
+      const wrap = document.createElement('div');
+      wrap.className = 'eb-img-wrap';
+      wrap.setAttribute('style', 'display:inline-block;line-height:0;width:' + (w ? w + 'px' : '100%'));
+      const im = document.createElement('img');
+      im.setAttribute('src', src);
+      im.setAttribute('alt', alt);
+      im.setAttribute('style', 'width:100%;height:auto;display:block;border-radius:8px');
+      const hd = document.createElement('span');
+      hd.className = 'eb-resize-handle';
+      hd.setAttribute('data-eb-handle', '1');
+      hd.setAttribute('contenteditable', 'false');
+      hd.title = 'Tarik untuk mengubah ukuran gambar';
+      wrap.appendChild(im);
+      wrap.appendChild(hd);
+      preview.appendChild(wrap);
+
+      const ctrls = document.createElement('div');
+      ctrls.className = 'eb-controls';
+      ctrls.setAttribute('style', 'margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center');
+      ctrls.innerHTML = '<button type="button" data-eb-upload="1" style="font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600">⬆ Upload</button>'
+        + '<input data-eb-input="src" style="width:40%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Image URL..." />'
+        + '<input data-eb-input="alt" style="width:25%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Alt text" />'
+        + '<input data-eb-input="width" type="number" min="40" step="1" title="Lebar gambar (px)" style="width:84px;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Lebar px" />';
+
+      block.appendChild(preview);
+      block.appendChild(ctrls);
+      parent.insertBefore(block, img);
+      img.remove();
+
+      const srcEl = ctrls.querySelector('[data-eb-input="src"]');
+      const altEl = ctrls.querySelector('[data-eb-input="alt"]');
+      const wEl = ctrls.querySelector('[data-eb-input="width"]');
+      if (srcEl) srcEl.setAttribute('value', src);
+      if (altEl) altEl.setAttribute('value', alt);
+      if (wEl && w) wEl.setAttribute('value', w);
+      if (w) { block.setAttribute('data-img-w', w); block.setAttribute('data-img-max', 542); }
+    });
     orphans.forEach(node => {
       const isImg = node.classList.contains('eb-image-preview');
       const parent = node.parentNode;
@@ -7778,18 +7843,24 @@
      satu lagi dari HTML ter-escape yang di-decode. Sisakan yang pertama. */
   function dedupeImageBlocks(root) {
     if (!root) return;
-    const seen = {};
-    // 1) <img> di luar .email-block -> duplikat, buang (dan wrapper-nya)
+    // Acuan: src gambar yang sudah berada di dalam .email-block (blok "bener").
+    const canonical = {};
+    Array.from(root.querySelectorAll('.email-block[data-block="image"] img')).forEach(img => {
+      const src = (img.getAttribute('src') || '').slice(0, 120);
+      if (src) canonical[src] = true;
+    });
+    // 1) <img> di luar .email-block -> HAPUS HANYA kalau memang duplikat dari blok di atas.
+    //    DULU semua img di luar .email-block dihapus tanpa cek -> gambar draft lama
+    //    (yang belum punya wrapper .email-block) HILANG PERMANEN begitu draft disimpan.
     Array.from(root.querySelectorAll('img')).forEach(img => {
       if (img.closest('.email-block')) return;
       const src = (img.getAttribute('src') || '').slice(0, 120);
       if (!src) return;
-      const holder = document.createElement('div');
-      holder.appendChild(img);
-      if (holder.innerHTML) { /* biarkan */ }
-      img.remove();
+      if (canonical[src]) img.remove();   // duplikat -> buang
+      // src unik -> JANGAN dihapus, itu gambar asli user
     });
     // 2) .email-block image dengan src yang sama -> sisakan yang pertama
+    const seen = {};
     Array.from(root.querySelectorAll('.email-block[data-block="image"]')).forEach(b => {
       const img = b.querySelector('img');
       const src = (img ? (img.getAttribute('src') || '') : '').slice(0, 120);
@@ -7816,12 +7887,12 @@
       return '<div class="card empty-state">No saved drafts. Compose a message and click "Save Draft".</div>';
     }
     // Auto-select first draft if none selected
-    if (!blastState.selectedItemId || !blastState.drafts.find(d => d.id === blastState.selectedItemId)) {
+    if (!blastState.selectedItemId || !blastState.drafts.find(d => String(d.id) === String(blastState.selectedItemId))) {
       blastState.selectedItemId = blastState.drafts[0].id;
       blastState.selectedItemType = 'draft';
     }
     const isEmail = channel === 'email';
-    const selectedDraft = blastState.drafts.find(d => d.id === blastState.selectedItemId);
+    const selectedDraft = blastState.drafts.find(d => String(d.id) === String(blastState.selectedItemId));
     return '<div class="blast-master-detail" style="display:flex;gap:0;min-height:480px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)">' +
       '<div class="blast-list-col" style="width:320px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;max-height:600px">' +
         blastState.drafts.map(d => {
@@ -8521,6 +8592,16 @@
   function splitEmails(v) {
     return String(v || '').split(',').map(function (x) { return x.trim(); })
       .filter(function (x) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x); });
+  }
+
+  /* Normalisasi Cc/Bcc jadi array email. Input bisa string ("a@b, c@d") atau array. */
+  function toEmailList(v) {
+    if (v == null) return [];
+    if (Array.isArray(v)) {
+      return v.map(function (x) { return String(x == null ? '' : x).trim(); })
+        .filter(function (x) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x); });
+    }
+    return splitEmails(v);
   }
 
   /* ====================================================
@@ -11216,7 +11297,7 @@
     document.querySelectorAll('[data-blast-action="save-draft-changes"]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
-        const draft = blastState.drafts.find(d => d.id === id);
+        const draft = blastState.drafts.find(d => String(d.id) === String(id));
         if (!draft) return;
         if (channel === 'email') {
           const subjEl = document.querySelector('[data-draft-input="subject"][data-draft-id="' + id + '"]');
@@ -11259,7 +11340,7 @@
     document.querySelectorAll('[data-blast-action="send-draft"]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
-        const draft = blastState.drafts.find(d => d.id === id);
+        const draft = blastState.drafts.find(d => String(d.id) === String(id));
         if (!draft) return;
         // Copy draft into current compose, then send
         if (channel === 'email') {
@@ -11394,17 +11475,27 @@
     document.querySelector(`[data-blast-action="send"][data-channel="${channel}"]`)?.addEventListener('click', () => sendBlast(channel));
     // drafts/history actions
     document.querySelectorAll(`[data-blast-action="load-draft"][data-channel="${channel}"]`).forEach(b => b.addEventListener('click', () => {
-      const id = b.getAttribute('data-id');
-      const draft = blastState.drafts.find(d => d.id === id);
-      if (!draft) return;
-      if (channel === 'email') {
-        const draftBody = normalizeDraftBody(draft.body || '');
-        emailBlast.compose = { subject:plainSnippet(draft.subject), body:draftBody, recipients:normalizeRecipients(draft.recipients), cc:toEmailList(draft.cc).join(', '), bcc:toEmailList(draft.bcc).join(', '), showCc:toEmailList(draft.cc).length>0, showBcc:toEmailList(draft.bcc).length>0, toDraft:'', ccDraft:'', bccDraft:'', blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
-      } else {
-        waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:normalizeRecipients(draft.recipients), sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+      // try/catch + toast: sebelumnya error di handler ini mati SENGAJA (nggak ada feedback),
+      // jadi user cuma ngeliat "button gak ada respons". Sekarang error-nya dimunculin.
+      try {
+        const id = b.getAttribute('data-id');
+        // String() biar aman kalau id-nya number vs string
+        const draft = blastState.drafts.find(d => String(d.id) === String(id));
+        if (!draft) { toast('Draft tidak ditemukan (id: ' + id + ')'); return; }
+        if (channel === 'email') {
+          const draftBody = normalizeDraftBody(draft.body || '');
+          const ccList = toEmailList(draft.cc);
+          const bccList = toEmailList(draft.bcc);
+          emailBlast.compose = { subject:plainSnippet(draft.subject), body:draftBody, recipients:normalizeRecipients(draft.recipients), cc:ccList.join(', '), bcc:bccList.join(', '), showCc:ccList.length>0, showBcc:bccList.length>0, toDraft:'', ccDraft:'', bccDraft:'', blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        } else {
+          waBlast.compose = { message:draft.message||'', media:draft.media||[], recipients:normalizeRecipients(draft.recipients), sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
+        }
+        blastState.activeTab = 'compose';
+        if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
+      } catch (err) {
+        console.error('[load-draft]', err);
+        toast('Gagal buka draft: ' + (err && err.message ? err.message : String(err)));
       }
-      blastState.activeTab = 'compose';
-      if (channel === 'email') renderEmailBlastView(); else renderWaBlastView();
     }));
     document.querySelectorAll(`[data-blast-action="delete-draft"][data-channel="${channel}"]`).forEach(b => b.addEventListener('click', () => {
       const id = b.getAttribute('data-id');
