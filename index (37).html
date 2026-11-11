@@ -7714,6 +7714,7 @@
     const orphans = [];
     root.querySelectorAll('.eb-image-preview, .eb-btn-wrap').forEach(node => {
       if (node.closest('.email-block')) return;  // sudah punya wrapper — tidak perlu
+      if (node.closest('[data-hf]')) return;     // logo header/footer brand -> jangan diedit
       orphans.push(node);
     });
     // <img> telanjang (draft lama, belum punya wrapper .email-block) -> jadikan blok gambar
@@ -7723,6 +7724,7 @@
     root.querySelectorAll('img').forEach(img => {
       if (img.closest('.email-block')) return;         // sudah ada wrapper-nya
       if (img.closest('.eb-image-preview')) return;    // ditangani di bawah
+      if (img.closest('[data-hf]')) return;            // logo header/footer brand -> jangan diedit
       looseImgs.push(img);
     });
     looseImgs.forEach(img => {
@@ -7854,6 +7856,7 @@
     //    (yang belum punya wrapper .email-block) HILANG PERMANEN begitu draft disimpan.
     Array.from(root.querySelectorAll('img')).forEach(img => {
       if (img.closest('.email-block')) return;
+      if (img.closest('[data-hf]')) return;   // logo header/footer brand -> jangan dihapus
       const src = (img.getAttribute('src') || '').slice(0, 120);
       if (!src) return;
       if (canonical[src]) img.remove();   // duplikat -> buang
@@ -11309,8 +11312,9 @@
             draft.subject = typed && typed !== plainSnippet(orig) ? subjEl.value : orig;
           }
           // Body draft sekarang hidup di DOM (canvas editable) — baca dari situ.
+          // Header/footer brand di-strip: dia auto-inject saat kirim, gak perlu disimpan.
           const liveBody = document.querySelector('[data-draft-body="' + id + '"]');
-          if (liveBody) draft.body = liveBody.innerHTML;
+          if (liveBody) draft.body = stripSavedHeaderFooter(liveBody.innerHTML);
           else if (bodyEl) draft.body = bodyEl.value;
         } else {
           const msgEl = document.querySelector('[data-draft-input="message"][data-draft-id="' + id + '"]');
@@ -11345,7 +11349,8 @@
         // Copy draft into current compose, then send
         if (channel === 'email') {
           emailBlast.compose.subject = plainSnippet(draft.subject);
-          emailBlast.compose.body = stripBlockMarkup(draft.body || '');
+          // Strip header/footer brand yg mungkin tersimpan di body -> gak jadi double footer
+          emailBlast.compose.body = stripSavedHeaderFooter(stripBlockMarkup(draft.body || ''));
           emailBlast.compose.blocks = draft.blocks || draft.attachments || [];
           emailBlast.compose.recipients = normalizeRecipients(draft.recipients);
         } else {
@@ -11483,7 +11488,9 @@
         const draft = blastState.drafts.find(d => String(d.id) === String(id));
         if (!draft) { toast('Draft tidak ditemukan (id: ' + id + ')'); return; }
         if (channel === 'email') {
-          const draftBody = normalizeDraftBody(draft.body || '');
+          // Header/footer brand auto-inject saat kirim -> jangan ikut tersimpan di body.
+          // Strip juga membersihkan draft lama yg footernya udah jadi "blok editable".
+          const draftBody = stripSavedHeaderFooter(normalizeDraftBody(draft.body || ''));
           const ccList = toEmailList(draft.cc);
           const bccList = toEmailList(draft.bcc);
           emailBlast.compose = { subject:plainSnippet(draft.subject), body:draftBody, recipients:normalizeRecipients(draft.recipients), cc:ccList.join(', '), bcc:bccList.join(', '), showCc:ccList.length>0, showBcc:bccList.length>0, toDraft:'', ccDraft:'', bccDraft:'', blocks:draft.blocks||draft.attachments||[], files:draft.files||[], sendMode:draft.sendMode||'now', scheduled_at:draft.scheduled_at||'' };
