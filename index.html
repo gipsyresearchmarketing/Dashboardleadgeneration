@@ -7966,6 +7966,20 @@
     }
     const isEmail = channel === 'email';
     const selected = blastState.history.find(h => h.id === blastState.selectedItemId);
+    // Muat statistik blast (open/click/reply) untuk email.
+    // PENTING: ini harus SEBELUM return — kalau setelah, kodenya jadi dead code
+    // dan loadEmailStats() gak pernah dipanggil (kotak Analisa blast kosong).
+    if (isEmail && selected && selected.id) {
+      var sid = selected.id;
+      if (emailStatsCache[sid]) {
+        setTimeout(function () {
+          var b = document.getElementById('email-stat-' + sid);
+          if (b) b.innerHTML = emailStatsInner(emailStatsCache[sid]);
+        }, 0);
+      } else {
+        loadEmailStats(sid);
+      }
+    }
     return '<div class="blast-master-detail" style="display:flex;gap:0;min-height:480px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)">' +
       '<div class="blast-list-col" style="width:320px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;max-height:600px">' +
         blastState.history.map(h => {
@@ -7992,18 +8006,6 @@
         renderHistoryDetail(selected, channel, isEmail) +
       '</div>' +
     '</div>';
-    // Muat statistik blast (open/click/reply) untuk email
-    if (isEmail && selected && selected.id) {
-      var sid = selected.id;
-      if (emailStatsCache[sid]) {
-        setTimeout(function () {
-          var b = document.getElementById('email-stat-' + sid);
-          if (b) b.innerHTML = emailStatsInner(emailStatsCache[sid]);
-        }, 0);
-      } else {
-        loadEmailStats(sid);
-      }
-    }
   }
 
   // Read-only detail panel for a HISTORY entry
