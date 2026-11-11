@@ -21,7 +21,7 @@
  *     terbuka bisa tercatat beberapa kali. Anggap sebagai indikasi.
  */
 const { authBrand } = require('./_lib/brand');
-const { svc, svcHeaders } = require('./_lib/wa');
+const { svc, svcHeaders } = require('./_lib/supabase');
 
 const PIXEL_1x1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',

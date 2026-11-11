@@ -8,7 +8,7 @@
  *               Default host smtp.gmail.com:465 -> pakai Gmail + App Password.
  * Opsional : REPLY_TO, SUPABASE_URL, SUPABASE_ANON_KEY
  */
-const { svc, svcHeaders } = require('./_lib/wa');
+const { svc, svcHeaders } = require('./_lib/supabase');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ugxrtiitmqrfrdpmcxka.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_JTxgxH__IgjcJhGkncaIkQ_erJNnZDG';

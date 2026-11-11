@@ -239,16 +239,9 @@ async function createMailer(mc) {
   return { send, verify, accessToken };
 }
 
-/** Konfigurasi WhatsApp brand (token terdekripsi), atau null kalau belum diatur. */
-async function getWaConfig(token, brandId) {
-  const cfg = await loadSettings(token, brandId);
-  if (!cfg || !cfg.wa_phone_number_id || !cfg.wa_token_enc) return null;
-  return { phoneId: cfg.wa_phone_number_id, token: decrypt(cfg.wa_token_enc), version: cfg.wa_api_version || process.env.WA_API_VERSION || 'v25.0', waba: cfg.wa_waba_id || null };
-}
-
 module.exports = {
   authBrand, verifyUser, isBrandMember, memberRole, encrypt, decrypt, sign, unsign,
-  loadSettings, saveSettings, loadBrandName, getMailConfig, createMailer, getWaConfig,
+  loadSettings, saveSettings, loadBrandName, getMailConfig, createMailer,
   googleClient, oauthRedirectUri, gmailAccessToken, GmailAuthError, GMAIL_SEND_SCOPE, GMAIL_READ_SCOPE,
   SUPABASE_URL, SUPABASE_KEY,
 };
