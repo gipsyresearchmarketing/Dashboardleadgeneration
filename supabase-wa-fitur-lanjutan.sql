@@ -66,15 +66,22 @@ CREATE TABLE IF NOT EXISTS brand_invites (
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 
--- Perbaiki kalau tabelnya sudah pernah dibuat dengan brand_id uuid
+-- Perbaiki kalau tabelnya sudah pernah dibuat dengan brand_id uuid.
+-- CATATAN: kolom brand_id dipakai di policy RLS -> Postgres TOLAK ALTER selama
+-- policy masih ada ("cannot alter type of a column used in a policy definition").
+-- Jadi policy harus DIBUANG DULU, baru ALTER. Policy-nya dibuat ulang di bawah.
 DO $$ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'brand_invites'
       AND column_name = 'brand_id' AND data_type = 'uuid'
   ) THEN
+    DROP POLICY IF EXISTS "brand_invites_read"   ON brand_invites;
+    DROP POLICY IF EXISTS "brand_invites_insert" ON brand_invites;
+    DROP POLICY IF EXISTS "brand_invites_update" ON brand_invites;
+    DROP POLICY IF EXISTS "brand_invites_delete" ON brand_invites;
     ALTER TABLE brand_invites ALTER COLUMN brand_id TYPE text USING brand_id::text;
-    RAISE NOTICE 'brand_invites.brand_id diubah uuid -> text';
+    RAISE NOTICE 'brand_invites.brand_id diubah uuid -> text (policy dibuat ulang di bawah)';
   END IF;
 END $$;
 
@@ -121,14 +128,16 @@ CREATE TABLE IF NOT EXISTS wa_quick_replies (
 );
 
 -- Perbaiki kalau tabelnya sudah pernah dibuat dengan brand_id uuid
+-- (policy harus dibuang dulu — Postgres tidak bisa ALTER kolom yang dipakai policy)
 DO $$ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'wa_quick_replies'
       AND column_name = 'brand_id' AND data_type = 'uuid'
   ) THEN
+    DROP POLICY IF EXISTS "wa_quick_replies_all" ON wa_quick_replies;
     ALTER TABLE wa_quick_replies ALTER COLUMN brand_id TYPE text USING brand_id::text;
-    RAISE NOTICE 'wa_quick_replies.brand_id diubah uuid -> text';
+    RAISE NOTICE 'wa_quick_replies.brand_id diubah uuid -> text (policy dibuat ulang di bawah)';
   END IF;
 END $$;
 
