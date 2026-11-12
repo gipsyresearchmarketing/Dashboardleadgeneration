@@ -49,16 +49,34 @@ GRANT EXECUTE ON FUNCTION public.is_brand_owner(text) TO authenticated, anon;
 
 -- =====================================================
 -- BAGIAN 2 — Tabel brand_invites (undang anggota tim)
+--
+-- PENTING: brand_id harus TEXT (bukan uuid)!
+-- Id brand di app dibuat dari uid('B') -> "B-XXXXXX" (TEKS),
+-- sama seperti brands.id dan brand_members.brand_id.
+-- Kalau brand_id dibuat uuid, INSERT '.'B-GIPSY' error:
+--   invalid input syntax for type uuid
 -- =====================================================
 CREATE TABLE IF NOT EXISTS brand_invites (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  brand_id     uuid NOT NULL,
+  brand_id     text NOT NULL,
   email        text NOT NULL,
   role         text NOT NULL DEFAULT 'member',
   invited_by   uuid,
   accepted_at  timestamptz,
   created_at   timestamptz NOT NULL DEFAULT now()
 );
+
+-- Perbaiki kalau tabelnya sudah pernah dibuat dengan brand_id uuid
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brand_invites'
+      AND column_name = 'brand_id' AND data_type = 'uuid'
+  ) THEN
+    ALTER TABLE brand_invites ALTER COLUMN brand_id TYPE text USING brand_id::text;
+    RAISE NOTICE 'brand_invites.brand_id diubah uuid -> text';
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS brand_invites_brand_idx ON brand_invites (brand_id);
 CREATE INDEX IF NOT EXISTS brand_invites_email_idx ON brand_invites (lower(email));
@@ -90,14 +108,29 @@ CREATE POLICY "brand_invites_delete" ON brand_invites FOR DELETE TO authenticate
 
 -- =====================================================
 -- BAGIAN 3 — Tabel wa_quick_replies (balasan cepat WhatsApp)
+-- CATATAN: fitur WA Blast sudah dihapus dari dashboard (2026-11-11).
+-- Tabel ini dibikin aja supaya tidak error; boleh di-drop kalau ga dipakai.
+-- brand_id TEXT, sama seperti brand_members.brand_id.
 -- =====================================================
 CREATE TABLE IF NOT EXISTS wa_quick_replies (
   id         text PRIMARY KEY,
-  brand_id   uuid NOT NULL,
+  brand_id   text NOT NULL,
   title      text NOT NULL,
   body       text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Perbaiki kalau tabelnya sudah pernah dibuat dengan brand_id uuid
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'wa_quick_replies'
+      AND column_name = 'brand_id' AND data_type = 'uuid'
+  ) THEN
+    ALTER TABLE wa_quick_replies ALTER COLUMN brand_id TYPE text USING brand_id::text;
+    RAISE NOTICE 'wa_quick_replies.brand_id diubah uuid -> text';
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS wa_quick_replies_brand_idx ON wa_quick_replies (brand_id, title);
 
