@@ -139,17 +139,20 @@ function getSender() {
   const replyTo = process.env.REPLY_TO || undefined;
   if (process.env.RESEND_API_KEY) {
     const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
-    return async (m) => {
-      const r = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to: [m.to], subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, reply_to: replyTo, attachments: (m.attachments || []).length ? m.attachments.map((a) => ({ filename: a.filename, content: a.content, content_type: a.contentType, ...(a.cid ? { content_id: a.cid } : {}) })) : undefined }),
-      });
-      if (!r.ok) {
-        let msg = `Resend HTTP ${r.status}`;
-        try { const j = await r.json(); msg = j.message || j.error || msg; } catch (e) {}
-        throw new Error(msg);
-      }
+    return {
+      send: async (m) => {
+        const r = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from, to: [m.to], subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, reply_to: replyTo, attachments: (m.attachments || []).length ? m.attachments.map((a) => ({ filename: a.filename, content: a.content, content_type: a.contentType, ...(a.cid ? { content_id: a.cid } : {}) })) : undefined }),
+        });
+        if (!r.ok) {
+          let msg = `Resend HTTP ${r.status}`;
+          try { const j = await r.json(); msg = j.message || j.error || msg; } catch (e) {}
+          throw new Error(msg);
+        }
+      },
+      close: async () => {},
     };
   }
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
@@ -160,13 +163,41 @@ function getSender() {
       port,
       secure: port === 465,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      // PENTING: pool = 1 koneksi SMTP yang DIPAKAI BERULANG.
+      // Tanpa pool, nodemailer bikin login SMTP BARU tiap email -> Gmail throttle
+      // dgn "421-4.3.0 Temporary System Problem" (limit koneksi/auth per detik).
+      pool: true,
+      maxConnections: 2,
+      maxMessages: 200,
     });
     const from = process.env.EMAIL_FROM || `"${process.env.EMAIL_FROM_NAME || 'Leads CRM'}" <${process.env.SMTP_USER}>`;
-    return async (m) => {
-      await transporter.sendMail({ from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo, attachments: (m.attachments || []).map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64', contentType: a.contentType, ...(a.cid ? { cid: a.cid, contentDisposition: 'inline' } : {}) })) });
+    return {
+      send: async (m) => {
+        await transporter.sendMail({ from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo, attachments: (m.attachments || []).map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64', contentType: a.contentType, ...(a.cid ? { cid: a.cid, contentDisposition: 'inline' } : {}) })) });
+      },
+      // Tutup pool biar serverless function bisa selesai (kalau pool dibiarin, socket ngeganggu).
+      close: async () => { try { transporter.close(); } catch (e) {} },
     };
   }
   return null;
+}
+
+/* ---------- Rate limit + retry SMTP (Gmail 421-4.3.0 "Temporary System Problem") ---------- */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Error sementara: 421/450/451/452/454 (throttle/busy), timeout, koneksi putus.
+const TRANSIENT_RE = /\b(421|450|451|452|454)\b|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EPIPE|socket hang up|Temporary System/i;
+const SEND_GAP_MS = 300;   // jeda minimal antar email
+const SEND_ATTEMPTS = 3;   // percobaan per email (1 + 2 retry)
+
+/** Jalankan fn untuk tiap item dengan batas konkurensi (Gmail SMTP dibatasi koneksinya). */
+async function runLimited(items, fn, limit = 2) {
+  const out = [];
+  for (let i = 0; i < items.length; i += limit) {
+    const slice = items.slice(i, i + limit);
+    const res = await Promise.all(slice.map((x) => fn(x)));
+    out.push(...res);
+  }
+  return out;
 }
 
 module.exports = async (req, res) => {
@@ -180,6 +211,7 @@ module.exports = async (req, res) => {
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = null; } }
   if (!body || typeof body !== 'object') return res.status(400).json({ error: 'Body tidak valid' });
 
+  let sender = null;
   try {
     const user = await verifyUser(token);
     if (!user) return res.status(401).json({ error: 'Session tidak valid, coba login ulang' });
@@ -201,8 +233,9 @@ module.exports = async (req, res) => {
     if (!recipients.length) return res.status(400).json({ error: 'Tidak ada penerima' });
     if (recipients.length > MAX_RECIPIENTS) return res.status(400).json({ error: `Maksimal ${MAX_RECIPIENTS} penerima per request` });
 
-    const send = getSender();
-    if (!send) return res.status(500).json({ error: 'Pengirim email belum dikonfigurasi di Vercel (isi RESEND_API_KEY, atau SMTP_USER + SMTP_PASS)' });
+    sender = getSender();
+    if (!sender) return res.status(500).json({ error: 'Pengirim email belum dikonfigurasi di Vercel (isi RESEND_API_KEY, atau SMTP_USER + SMTP_PASS)' });
+    const send = sender.send;
 
     const text = htmlToText(html);
     const cc = parseEmails(body.cc);
@@ -217,6 +250,32 @@ module.exports = async (req, res) => {
     /* Kirim 1 email ke 1 penerima + token tracking sendiri.
        Dipakai untuk: To, Cc, dan Bcc — masing-masing dapet salinan sendiri,
        jadi open/click bisa diatribusi per orang dan gak ada email dobel. */
+
+    // Throttle global: kalo Gmail balas error sementara (421-4.3.0), SEMUA pengiriman
+    // dijeda, bukan cuma email yg kena. Efektifnya jauh lebih baik daripada retry per-email.
+    let throttleUntil = 0;
+    let lastSendAt = 0;
+
+    async function sendWithRetry(m) {
+      for (let attempt = 1; ; attempt++) {
+        const now = Date.now();
+        if (now < throttleUntil) await sleep(throttleUntil - now);
+        const gap = SEND_GAP_MS - (Date.now() - lastSendAt);
+        if (gap > 0) await sleep(gap);
+        lastSendAt = Date.now();
+        try {
+          await send(m);
+          return;
+        } catch (e) {
+          const msg = String((e && e.message) || e);
+          if (attempt >= SEND_ATTEMPTS || !TRANSIENT_RE.test(msg)) throw e;
+          const backoff = 2000 * attempt;   // 2 detik, lalu 4 detik
+          throttleUntil = Date.now() + backoff;
+          console.warn(`[send-email] transient error (${msg.slice(0, 120)}) -> jeda ${backoff}ms, retry ${attempt}/${SEND_ATTEMPTS - 1}`);
+        }
+      }
+    }
+
     async function sendToOne(email, role, leadId) {
       let token = '';
       let mailHtml = html;
@@ -237,7 +296,7 @@ module.exports = async (req, res) => {
             links: links,
           });
         }
-        await send({ to: email, subject, html: mailHtml, text, attachments });
+        await sendWithRetry({ to: email, subject, html: mailHtml, text, attachments });
         if (token) await updateTrack(token, { delivered_at: new Date().toISOString() });
         return { email: email, role: role, ok: true };
       } catch (e) {
@@ -247,9 +306,9 @@ module.exports = async (req, res) => {
       }
     }
 
-    // 5 email paralel untuk penerima To
-    for (let i = 0; i < recipients.length; i += 5) {
-      const slice = recipients.slice(i, i + 5);
+    // 2 email paralel untuk penerima To (Gmail SMTP dibatasi; 5 paralel bikin 421-4.3.0)
+    for (let i = 0; i < recipients.length; i += 2) {
+      const slice = recipients.slice(i, i + 2);
       const out = await Promise.all(slice.map(async (r) => {
         const email = String((r && r.email) || '').trim();
         if (!EMAIL_RE.test(email)) return { lead_id: r && r.lead_id, email, ok: false, error: 'Email tidak valid' };
@@ -260,17 +319,17 @@ module.exports = async (req, res) => {
     }
     // Cc & Bcc: masing-masing dapet email sendiri (bukan header) -> bisa dilacak per orang
     if (cc.length) {
-      const out = await Promise.all(cc.map(async (em) => {
+      const out = await runLimited(cc, async (em) => {
         const res = await sendToOne(em, 'cc', null);
         return { email: res.email, ok: res.ok, error: res.error, role: res.role };
-      }));
+      });
       results.push(...out);
     }
     if (bcc.length) {
-      const out = await Promise.all(bcc.map(async (em) => {
+      const out = await runLimited(bcc, async (em) => {
         const res = await sendToOne(em, 'bcc', null);
         return { email: res.email, ok: res.ok, error: res.error, role: res.role };
-      }));
+      });
       results.push(...out);
     }
     // Flag tracking biar gampang dicek dari Network tab / log Vercel
@@ -286,5 +345,8 @@ module.exports = async (req, res) => {
   } catch (e) {
     console.error('[send-email]', e);
     return res.status(500).json({ error: String((e && e.message) || e).slice(0, 300) });
+  } finally {
+    // Tutup pool SMTP -> serverless function bisa selesai (kalau pool dibiarin, socket ngeganggu).
+    if (sender) { try { await sender.close(); } catch (e) {} }
   }
 };
