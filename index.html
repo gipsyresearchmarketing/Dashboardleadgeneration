@@ -1826,6 +1826,14 @@
 
       <!-- ========== View: Dashboard ========== -->
       <div class="view-container active" id="view-dashboard">
+        <section class="mb-4 flex items-center justify-between flex-wrap gap-2">
+          <div id="dash-period-note" class="text-sm text-gray-500"></div>
+          <label class="flex items-center gap-2 text-sm text-gray-500">Periode
+            <select id="dash-month-filter" class="input" style="font-size:12px;padding:6px 10px;width:auto">
+              <option value="">Semua waktu</option>
+            </select>
+          </label>
+        </section>
         <section class="mb-6">
           <div id="summary-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4"></div>
         </section>
@@ -2896,9 +2904,58 @@
   /* ================================================================
    * Renderers
    * ================================================================ */
+  /* ---------- Filter bulan di Dashboard ----------
+   * Tanggal lead = transaction_date (tgl transaksi) kalau ada, kalau tidak created_at.
+   * Need Follow-up Today & Open Tasks tetap realtime (tidak ikut filter). */
+  let dashMonth = '';
+  try { dashMonth = localStorage.getItem('leads-dashboard:dash-month') || ''; } catch (e) {}
+  function leadDashDate(l) { return (l && (l.transaction_date || l.created_at || l.last_contacted_at)) || null; }
+  function monthKeyOf(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function monthLabelOf(key) {
+    const p = String(key).split('-');
+    return new Date(+p[0], +p[1] - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  }
+  function dashLeads() {
+    if (!dashMonth) return state.leads;
+    return state.leads.filter(l => monthKeyOf(leadDashDate(l)) === dashMonth);
+  }
+  function renderDashMonthFilter() {
+    const sel = document.getElementById('dash-month-filter');
+    if (!sel) return;
+    const counts = {};
+    state.leads.forEach(l => { const k = monthKeyOf(leadDashDate(l)); if (k) counts[k] = (counts[k] || 0) + 1; });
+    if (dashMonth && !counts[dashMonth]) counts[dashMonth] = 0;
+    const keys = Object.keys(counts).sort().reverse();
+    sel.innerHTML = '<option value="">Semua waktu (' + state.leads.length.toLocaleString('id-ID') + ')</option>'
+      + keys.map(k => '<option value="' + k + '"' + (k === dashMonth ? ' selected' : '') + '>' + monthLabelOf(k) + ' (' + counts[k].toLocaleString('id-ID') + ')</option>').join('');
+    sel.value = dashMonth;
+    const note = document.getElementById('dash-period-note');
+    if (note) note.innerHTML = dashMonth
+      ? 'Menampilkan data <b>' + monthLabelOf(dashMonth) + '</b> · Follow-up hari ini & Open Tasks tetap realtime'
+      : 'Menampilkan <b>semua waktu</b>';
+    const rangeSel = document.getElementById('chart-range-filter');
+    if (rangeSel) { rangeSel.disabled = !!dashMonth; rangeSel.title = dashMonth ? 'Ikut periode bulan di atas' : ''; }
+  }
+  document.addEventListener('change', (e) => {
+    if (!e.target || e.target.id !== 'dash-month-filter') return;
+    dashMonth = e.target.value || '';
+    try { localStorage.setItem('leads-dashboard:dash-month', dashMonth); } catch (err) {}
+    renderSummary();
+    renderCharts();
+    renderFunnel();
+    renderRecentLeads();
+  });
+
   function renderSummary() {
-    const total = state.leads.length;
-    const won = state.leads.filter(l => l.status === 'Won/Sales');
+    renderDashMonthFilter();
+    const L = dashLeads();
+    const total = L.length;
+    const won = L.filter(l => l.status === 'Won/Sales');
     const wonCount = won.length;
     const wonValue = won.reduce((s, l) => s + (l.sales_value || 0), 0);
     const needFollow = state.leads.filter(l => {
@@ -2910,16 +2967,16 @@
     const conv = total > 0 ? (wonCount / total) * 100 : 0;
 
     // Pipeline Close Rate metrics (computed once, used by both Conversion Rate card and tooltip)
-    const activePipeline = state.leads.filter(l => l.status === 'In Negotiation' || l.status === 'Won/Sales').length;
+    const activePipeline = L.filter(l => l.status === 'In Negotiation' || l.status === 'Won/Sales').length;
     const pipelineRate = activePipeline > 0 ? (wonCount / activePipeline) * 100 : 0;
-    const stageCounts = LEAD_STATUSES.reduce((acc, s) => { acc[s] = state.leads.filter(l => l.status === s).length; return acc; }, {});
+    const stageCounts = LEAD_STATUSES.reduce((acc, s) => { acc[s] = L.filter(l => l.status === s).length; return acc; }, {});
     const wonNames = won.map(l => l.company || l.name).join(', ');
 
     const cards = [
       {
         label: 'Total Leads',
         value: total.toLocaleString('id-ID'),
-        hint: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline"><path d="M7 17l5-5 5 5"/><path d="M7 7l5 5 5-5"/></svg> All statuses combined',
+        hint: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline"><path d="M7 17l5-5 5 5"/><path d="M7 7l5 5 5-5"/></svg> ' + (dashMonth ? 'Lead ' + monthLabelOf(dashMonth) : 'All statuses combined'),
         icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
         tone: 'tone-default',
         iconTone: 'text-indigo-600',
@@ -3049,9 +3106,11 @@
       const days = parseInt(r, 10) || 7;
       const d = new Date(now); d.setDate(d.getDate() - days); return d;
     })();
-    for (const l of state.leads) {
-      // Filter by last_contacted_at (fallback to created/scheduled if needed)
-      const d = l.last_contacted_at ? new Date(l.last_contacted_at) : null;
+    for (const l of dashLeads()) {
+      // Filter by last_contacted_at (fallback to created/scheduled if needed).
+      // Kalau periode bulan dipilih di atas, range chart diabaikan (sudah difilter per bulan).
+      const d = (!dashMonth && l.last_contacted_at) ? new Date(l.last_contacted_at) : null;
+      if (dashMonth) { counts[l.status] = (counts[l.status] || 0) + 1; continue; }
       if (cutoff && d) {
         if (d < cutoff) continue;
       } else if (cutoff && !d) {
@@ -3169,7 +3228,7 @@
   function renderRecentLeads() {
     const el = document.getElementById('recent-leads');
     if (!el) return;
-    const recent = state.leads
+    const recent = dashLeads()
       .slice()
       .sort((a,b) => new Date(b.last_contacted_at) - new Date(a.last_contacted_at))
       .slice(0, 5);
