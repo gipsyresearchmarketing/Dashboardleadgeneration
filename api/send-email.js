@@ -192,7 +192,7 @@ const SEND_ATTEMPTS = 3;   // percobaan per email (1 + 2 retry)
 // SELALU sempat balikin hasil (sukses + gagal) alih-alih dibunuh jadi HTTP 504.
 // Kalau batasnya kepotong, penerima yang belum terkirim dilaporkan sebagai gagal
 // (bukan hilang gitu aja) -> client otomatis kirim ulang sisanya.
-const SEND_BUDGET_MS = Number(process.env.SEND_BUDGET_MS || 50000);
+const SEND_BUDGET_MS = Number(process.env.SEND_BUDGET_MS || 240000);
 
 /** Jalankan fn untuk tiap item dengan batas konkurensi (Gmail SMTP dibatasi koneksinya). */
 async function runLimited(items, fn, limit = 3) {
@@ -261,12 +261,15 @@ module.exports = async (req, res) => {
     let throttleUntil = 0;
     let lastSendAt = 0;
     const startedAt = Date.now();
+    // Diagnostik: dikirim balik ke client biar keliatan kenapa email lama/gagal.
+    const stats = { retried: 0, throttled: 0, budgetHit: 0 };
 
     async function sendWithRetry(m) {
       for (let attempt = 1; ; attempt++) {
         // Budget habis? Berhenti (jangan retry) -> dilaporkan sebagai gagal, biar user
         // bisa kirim ulang sisanya. Lebih baik daripada function dibunuh (HTTP 504).
         if (Date.now() - startedAt > SEND_BUDGET_MS) {
+          stats.budgetHit++;
           throw new Error('Waktu kirim habis (' + Math.round(SEND_BUDGET_MS / 1000) + ' detik) — kirim ulang penerima ini.');
         }
         const now = Date.now();
@@ -280,6 +283,8 @@ module.exports = async (req, res) => {
         } catch (e) {
           const msg = String((e && e.message) || e);
           if (attempt >= SEND_ATTEMPTS || !TRANSIENT_RE.test(msg)) throw e;
+          stats.retried++;
+          stats.throttled++;
           const backoff = 2000 * attempt;   // 2 detik, lalu 4 detik
           throttleUntil = Date.now() + backoff;
           console.warn(`[send-email] transient error (${msg.slice(0, 120)}) -> jeda ${backoff}ms, retry ${attempt}/${SEND_ATTEMPTS - 1}`);
@@ -353,6 +358,11 @@ module.exports = async (req, res) => {
       to_count: results.filter((r) => r.role === 'to').length,
       cc_count: results.filter((r) => r.role === 'cc').length,
       bcc_count: results.filter((r) => r.role === 'bcc').length,
+      // Diagnostik throttle (biar numpang di alert client)
+      elapsed_ms: Date.now() - startedAt,
+      retried: stats.retried,
+      throttled: stats.throttled,
+      budget_hit: stats.budgetHit,
     });
   } catch (e) {
     console.error('[send-email]', e);

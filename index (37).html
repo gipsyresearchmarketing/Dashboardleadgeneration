@@ -8478,48 +8478,73 @@
     if (payloadSize > 4000000) { alert('Total ukuran isi email + gambar + lampiran terlalu besar (' + (payloadSize / 1048576).toFixed(1) + ' MB, batas ~3 MB).\n\nKecilkan gambar atau kurangi lampiran.'); return null; }
     const cc = compose.cc || '', bcc = compose.bcc || '';
     const okIds = {}, failMap = {};
+    const diag = { elapsed: 0, retried: 0, throttled: 0, requests: 0 };
     // 1 BLAST = 1 REQUEST (sampai 200 penerima).
-    // Kalau sebagian gagal (mis. Gmail throttling / function keabisan budget waktu),
-    // sisanya otomatis dikirim ulang 1x lagi — jadi blast tetap lengkap.
     let pending = targets.slice(0, MAX_BLAST_RECIPIENTS);
     if (targets.length > MAX_BLAST_RECIPIENTS) skipped.push((targets.length - MAX_BLAST_RECIPIENTS) + ' penerima melebihi batas ' + MAX_BLAST_RECIPIENTS);
-    for (let round = 0; round < 2 && pending.length; round++) {
-      const stillFailed = [];
+
+    let firstReq = true;
+    // Kirim 1 blok penerima.
+    // - Server timeout (5xx) -> pecah jadi 2 bagian, kirim ulang (maks 2x split).
+    // - Sebagian recipient gagal (mis. budget habis / Gmail 421) -> kirim ulang sisanya 1x.
+    async function sendChunk(list, depth) {
+      if (!list.length) return;
+      diag.requests++;
+      const withCc = firstReq; firstReq = false;
       try {
         const resp = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ brand_id: window.currentBrand.id, blast_id: blastId || '', subject: compose.subject.trim(), html: html, recipients: pending, files: files, cc: round === 0 ? cc : '', bcc: round === 0 ? bcc : '' }),
+          body: JSON.stringify({ brand_id: window.currentBrand.id, blast_id: blastId || '', subject: compose.subject.trim(), html: html, recipients: list, files: files, cc: withCc ? cc : '', bcc: withCc ? bcc : '' }),
         });
         let data = null; try { data = await resp.json(); } catch (e) {}
         if (!resp.ok || !data || !Array.isArray(data.results)) {
           let why = (data && data.error) || ('HTTP ' + resp.status);
           if (resp.status === 404) why = 'Endpoint /api/send-email tidak ditemukan — pastikan folder api/ dan package.json ikut ke-deploy di Vercel';
-          throw new Error(why);
+          // Server timeout / mati -> pecah jadi 2, kirim ulang. Gagal total? pecah terus (maks 2x).
+          if (resp.status >= 500 && depth < 2 && list.length > 1) {
+            const mid = Math.ceil(list.length / 2);
+            await sendChunk(list.slice(0, mid), depth + 1);
+            await sendChunk(list.slice(mid), depth + 1);
+            return;
+          }
+          list.forEach(t => { failMap[t.email] = why; });
+          return;
         }
+        diag.elapsed = Math.max(diag.elapsed, data.elapsed_ms || 0);
+        diag.retried += data.retried || 0;
+        diag.throttled += data.throttled || 0;
+        const retryList = [];
         data.results.forEach(r => {
           if (r.ok) { okIds[r.lead_id] = 1; return; }
           failMap[r.email] = r.error || 'gagal';
-          const t = pending.find(x => String(x.email || '').trim().toLowerCase() === String(r.email || '').trim().toLowerCase());
-          if (t) stillFailed.push(t);
+          const t = list.find(x => String(x.email || '').trim().toLowerCase() === String(r.email || '').trim().toLowerCase());
+          if (t) retryList.push(t);
         });
+        if (retryList.length && depth === 0) {
+          toast('Sebagian gagal (' + retryList.length + ') — kirim ulang sisanya…');
+          await new Promise(res => setTimeout(res, 3000));
+          await sendChunk(retryList, 1);
+        }
       } catch (e) {
-        pending.forEach(t => { failMap[t.email] = e.message; });
-        stillFailed.push(...pending);
+        // Error jaringan (koneksi putus / DNS) -> pecah jadi 2 dan coba lagi
+        if (depth < 2 && list.length > 1) {
+          const mid = Math.ceil(list.length / 2);
+          await sendChunk(list.slice(0, mid), depth + 1);
+          await sendChunk(list.slice(mid), depth + 1);
+          return;
+        }
+        list.forEach(t => { failMap[t.email] = e.message; });
       }
-      if (stillFailed.length && round === 0) {
-        toast('Sebagian gagal (' + stillFailed.length + ') — kirim ulang sisanya…');
-        await new Promise(res => setTimeout(res, 3000));
-      }
-      pending = stillFailed;
     }
+    await sendChunk(pending, 0);
     const failed = Object.keys(failMap).map(email => ({ email: email, error: failMap[email] }));
     const okRecipients = targets.filter(t => okIds[t.lead_id]).map(t => ({ lead_id: t.lead_id }));
     if (!okRecipients.length) {
       alert('Email GAGAL terkirim.\n\n' + failed.slice(0, 5).map(f => '• ' + f.email + ' — ' + f.error).join('\n'));
       return null;
     }
-    return { okRecipients: okRecipients, failed: failed, skipped: skipped };
+    return { okRecipients: okRecipients, failed: failed, skipped: skipped, diag: diag };
   }
 
   /* ----- Overlay status kirim (mencegah klik Send dobel) ----- */
@@ -8714,7 +8739,9 @@
       toast((channel === 'email' ? '✉ ' : '💬 ') + chLabel + ' terkirim ke ' + totalN + ' penerima' + (nFail ? ' · ' + nFail + ' gagal' : ''));
       if (nFail) hideBlastOverlay();
       else showBlastOverlay('done', chLabel + ' terkirim!', detailTxt);
-      if (nFail) alert('Sebagian ' + (channel === 'email' ? 'email' : 'WhatsApp') + ' gagal terkirim (' + nFail + '):\n\n' + sendSummary.failed.slice(0, 8).map(f => '• ' + f.email + ' — ' + f.error).join('\n') + (nFail > 8 ? '\n…dan ' + (nFail - 8) + ' lainnya' : ''));
+      if (nFail) alert('Sebagian ' + (channel === 'email' ? 'email' : 'WhatsApp') + ' gagal terkirim (' + nFail + '):\n\n' + sendSummary.failed.slice(0, 8).map(f => '• ' + f.email + ' — ' + f.error).join('\n') + (nFail > 8 ? '\n…dan ' + (nFail - 8) + ' lainnya' : '')
+        + (sendSummary.diag ? '\n\n── Diagnostik ──\n' + 'Request: ' + sendSummary.diag.requests + ' · slowest ' + Math.round((sendSummary.diag.elapsed || 0) / 1000) + 's'
+          + ' · retry: ' + (sendSummary.diag.retried || 0) + ' · throttle(421): ' + (sendSummary.diag.throttled || 0) : ''));
     } else {
       toast(isScheduled ? `⏰ ${channel==='email'?'Email':'WA'} Blast dijadwalkan (belum ada pengirim otomatis — belum akan terkirim sendiri)` : `✉ ${channel==='email'?'Email':'WA'} Blast sent ke ${compose.recipients.length} recipient`);
     }
