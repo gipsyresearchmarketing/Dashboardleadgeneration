@@ -7294,6 +7294,22 @@
           });
         }
       }
+      // Draft lama belum punya tombol "Test link" + baris info link final -> tambahkan.
+      if (!blockEl.querySelector('[data-eb-testlink]')) {
+        const tb = document.createElement('button');
+        tb.type = 'button';
+        tb.setAttribute('data-eb-testlink', '1');
+        tb.setAttribute('title', 'Buka link di tab baru (buat ngetes link-nya)');
+        tb.setAttribute('style', 'font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600');
+        tb.textContent = '🔗 Test';
+        blockEl.querySelector('.eb-controls').appendChild(tb);
+      }
+      if (!blockEl.querySelector('.eb-href-hint')) {
+        const hint = document.createElement('div');
+        hint.className = 'eb-href-hint';
+        hint.setAttribute('style', 'width:100%;font-size:10.5px;color:#64748b;word-break:break-all');
+        blockEl.querySelector('.eb-controls').appendChild(hint);
+      }
       return;
     }
 
@@ -9157,7 +9173,8 @@
         const cmd = btn.getAttribute('data-editor-cmd');
         if (cmd === 'createLink') {
           const url = prompt('Enter URL:', 'https://');
-          if (url) document.execCommand('createLink', false, url);
+          // Normalisasi domain tanpa skema (mis. "wa.me/628...") -> https://
+          if (url) document.execCommand('createLink', false, safeLink(url));
         } else if (cmd === 'justifyLeft' || cmd === 'justifyCenter' || cmd === 'justifyRight') {
           document.execCommand(cmd, false, null);
         } else {
@@ -9405,6 +9422,29 @@
           applyBtnWidth(block);
           syncBody();
         });
+        // Buka link tombol di tab baru (buat ngetes link-nya, mis. wa.me/...)
+        // Preview tombol ada di dalam contenteditable -> klik biasa cuma placing caret,
+        // jadi perlu tombol eksplisit atau Cmd/Ctrl+Click.
+        bodyHost.addEventListener('click', (e) => {
+          const tl = e.target.closest && e.target.closest('[data-eb-testlink]');
+          if (!tl) return;
+          e.preventDefault(); e.stopPropagation();
+          const blk = tl.closest('.email-block');
+          const inp = blk && blk.querySelector('[data-eb-input="href"]');
+          const u = safeLink(inp ? String(inp.value || '').trim() : '');
+          if (!u || u === '#') { toast('Link belum valid'); return; }
+          try { window.open(u, '_blank', 'noopener'); } catch (err) { toast('Gagal buka link'); }
+        });
+        // Cmd/Ctrl + klik preview tombol -> buka link di tab baru
+        bodyHost.addEventListener('click', (e) => {
+          if (!(e.metaKey || e.ctrlKey)) return;
+          const a = e.target.closest && e.target.closest('a[data-eb-input="text"]');
+          if (!a) return;
+          const u = safeLink(a.getAttribute('href') || '');
+          if (!u || u === '#') return;
+          e.preventDefault(); e.stopPropagation();
+          try { window.open(u, '_blank', 'noopener'); } catch (err) {}
+        });
         // Tarik titik biru untuk ubah lebar gambar / tombol (simetris kiri-kanan)
         bodyHost.addEventListener('mousedown', (e) => {
           const h = e.target.closest && e.target.closest('[data-eb-handle]');
@@ -9568,6 +9608,22 @@
         const preview = block.querySelector('.eb-button-preview, a[data-eb-input="text"]');
         const text = textEl ? (textEl.textContent || textEl.innerText || textEl.value || '').trim() : '';
         const href = hrefEl ? hrefEl.value.trim() : '';
+        // Tampilkan link FINAL yg akan dipakai di email (mis. "wa.me/628..." -> "https://wa.me/628...")
+        // supaya user gak perluebak harus nulis https://.
+        let hintEl = block.querySelector('.eb-href-hint');
+        if (!hintEl) {
+          const ctrlsEl = block.querySelector('.eb-controls');
+          if (ctrlsEl) {
+            hintEl = document.createElement('div');
+            hintEl.className = 'eb-href-hint';
+            hintEl.setAttribute('style', 'width:100%;font-size:10.5px;color:#64748b;word-break:break-all');
+            ctrlsEl.appendChild(hintEl);
+          }
+        }
+        if (hintEl) {
+          const resolved = safeLink(href);
+          hintEl.textContent = (href && resolved !== '#') ? '→ ' + resolved : '';
+        }
         if (preview) {
           // PENTING: untuk blok tombol, "label" itu ADALAH elemen preview-nya
           // sendiri (contenteditable). Kalau kita menulis preview.textContent
@@ -9582,7 +9638,11 @@
           // Bungkus preview jadi link kalau ada href (supaya preview = hasil email penerima)
           if (href && preview.tagName !== 'A') {
             const a = document.createElement('a');
-            a.href = href;
+            // PENTING: pakai safeLink() + setAttribute, BUKAN a.href = ...
+            // "wa.me/628..." itu domain TANPA skema. Kalau ditulis lewat a.href = ...,
+            // browser nganggapnya URL RELATIF -> nunjuk ke domain dashboard sendiri
+            // (dashboardleadgeneration.vercel.app/wa.me/...) bukan ke WhatsApp.
+            a.setAttribute('href', safeLink(href));
             a.target = '_blank';
             a.style.cssText = 'display:block;text-align:center;background:#eef2ff;border:2px dashed #cbd5e1;border-radius:6px;padding:12px 28px;color:#4338ca;font-size:14px;font-weight:600;cursor:text;min-width:120px;text-decoration:none';
             a.textContent = text || 'Click here, type button label';
@@ -9602,7 +9662,7 @@
             }
             setupImageButtonLiveEditors();
           } else if (href && preview.tagName === 'A') {
-            preview.setAttribute('href', href);
+            preview.setAttribute('href', safeLink(href));
           }
         }
         applyBtnWidth(block);
@@ -9647,6 +9707,8 @@
           '<div class="eb-controls" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center">' +
             '<input data-eb-input="href" style="width:62%;font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px" placeholder="Button link URL (https://...)" />' +
             '<button type="button" data-eb-btnfull="1" style="font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600">↔ Full width</button>' +
+            '<button type="button" data-eb-testlink="1" title="Buka link di tab baru (buat ngetes link-nya)" style="font-size:11px;padding:4px 10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;border-radius:4px;cursor:pointer;font-weight:600">🔗 Test</button>' +
+            '<div class="eb-href-hint" style="width:100%;font-size:10.5px;color:#64748b;word-break:break-all"></div>' +
           '</div>' +
         '</div>';
       } else if (type === 'divider') {
