@@ -186,8 +186,13 @@ function getSender() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Error sementara: 421/450/451/452/454 (throttle/busy), timeout, koneksi putus.
 const TRANSIENT_RE = /\b(421|450|451|452|454)\b|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EPIPE|socket hang up|Temporary System/i;
-const SEND_GAP_MS = 300;   // jeda minimal antar email
+const SEND_GAP_MS = 200;   // jeda minimal antar email
 const SEND_ATTEMPTS = 3;   // percobaan per email (1 + 2 retry)
+// Batas waktu kerja function. WAJIB di bawah maxDuration Vercel, supaya function
+// SELALU sempat balikin hasil (sukses + gagal) alih-alih dibunuh jadi HTTP 504.
+// Kalau batasnya kepotong, penerima yang belum terkirim dilaporkan sebagai gagal
+// (bukan hilang gitu aja) -> tinggal dikirim ulang.
+const SEND_BUDGET_MS = Number(process.env.SEND_BUDGET_MS || 45000);
 
 /** Jalankan fn untuk tiap item dengan batas konkurensi (Gmail SMTP dibatasi koneksinya). */
 async function runLimited(items, fn, limit = 2) {
@@ -255,9 +260,15 @@ module.exports = async (req, res) => {
     // dijeda, bukan cuma email yg kena. Efektifnya jauh lebih baik daripada retry per-email.
     let throttleUntil = 0;
     let lastSendAt = 0;
+    const startedAt = Date.now();
 
     async function sendWithRetry(m) {
       for (let attempt = 1; ; attempt++) {
+        // Budget habis? Berhenti (jangan retry) -> dilaporkan sebagai gagal, biar user
+        // bisa kirim ulang sisanya. Lebih baik daripada function dibunuh (HTTP 504).
+        if (Date.now() - startedAt > SEND_BUDGET_MS) {
+          throw new Error('Waktu kirim habis (' + Math.round(SEND_BUDGET_MS / 1000) + ' detik) — kirim ulang penerima ini.');
+        }
         const now = Date.now();
         if (now < throttleUntil) await sleep(throttleUntil - now);
         const gap = SEND_GAP_MS - (Date.now() - lastSendAt);

@@ -8475,8 +8475,10 @@
     if (payloadSize > 4000000) { alert('Total ukuran isi email + gambar + lampiran terlalu besar (' + (payloadSize / 1048576).toFixed(1) + ' MB, batas ~3 MB).\n\nKecilkan gambar atau kurangi lampiran.'); return null; }
     const cc = compose.cc || '', bcc = compose.bcc || '';
     const okIds = {}, failed = [];
-    for (let i = 0; i < targets.length; i += 25) {
-      const batch = targets.slice(i, i + 25);
+    // Batch 20 penerima per request: each request punya headroom cukup buat retry
+    // tanpa kena batas waktu function (HTTP 504). 200 penerima = 10 request.
+    for (let i = 0; i < targets.length; i += 20) {
+      const batch = targets.slice(i, i + 20);
       try {
         const resp = await fetch('/api/send-email', {
           method: 'POST',
