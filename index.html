@@ -9569,7 +9569,16 @@
         const text = textEl ? (textEl.textContent || textEl.innerText || textEl.value || '').trim() : '';
         const href = hrefEl ? hrefEl.value.trim() : '';
         if (preview) {
-          preview.textContent = text || 'Click here, type button label';
+          // PENTING: untuk blok tombol, "label" itu ADALAH elemen preview-nya
+          // sendiri (contenteditable). Kalau kita menulis preview.textContent
+          // saat user sedang mengetik di dalamnya, text node-nya DIGANTI ->
+          // caret meloncat ke awal -> ketikan berikutnya masuk di depan ->
+          // TEKS KEBALIK (mis. "sSESelengka" -> "akgneleSESs").
+          // Jadi: kalau preview === textEl, jangan sentuh isinya sama sekali.
+          const sameAsText = (preview === textEl);
+          if (!sameAsText) {
+            preview.textContent = text || 'Click here, type button label';
+          }
           // Bungkus preview jadi link kalau ada href (supaya preview = hasil email penerima)
           if (href && preview.tagName !== 'A') {
             const a = document.createElement('a');
