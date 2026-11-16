@@ -8429,6 +8429,9 @@
   /** Return { okRecipients, failed[], skipped[] } atau null kalau dibatalkan / gagal total. */
 
 
+  // Batas penerima per blast (1 request = 1 blast). Dipasukan sama dgn MAX_RECIPIENTS di api/send-email.js.
+  const MAX_BLAST_RECIPIENTS = 200;
+
   async function sendEmailsViaApi(compose, blastId) {
     const leads = appLeads();
     const targets = [], skipped = [], seen = {};
@@ -8474,16 +8477,19 @@
     const payloadSize = html.length + files.reduce((n, f) => n + f.data.length, 0);
     if (payloadSize > 4000000) { alert('Total ukuran isi email + gambar + lampiran terlalu besar (' + (payloadSize / 1048576).toFixed(1) + ' MB, batas ~3 MB).\n\nKecilkan gambar atau kurangi lampiran.'); return null; }
     const cc = compose.cc || '', bcc = compose.bcc || '';
-    const okIds = {}, failed = [];
-    // Batch 20 penerima per request: each request punya headroom cukup buat retry
-    // tanpa kena batas waktu function (HTTP 504). 200 penerima = 10 request.
-    for (let i = 0; i < targets.length; i += 20) {
-      const batch = targets.slice(i, i + 20);
+    const okIds = {}, failMap = {};
+    // 1 BLAST = 1 REQUEST (sampai 200 penerima).
+    // Kalau sebagian gagal (mis. Gmail throttling / function keabisan budget waktu),
+    // sisanya otomatis dikirim ulang 1x lagi — jadi blast tetap lengkap.
+    let pending = targets.slice(0, MAX_BLAST_RECIPIENTS);
+    if (targets.length > MAX_BLAST_RECIPIENTS) skipped.push((targets.length - MAX_BLAST_RECIPIENTS) + ' penerima melebihi batas ' + MAX_BLAST_RECIPIENTS);
+    for (let round = 0; round < 2 && pending.length; round++) {
+      const stillFailed = [];
       try {
         const resp = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ brand_id: window.currentBrand.id, blast_id: blastId || '', subject: compose.subject.trim(), html: html, recipients: batch, files: files, cc: i === 0 ? cc : '', bcc: i === 0 ? bcc : '' }),
+          body: JSON.stringify({ brand_id: window.currentBrand.id, blast_id: blastId || '', subject: compose.subject.trim(), html: html, recipients: pending, files: files, cc: round === 0 ? cc : '', bcc: round === 0 ? bcc : '' }),
         });
         let data = null; try { data = await resp.json(); } catch (e) {}
         if (!resp.ok || !data || !Array.isArray(data.results)) {
@@ -8491,11 +8497,23 @@
           if (resp.status === 404) why = 'Endpoint /api/send-email tidak ditemukan — pastikan folder api/ dan package.json ikut ke-deploy di Vercel';
           throw new Error(why);
         }
-        data.results.forEach(r => { if (r.ok) okIds[r.lead_id] = 1; else failed.push({ email: r.email, error: r.error || 'gagal' }); });
+        data.results.forEach(r => {
+          if (r.ok) { okIds[r.lead_id] = 1; return; }
+          failMap[r.email] = r.error || 'gagal';
+          const t = pending.find(x => String(x.email || '').trim().toLowerCase() === String(r.email || '').trim().toLowerCase());
+          if (t) stillFailed.push(t);
+        });
       } catch (e) {
-        batch.forEach(t => failed.push({ email: t.email, error: e.message }));
+        pending.forEach(t => { failMap[t.email] = e.message; });
+        stillFailed.push(...pending);
       }
+      if (stillFailed.length && round === 0) {
+        toast('Sebagian gagal (' + stillFailed.length + ') — kirim ulang sisanya…');
+        await new Promise(res => setTimeout(res, 3000));
+      }
+      pending = stillFailed;
     }
+    const failed = Object.keys(failMap).map(email => ({ email: email, error: failMap[email] }));
     const okRecipients = targets.filter(t => okIds[t.lead_id]).map(t => ({ lead_id: t.lead_id }));
     if (!okRecipients.length) {
       alert('Email GAGAL terkirim.\n\n' + failed.slice(0, 5).map(f => '• ' + f.email + ' — ' + f.error).join('\n'));

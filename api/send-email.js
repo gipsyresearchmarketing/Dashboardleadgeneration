@@ -12,7 +12,7 @@ const { svc, svcHeaders } = require('./_lib/supabase');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ugxrtiitmqrfrdpmcxka.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_JTxgxH__IgjcJhGkncaIkQ_erJNnZDG';
-const MAX_RECIPIENTS = 100;
+const MAX_RECIPIENTS = 200;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function htmlToText(html) {
@@ -167,7 +167,7 @@ function getSender() {
       // Tanpa pool, nodemailer bikin login SMTP BARU tiap email -> Gmail throttle
       // dgn "421-4.3.0 Temporary System Problem" (limit koneksi/auth per detik).
       pool: true,
-      maxConnections: 2,
+      maxConnections: 3,
       maxMessages: 200,
     });
     const from = process.env.EMAIL_FROM || `"${process.env.EMAIL_FROM_NAME || 'Leads CRM'}" <${process.env.SMTP_USER}>`;
@@ -186,16 +186,16 @@ function getSender() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Error sementara: 421/450/451/452/454 (throttle/busy), timeout, koneksi putus.
 const TRANSIENT_RE = /\b(421|450|451|452|454)\b|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EPIPE|socket hang up|Temporary System/i;
-const SEND_GAP_MS = 200;   // jeda minimal antar email
+const SEND_GAP_MS = 120;   // jeda minimal antar email
 const SEND_ATTEMPTS = 3;   // percobaan per email (1 + 2 retry)
 // Batas waktu kerja function. WAJIB di bawah maxDuration Vercel, supaya function
 // SELALU sempat balikin hasil (sukses + gagal) alih-alih dibunuh jadi HTTP 504.
 // Kalau batasnya kepotong, penerima yang belum terkirim dilaporkan sebagai gagal
-// (bukan hilang gitu aja) -> tinggal dikirim ulang.
-const SEND_BUDGET_MS = Number(process.env.SEND_BUDGET_MS || 45000);
+// (bukan hilang gitu aja) -> client otomatis kirim ulang sisanya.
+const SEND_BUDGET_MS = Number(process.env.SEND_BUDGET_MS || 50000);
 
 /** Jalankan fn untuk tiap item dengan batas konkurensi (Gmail SMTP dibatasi koneksinya). */
-async function runLimited(items, fn, limit = 2) {
+async function runLimited(items, fn, limit = 3) {
   const out = [];
   for (let i = 0; i < items.length; i += limit) {
     const slice = items.slice(i, i + limit);
@@ -317,9 +317,10 @@ module.exports = async (req, res) => {
       }
     }
 
-    // 2 email paralel untuk penerima To (Gmail SMTP dibatasi; 5 paralel bikin 421-4.3.0)
-    for (let i = 0; i < recipients.length; i += 2) {
-      const slice = recipients.slice(i, i + 2);
+    // 3 email paralel untuk penerima To (Gmail SMTP dibatasi; 5 paralel bikin 421-4.3.0).
+    // 200 penerima = 1 request, ~30 detik, aman di bawah budget 50 detik.
+    for (let i = 0; i < recipients.length; i += 3) {
+      const slice = recipients.slice(i, i + 3);
       const out = await Promise.all(slice.map(async (r) => {
         const email = String((r && r.email) || '').trim();
         if (!EMAIL_RE.test(email)) return { lead_id: r && r.lead_id, email, ok: false, error: 'Email tidak valid' };
