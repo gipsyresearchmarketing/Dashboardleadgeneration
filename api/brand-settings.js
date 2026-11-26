@@ -11,6 +11,7 @@
  *   verify -> { what: "email" | "both" } cek koneksi dengan kredensial yang tersimpan
  */
 const { authBrand, encrypt, loadSettings, saveSettings, getMailConfig, createMailer, GMAIL_READ_SCOPE } = require('./_lib/brand');
+const { svc } = require('./_lib/supabase');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -62,7 +63,18 @@ module.exports = async (req, res) => {
     const action = String(body.action || 'get');
 
     if (action === 'get') {
-      return res.status(200).json(publicView(await loadSettings(a.token, a.brandId)));
+      let cfg = await loadSettings(a.token, a.brandId);
+      // Member (bukan owner) sering gak bisa baca baris brand_settings karena RLS cuma
+      // ngizinin owner (baris itu juga nyimpen token terenkripsi). Akibatnya header/footer
+      // email kosong di akun member. Membership sudah dicek authBrand di atas, dan
+      // publicView() tidak pernah mengirim token/password -> aman dibaca pakai kunci server.
+      if (!cfg) {
+        try {
+          const r = await svc(`brand_settings?select=*&brand_id=eq.${encodeURIComponent(a.brandId)}`);
+          if (r.ok && Array.isArray(r.data) && r.data[0]) cfg = r.data[0];
+        } catch (e) { console.warn('[brand-settings] fallback svc gagal:', e.message); }
+      }
+      return res.status(200).json(publicView(cfg));
     }
 
     if (action === 'save') {
