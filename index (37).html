@@ -9981,6 +9981,11 @@
           emailBlast.compose.body = stripSavedHeaderFooter(stripBlockMarkup(draft.body || ''));
           emailBlast.compose.blocks = draft.blocks || draft.attachments || [];
           emailBlast.compose.recipients = normalizeRecipients(draft.recipients);
+          // Lampiran, Cc & Bcc HARUS dari draft ini juga. Dulu gak disalin -> lampiran draft
+          // gak ikut terkirim, atau malah kebawa lampiran/Cc/Bcc yg lagi ada di Compose.
+          emailBlast.compose.files = Array.isArray(draft.files) ? draft.files.slice() : [];
+          emailBlast.compose.cc = toEmailList(draft.cc).join(', ');
+          emailBlast.compose.bcc = toEmailList(draft.bcc).join(', ');
         }
         sendBlast(channel);
       });
@@ -10042,7 +10047,7 @@
           const dataUrl = reader.result;
           const isImage = (f.type || '').startsWith('image/');
           if (channel === 'email') {
-            blastState.compose.files.push({
+            (blastState.compose.files || (blastState.compose.files = [])).push({
               name: f.name,
               size: f.size,
               type: f.type || '',
@@ -10071,8 +10076,9 @@
     // attachment remove
     document.querySelectorAll(`[data-blast-action="remove-att"][data-channel="${channel}"]`).forEach(btn => btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-idx'));
-      const list = channel === 'email' ? blastState.compose.attachments : blastState.compose.media;
-      list.splice(idx, 1);
+      // Lampiran email disimpan di compose.files (dulu salah nunjuk ke compose.attachments -> error, gak kehapus)
+      const list = blastState.compose.files || (blastState.compose.files = []);
+      if (idx >= 0 && idx < list.length) list.splice(idx, 1);
       renderEmailBlastView();
     }));
     // clear
