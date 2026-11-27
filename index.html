@@ -7090,12 +7090,13 @@
             '<div class="ech-to-input" data-ech-field="to">' +
               // Show existing recipients as removable chips
               compose.recipients.map(r => {
-                const lead = state.leads.find(l => l.id === r.lead_id);
+                const lead = r.lead_id ? state.leads.find(l => l.id === r.lead_id) : null;
                 const rid = (r && (r.lead_id || r.id)) || '';
-                const label = lead ? (lead.name || lead.email || rid) : (rid || '(lead tidak ditemukan)');
-                return '<span class="ech-chip" data-chip-id="' + escapeHTML(rid) + '">' +
+                const label = lead ? (lead.name || lead.email || rid)
+                  : (r.email ? r.email : (rid || '(lead tidak ditemukan)'));
+                return '<span class="ech-chip" data-chip-id="' + escapeHTML(recipientKey(r)) + '"' + (r.email && !r.lead_id ? ' title="Alamat manual — tidak disimpan ke Contacts/Companies"' : '') + '>' +
                   escapeHTML(label) +
-                  '<button type="button" class="ech-chip-x" data-ech-remove="' + escapeHTML(r.lead_id) + '" title="Remove">×</button>' +
+                  '<button type="button" class="ech-chip-x" data-ech-remove="' + escapeHTML(recipientKey(r)) + '" title="Remove">×</button>' +
                 '</span>';
               }).join('') +
               // Free-text input for adding more recipients (type then comma/enter)
@@ -7276,11 +7277,21 @@
       const rid = o.lead_id || o.id || o.leadId || '';
       if (rid) { out.push({ lead_id: rid }); return; }
       if (o.email) {
-        const hit = state.leads.find(l => (l.email || '').toLowerCase() === String(o.email).toLowerCase());
+        const em = String(o.email).trim();
+        const hit = state.leads.find(l => (l.email || '').toLowerCase() === em.toLowerCase());
+        // Alamat yang diketik manual (bukan lead) tetap disimpan sebagai {email} -> tercatat di Sent.
         if (hit) out.push({ lead_id: hit.id });
+        else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) out.push({ email: em });
       }
     });
     return out;
+  }
+
+  /** Kunci unik 1 penerima: lead_id, atau "e:<email>" untuk alamat manual (bukan lead). */
+  function recipientKey(r) {
+    if (!r) return '';
+    if (r.lead_id) return String(r.lead_id);
+    return r.email ? 'e:' + String(r.email).trim().toLowerCase() : '';
   }
 
   /* Blok gambar/button dari draft lama bisa kehilangan .eb-controls (editor upload/URL/lebar).
@@ -8495,12 +8506,13 @@
     const leads = appLeads();
     const targets = [], skipped = [], seen = {};
     compose.recipients.forEach(r => {
-      const lead = leads.find(l => l.id === r.lead_id);
-      const em = lead ? String(lead.email || '').trim() : '';
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { skipped.push(lead ? lead.name : r.lead_id); return; }
+      const lead = r.lead_id ? leads.find(l => l.id === r.lead_id) : null;
+      // Alamat manual (bukan lead): kirim ke r.email, lead_id null.
+      const em = lead ? String(lead.email || '').trim() : String(r.email || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { skipped.push(lead ? lead.name : (r.email || r.lead_id)); return; }
       if (seen[em.toLowerCase()]) return;
       seen[em.toLowerCase()] = 1;
-      targets.push({ lead_id: lead.id, email: em, name: lead.name || '' });
+      targets.push({ lead_id: lead ? lead.id : null, email: em, name: lead ? (lead.name || '') : '' });
     });
     if (!targets.length) { toast('Tidak ada recipient dengan email yang valid'); return null; }
     if (!window.currentBrand) { toast('Brand belum ke-load, coba refresh'); return null; }
@@ -8575,7 +8587,7 @@
         diag.throttled += data.throttled || 0;
         const retryList = [];
         data.results.forEach(r => {
-          if (r.ok) { okIds[r.lead_id] = 1; return; }
+          if (r.ok) { okIds[r.lead_id ? String(r.lead_id) : 'e:' + String(r.email || '').trim().toLowerCase()] = 1; return; }
           failMap[r.email] = r.error || 'gagal';
           const t = list.find(x => String(x.email || '').trim().toLowerCase() === String(r.email || '').trim().toLowerCase());
           if (t) retryList.push(t);
@@ -8598,7 +8610,8 @@
     }
     await sendChunk(pending, 0);
     const failed = Object.keys(failMap).map(email => ({ email: email, error: failMap[email] }));
-    const okRecipients = targets.filter(t => okIds[t.lead_id]).map(t => ({ lead_id: t.lead_id }));
+    const okRecipients = targets.filter(t => okIds[t.lead_id ? String(t.lead_id) : 'e:' + t.email.toLowerCase()])
+      .map(t => t.lead_id ? { lead_id: t.lead_id } : { email: t.email });
     if (!okRecipients.length) {
       alert('Email GAGAL terkirim.\n\n' + failed.slice(0, 5).map(f => '• ' + f.email + ' — ' + f.error).join('\n'));
       return null;
@@ -8745,7 +8758,7 @@
       subject: compose.subject || null,
       body: compose.body || null,
       message: compose.message || null,
-      recipients: sentRecipients.map(r => ({ lead_id: r.lead_id })),
+      recipients: sentRecipients.map(r => r.lead_id ? { lead_id: r.lead_id } : { email: r.email }),
       cc: channel === 'email' ? (compose.cc || '').split(',').map(s => s.trim()).filter(Boolean) : null,
       bcc: channel === 'email' ? (compose.bcc || '').split(',').map(s => s.trim()).filter(Boolean) : null,
       attachments: compose.blocks || [],
@@ -8911,7 +8924,7 @@
       btn.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();
         const id = btn.getAttribute('data-ech-remove');
-        blastState.compose.recipients = blastState.compose.recipients.filter(r => r.lead_id !== id);
+        blastState.compose.recipients = blastState.compose.recipients.filter(r => recipientKey(r) !== id);
         renderEmailBlastView();
       });
     });
@@ -8926,31 +8939,17 @@
           e.preventDefault();
           const raw = addInput.value.trim().replace(/,$/, '').trim();
           if (!raw) return;
-          // Try to find existing lead by email, then name; otherwise create a new lead
-          let lead = state.leads.find(l => (l.email && l.email.toLowerCase() === raw.toLowerCase()) ||
-                                            l.name.toLowerCase() === raw.toLowerCase());
-          if (!lead) {
-            const newId = uid('L');
-            const isEmailLike = /@/.test(raw);
-            lead = {
-              id: newId,
-              type: isEmailLike ? 'company' : 'person',
-              name: raw,
-              company: '',
-              email: isEmailLike ? raw : '',
-              phone: '',
-              status: 'New Lead',
-              sales_value: 0,
-              notes: 'Added via Email Blast composer',
-              last_contacted_at: new Date().toISOString(),
-              tags: [],
-              created_at: new Date().toISOString(),
-            };
-            state.leads = [lead, ...state.leads];
-            saveLeads(state.leads);
-          }
-          if (!blastState.compose.recipients.find(r => r.lead_id === lead.id)) {
-            blastState.compose.recipients.push({ lead_id: lead.id });
+          // Cari lead yang sudah ada (by email / nama). Kalau gak ketemu dan formatnya email,
+          // pakai sebagai alamat MANUAL: gak disimpan ke Contacts/Companies, tapi tetap
+          // tercatat di riwayat Sent & Analisa blast.
+          const lead = state.leads.find(l => (l.email && l.email.toLowerCase() === raw.toLowerCase()) ||
+                                            (l.name || '').toLowerCase() === raw.toLowerCase());
+          let rec = null;
+          if (lead) rec = { lead_id: lead.id };
+          else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) rec = { email: raw };
+          else { toast('"' + raw + '" bukan alamat email & gak ada di contact'); return; }
+          if (!blastState.compose.recipients.find(r => recipientKey(r) === recipientKey(rec))) {
+            blastState.compose.recipients.push(rec);
           }
           addInput.value = '';
           blastState.compose.toDraft = '';
@@ -9109,8 +9108,11 @@
       const filterType = channel === 'email' ? 'company' : 'person';
       const all = state.leads.filter(l => l.type === filterType);
       const filtered = blastState.recipientsFilter === 'all' ? all : all.filter(c => c.status === blastState.recipientsFilter);
-      const allSelected = blastState.compose.recipients.length === filtered.length && filtered.length > 0;
-      blastState.compose.recipients = allSelected ? [] : filtered.map(c => ({ lead_id: c.id }));
+      // Alamat manual (bukan lead) tetap dipertahankan saat select/unselect all.
+      const manual = blastState.compose.recipients.filter(r => !r.lead_id && r.email);
+      const leadCount = blastState.compose.recipients.length - manual.length;
+      const allSelected = leadCount === filtered.length && filtered.length > 0;
+      blastState.compose.recipients = manual.concat(allSelected ? [] : filtered.map(c => ({ lead_id: c.id })));
       renderEmailBlastView();
     });
     // pick recipients
