@@ -135,16 +135,33 @@ async function isBrandMember(token, brandId, userId) {
 }
 
 /** Return async function send(msg) sesuai provider yang dikonfigurasi, atau null kalau belum diset. */
+/** Ambil alamat email polos dari "Nama <a@b.com>" atau "a@b.com". */
+function bareEmail(v) {
+  const s = String(v || '');
+  const m = s.match(/<([^>]+)>/);
+  const e = (m ? m[1] : s).trim();
+  return EMAIL_RE.test(e) ? e : '';
+}
+
+/** Header List-Unsubscribe: Gmail menampilkan tombol "Berhenti berlangganan" di atas email,
+ *  jadi penerima yang gak tertarik gak perlu klik "Laporkan spam" (yang nurunin reputasi pengirim).
+ *  Klik -> Gmail penerima kirim email "unsubscribe" ke alamat ini. */
+function unsubHeaders(addr) {
+  const a = bareEmail(addr);
+  return a ? { 'List-Unsubscribe': `<mailto:${a}?subject=unsubscribe>` } : {};
+}
+
 function getSender() {
   const replyTo = process.env.REPLY_TO || undefined;
   if (process.env.RESEND_API_KEY) {
     const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+    const extraHeaders = unsubHeaders(replyTo || from);
     return {
       send: async (m) => {
         const r = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from, to: [m.to], subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, reply_to: replyTo, attachments: (m.attachments || []).length ? m.attachments.map((a) => ({ filename: a.filename, content: a.content, content_type: a.contentType, ...(a.cid ? { content_id: a.cid } : {}) })) : undefined }),
+          body: JSON.stringify({ from, to: [m.to], subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, reply_to: replyTo, headers: extraHeaders, attachments: (m.attachments || []).length ? m.attachments.map((a) => ({ filename: a.filename, content: a.content, content_type: a.contentType, ...(a.cid ? { content_id: a.cid } : {}) })) : undefined }),
         });
         if (!r.ok) {
           let msg = `Resend HTTP ${r.status}`;
@@ -171,9 +188,10 @@ function getSender() {
       maxMessages: 200,
     });
     const from = process.env.EMAIL_FROM || `"${process.env.EMAIL_FROM_NAME || 'Leads CRM'}" <${process.env.SMTP_USER}>`;
+    const extraHeaders = unsubHeaders(replyTo || process.env.SMTP_USER);
     return {
       send: async (m) => {
-        await transporter.sendMail({ from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo, attachments: (m.attachments || []).map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64', contentType: a.contentType, ...(a.cid ? { cid: a.cid, contentDisposition: 'inline' } : {}) })) });
+        await transporter.sendMail({ from, to: m.to, subject: m.subject, html: m.html, text: m.text, cc: m.cc, bcc: m.bcc, replyTo, headers: extraHeaders, attachments: (m.attachments || []).map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64', contentType: a.contentType, ...(a.cid ? { cid: a.cid, contentDisposition: 'inline' } : {}) })) });
       },
       // Tutup pool biar serverless function bisa selesai (kalau pool dibiarin, socket ngeganggu).
       close: async () => { try { transporter.close(); } catch (e) {} },
